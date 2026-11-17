@@ -24,7 +24,7 @@ public extension StatusSnapshot {
         idle && server.type == .windows && remote(server.key).isReachable
     }
 
-    /// Tailscale 켜기·끄기 (사이드바 행·망 화면·메뉴바 Network 메뉴): 이 Mac 에 Tailscale 이 있고 다른 관리자 작업이 없을 때.
+    /// Tailscale 켜기·끄기 (사이드바 행·망 화면·메뉴 막대의 네트워크 메뉴): 이 Mac 에 Tailscale 이 있고 다른 관리자 작업이 없을 때.
     /// 확인 전(unknown)은 막지 않는다
     func canToggleTailscale(idle: Bool) -> Bool {
         idle && tailscale != .missing

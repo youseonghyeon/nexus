@@ -34,6 +34,11 @@ public struct MenuBarSwitch: Sendable, Equatable {
         kind == .tailscale && isOn
     }
 
+    /// 메뉴 막대(네트워크 메뉴)의 항목 글자: "Wi-Fi 끄기" · "Intranet 켜기". 끄기 전에 확인·인증 창이 따르는 망은 말줄임표 (Wi-Fi 는 바로 꺼진다)
+    public func menuTitle(name: String) -> String {
+        "\(name) \(isOn ? "끄기" : "켜기")" + (isOn && kind != .wifi ? "…" : "")
+    }
+
     // MARK: 망별
 
     /// powerOn 이 nil 이면 Wi-Fi 인터페이스가 없다

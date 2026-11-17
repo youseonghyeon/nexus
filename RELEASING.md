@@ -7,7 +7,7 @@
 - **Developer ID Application 인증서**가 로그인 키체인에 있어야 합니다 (`make dist` 가 찾아 씁니다).
 - **공증 자격 증명**: `xcrun notarytool store-credentials nexus --apple-id <이메일> --team-id <팀 ID>`
 - **업데이트 서명 키**: `app/.build/artifacts/sparkle/Sparkle/bin/generate_keys` — 개인 키는 로그인 키체인에 저장되고, 출력된 공개 키가 `app/Info.plist` 의 `SUPublicEDKey` 입니다.
-  이 키를 잃으면 이미 설치된 앱이 새 버전을 받지 못합니다. `generate_keys -x <파일>` 로 내보내 안전한 곳에 보관합니다.
+  `generate_keys -x <파일>` 로 내보내 안전한 곳에 보관합니다. 이 키만 잃었다면 같은 Developer ID 로 서명한 릴리스에서 새 키로 바꿀 수 있지만, 인증서까지 잃으면 이미 설치된 앱은 새 버전을 받지 못합니다.
 - **tap 저장소**: `youseonghyeon/homebrew-nexus` 에 `Casks/nexus.rb`.
 
 ## 매번
@@ -44,7 +44,9 @@
 ## 확인
 
 - README 의 설치 명령(`brew tap` → `brew trust` → `brew install --cask nexus`)으로 새로 설치되는지. cask 를 고쳤으면 `brew style youseonghyeon/nexus` · `brew audit --cask youseonghyeon/nexus/nexus`.
-- 이전 버전 앱을 켰을 때 사이드바 아래에 업데이트 띠가 뜨고, 누르면 새 버전으로 다시 시작하는지.
+- 피드가 새 버전을 가리키는지: `curl -sL https://github.com/youseonghyeon/nexus/releases/latest/download/appcast.xml | grep sparkle:version`
+  (Release 에 `appcast.xml` 을 빠뜨리면 앱의 확인이 조용히 실패해 아무도 모른다.)
+- 이전 버전 앱을 켰을 때 사이드바 아래에 업데이트 띠가 뜨고, 누르면 새 버전으로 다시 시작하는지 (시험 방법은 `AGENTS.md` 의 검증 절).
 
 ## 주의
 

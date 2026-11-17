@@ -1,4 +1,4 @@
-// 패킷 캡처 창 (Window ▸ Packet Capture · 망 화면 진단 카드 [Capture…]). 열면 바로 시작, 닫으면 끝.
+// 패킷 캡처 창 (윈도우 ▸ Packet Capture · 망 화면 진단 카드 [Capture…]). 열면 바로 시작, 닫으면 끝.
 // 툴바(본창과 같은 unifiedCompact): 장치 · 캡처 필터(tcpdump 식 + 도우미) · 일시정지/재개 · 초기화 · .pcap 저장 · 상태.
 // 본문: 요약 카드(대화 · 문제 · DNS · WireGuard — 누르면 목록을 그것만) → 패킷 카드(목록 검색 · 최근 것이 위) + 고른 패킷의 상세
 // (넓으면 오른쪽, 좁으면 아래 — 경계를 끌어 높이 조절). hex·펼치는 트리는 두지 않는다 — 깊게 볼 때는 .pcap 을 Wireshark 로.
@@ -310,7 +310,7 @@ enum CaptureText {
     }
 }
 
-/// 메뉴 Window ▸ Packet Capture (메뉴는 뷰 밖이라 openWindow 를 쓰는 작은 뷰로)
+/// 메뉴 윈도우 ▸ Packet Capture (메뉴는 뷰 밖이라 openWindow 를 쓰는 작은 뷰로)
 struct OpenCaptureButton: View {
     @Environment(\.openWindow) private var openWindow
     let model: AppModel

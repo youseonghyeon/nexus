@@ -15,6 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @MainActor func applicationWillFinishLaunching(_ notification: Notification) {
         AppearanceMode.stored.apply()
         ThinScroller.install()
+        // macOS 의 창 탭 기능을 끈다 — 보기·윈도우 메뉴에 "탭 막대 보기 · 모든 윈도우 통합" 류가 생기는데 이 앱의 탭(SSH 탭)과 무관하다
+        NSWindow.allowsAutomaticWindowTabbing = false
     }
 
     /// 메뉴바 항목을 한 번 만든다 (창 onAppear 에서). 앱이 사는 동안 유지.

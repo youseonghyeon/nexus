@@ -55,15 +55,15 @@ struct ServersApp: App {
             CommandGroup(replacing: .newItem) {
                 // this Mac 을 골랐으면 ⌘T 도 로컬 셸 (서버가 아니라 꺼져 있었다)
                 let localSelected = model.selectedKey == AppModel.localKey
-                Button(localSelected ? "New Local Shell" : "New SSH Tab") {
+                Button(localSelected ? "새 로컬 셸" : "새 SSH 탭") {
                     if localSelected { model.openLocalShell() } else if let server = model.selectedServer { model.openSSH(server) }
                 }
                 .keyboardShortcut("t", modifiers: .command)
                 .disabled(!localSelected && (model.selectedServer.map { !model.isReachable($0) } ?? true))
-                Button("New Local Shell") { model.openLocalShell() }
+                Button("새 로컬 셸") { model.openLocalShell() }
                     .keyboardShortcut("t", modifiers: [.command, .shift])
                 // ⌘W 키는 TerminalShortcuts 가 모든 창에서 먼저 받아 CloseCommand 로 처리한다 — 여기엔 메뉴 클릭만 온다
-                Button("Close Tab") {
+                Button("탭 닫기") {
                     if let id = model.visibleTab?.id { model.closeTab(id) }
                 }
                 .keyboardShortcut("w", modifiers: .command)
@@ -74,11 +74,19 @@ struct ServersApp: App {
                 Button("업데이트 확인…") { model.checkForUpdates() }
             }
             // .commands 는 WindowGroup 콘텐츠 밖이라 environment 가 전달되지 않는다. 명시적으로 넘긴다.
-            CommandMenu("Server") {
+            // 메뉴 이름은 옆의 시스템 메뉴(파일·편집·보기…)처럼 한국어. 항목 안의 기능 이름(SSH·Tunnel·Intranet…)은 화면의 버튼·행과 같은 글자 그대로
+            CommandMenu("서버") {
                 ServerActionsMenu().environment(model)
             }
-            CommandMenu("Network") {
+            CommandMenu("네트워크") {
                 NetworkMenu().environment(model)
+            }
+            // 도움말: 도움말 책이 없어 기본 항목은 "사용할 수 없습니다"만 띄운다 — 저장소 문서로 보낸다
+            CommandGroup(replacing: .help) {
+                Link("Nexus 사용 안내", destination: AppLinks.readme)
+                Link("변경 기록", destination: AppLinks.changelog)
+                Divider()
+                Link("문제 신고…", destination: AppLinks.issues)
             }
             CommandGroup(after: .windowArrangement) {
                 OpenCaptureButton(model: model)
@@ -89,18 +97,27 @@ struct ServersApp: App {
                 Button("servers.conf 다시 읽기") { model.loadConfig() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                 Divider()
+                // 키는 TerminalShortcuts 가 창에 가기 전에 먼저 받는다 (터미널에 포커스가 있어도) — 여기엔 메뉴 클릭만 오고, 단축키를 찾아볼 수 있게 적어 둔다
+                Button("명령 모음") { model.toggleSnippets() }
+                    .keyboardShortcut("p", modifiers: .command)
+                Button("이전 탭") { model.stepTab(forward: false) }
+                    .keyboardShortcut("[", modifiers: [.command, .shift])
+                Button("다음 탭") { model.stepTab(forward: true) }
+                    .keyboardShortcut("]", modifiers: [.command, .shift])
+                Divider()
                 // 창을 닫아 둔 채(메뉴바만)여도 바로 걸리게 고를 때 적용한다
                 Picker("화면 모드", selection: Binding(get: { appearance }, set: { appearance = $0; $0.apply() })) {
                     ForEach(AppearanceMode.allCases, id: \.self) { Text($0.title) }
                 }
             }
         }
-        // 패킷 캡처 창 (Window ▸ Packet Capture ⌥⌘P · 망 화면 진단 카드 [Capture…]) — 하나만, 열면 시작 닫으면 끝
+        // 패킷 캡처 창 (윈도우 ▸ Packet Capture ⌥⌘P · 망 화면 진단 카드 [Capture…]) — 하나만, 열면 시작 닫으면 끝
         Window("Packet Capture", id: PacketCaptureView.windowID) {
             PacketCaptureView(capture: model.capture).environment(model)
         }
         .defaultSize(width: 1100, height: 760)
         .windowToolbarStyle(.unifiedCompact(showsTitle: false))   // 본창처럼 윗줄이 툴바 (장치·필터·버튼)
+        .commandsRemoved()   // 윈도우 메뉴에 저절로 생기는 항목 — 장치 준비를 하는 OpenCaptureButton(⌥⌘P) 하나만 둔다
         // 설정 창 (⌘, · 앱 메뉴 ▸ 설정…)
         Settings {
             SettingsView().environment(model).tint(Palette.neutralTint)
@@ -185,4 +202,11 @@ struct ContentView: View {
             Text(model.pendingConfirm?.message ?? "")
         }
     }
+}
+
+/// 도움말 메뉴가 여는 곳 (공개 저장소)
+enum AppLinks {
+    static let readme = URL(string: "https://github.com/youseonghyeon/nexus#readme")!
+    static let changelog = URL(string: "https://github.com/youseonghyeon/nexus/blob/main/CHANGELOG.md")!
+    static let issues = URL(string: "https://github.com/youseonghyeon/nexus/issues")!
 }

@@ -402,7 +402,7 @@ struct EditActionsButton: View {
     }
 }
 
-/// 대표 카드의 접속 버튼 줄: SSH(주 버튼) · Browser · Tunnel… · 서버별 바로가기. 버튼이 많으면 줄바꿈. 메뉴(메뉴바 Server·우클릭)와 같은 규칙.
+/// 대표 카드의 접속 버튼 줄: SSH(주 버튼) · Browser · Tunnel… · 서버별 바로가기. 버튼이 많으면 줄바꿈. 메뉴(메뉴 막대의 서버 메뉴·우클릭)와 같은 규칙.
 struct ConnectActions: View {
     @Environment(AppModel.self) private var model
     let server: Server

@@ -59,13 +59,21 @@ struct NetworkMenu: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Button(model.tailscaleRunning ? "Tailscale 끄기…" : "Tailscale 켜기") { model.toggleTailscale() }
-            .disabled(!model.canToggleTailscale)
-        if model.config?.lan != nil {
-            Button(model.status.lan == .up ? "\(model.networkName(.lan)) 끄기…" : "\(model.networkName(.lan)) 켜기") { model.toggleLan() }
-                .disabled(!model.canToggleLan)
+        // 사이드바 Network · 메뉴바 패널과 같은 망·같은 조건 (menuBarSwitches) — 설치하지 않은 Tailscale, 설정에 없는 내부망은 나오지 않는다
+        ForEach(model.menuBarSwitches, id: \.kind) { row in
+            switch row.kind {
+            case .wifi: Button(row.menuTitle(name: "Wi-Fi")) { model.toggleWiFi() }.disabled(!row.isEnabled)
+            case .tailscale: Button(row.menuTitle(name: model.networkName(.tailscale))) { model.toggleTailscale() }.disabled(!row.isEnabled)
+            case .lan: Button(row.menuTitle(name: model.networkName(.lan))) { model.toggleLan() }.disabled(!row.isEnabled)
+            }
         }
-        Divider()
-        Button("지금 확인") { model.requestRefresh() }
+        // 시스템 설정의 VPN (구성은 각 VPN 앱에서 — 여기선 켜기·끄기만)
+        if let vpns = model.vpns, !vpns.isEmpty {
+            Divider()
+            ForEach(vpns) { vpn in
+                Button("\(vpn.name) \(vpn.isOn ? "끄기" : "켜기")") { model.toggleVPN(vpn) }
+                    .disabled(!vpn.canToggle || model.vpnBusy.contains(vpn.id))
+            }
+        }
     }
 }

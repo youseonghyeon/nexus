@@ -72,7 +72,7 @@ final class ActionAvailabilityTests: XCTestCase {
         }
     }
 
-    // MARK: 망 켜기·끄기 (사이드바 NETWORK 행 · 망 화면 · 메뉴바 Network 메뉴)
+    // MARK: 망 켜기·끄기 (사이드바 NETWORK 행 · 망 화면 · 메뉴 막대의 네트워크 메뉴)
 
     func testNetworkToggleTable() {
         // 옮기기 전 조건: `status.tailscale != .missing && busyAction == nil` (세 곳이 같은 식)

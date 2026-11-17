@@ -51,7 +51,7 @@ final class AppModel {
     var lanInfo: LanInfo?
     /// LOCAL 화면: 이 Mac 의 Spec·주소·리스닝 포트 (그 화면을 볼 때만 갱신)
     var localInfo: LocalInfo?
-    /// 패킷 캡처 창 (Window ▸ Packet Capture). 창이 닫혀 있으면 프로세스 없음
+    /// 패킷 캡처 창 (윈도우 ▸ Packet Capture). 창이 닫혀 있으면 프로세스 없음
     let capture = PacketCaptureController()
     var networkInfoAt: Date?
     /// Wi-Fi: 전원·SSID·신호는 매 갱신마다(CoreWLAN, 즉시), IP·게이트웨이는 Wi-Fi 화면을 볼 때만 networksetup 으로
@@ -186,6 +186,8 @@ final class AppModel {
     /// 앱 업데이트 띠 (사이드바 아래 UpdateBanner). 새 버전이 없으면 .none — 값은 AppUpdater 가 Sparkle 알림을 옮겨 넣는다
     var appUpdate: AppUpdate = .none
     @ObservationIgnored var updater: AppUpdater?
+    /// [업데이트]를 누를 때 끊겨도 된다고 확인받은 작업(탭·터널·전송) 수 — 설치 직전에 더 늘었으면 다시 묻는다
+    @ObservationIgnored var updateConfirmedWork = 0
     /// 시스템 설정의 VPN (scutil --nc, Tailscale 제외). nil = 아직 못 읽음 ("없음"과 구분) · 켜고 끄는 중인 VPN UUID
     var vpns: [SystemVPN]?
     var vpnBusy: Set<String> = []

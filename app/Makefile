@@ -23,6 +23,7 @@ SIGN_OPTS := $(if $(DEVID),--options runtime $(if $(filter release,$(CONFIG)),--
 NOTARY_PROFILE ?= nexus
 # 배포 zip 이름에 붙는 버전 (Info.plist CFBundleShortVersionString — 세 자리 주.부.수정)
 VERSION  := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist 2>/dev/null)
+BUILD_VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Info.plist 2>/dev/null)
 DIST_ZIP := build/$(APP)-$(VERSION).zip
 # 릴리스를 올리는 GitHub 저장소 (Info.plist SUFeedURL 과 같은 곳) · Sparkle 의 서명 도구 (swift build 가 받아 둔다)
 REPO     ?= youseonghyeon/nexus
@@ -87,6 +88,8 @@ install: release
 
 # 공증: 제출 → 승인 대기 → 표(staple)를 붙여 다시 묶는다. 받은 쪽은 인터넷 없이도 Gatekeeper 를 통과한다.
 dist: release
+	@# 앱 안 업데이트는 CFBundleVersion 으로 비교하고 피드에는 CFBundleShortVersionString 을 쓴다 — 둘이 다르면 설치한 뒤에도 업데이트 띠가 계속 뜬다
+	@[ "$(VERSION)" = "$(BUILD_VERSION)" ] || { echo "버전 키 두 개가 다릅니다 ($(VERSION) / $(BUILD_VERSION)) · CFBundleShortVersionString 과 CFBundleVersion 을 같은 값으로 맞추세요 · app/Info.plist"; exit 1; }
 	@[ -n "$(DEVID)" ] || { echo "Developer ID 인증서가 없습니다 · 키체인에 Developer ID Application 인증서를 설치하세요 · Makefile DEVID"; exit 1; }
 	@rm -f "$(DIST_ZIP)"
 	ditto -c -k --keepParent "$(OUT)" build/$(APP)-notarize.zip

@@ -58,7 +58,7 @@ extension AppModel {
         primaryService = await primary
     }
 
-    /// Tailscale·Intranet 켜기·끄기를 누를 수 있는가 (사이드바 행·망 화면·메뉴바 Network 메뉴 공통). 판정은 ServersCore (ActionAvailability)
+    /// Tailscale·Intranet 켜기·끄기를 누를 수 있는가 (사이드바 행·망 화면·메뉴 막대의 네트워크 메뉴 공통). 판정은 ServersCore (ActionAvailability)
     var canToggleTailscale: Bool { status.canToggleTailscale(idle: busyAction == nil) }
     var canToggleLan: Bool { status.canToggleLan(idle: busyAction == nil) }
 

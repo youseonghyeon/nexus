@@ -6,7 +6,7 @@ import Foundation
 import ServersCore
 
 extension AppModel {
-    // MARK: 액션 (메뉴바 Server·우클릭·정보 화면이 같은 규칙)
+    // MARK: 액션 (메뉴 막대의 서버 메뉴·우클릭·정보 화면이 같은 규칙)
 
     static let moonlightBundleID = "com.moonlight-stream.Moonlight"
 

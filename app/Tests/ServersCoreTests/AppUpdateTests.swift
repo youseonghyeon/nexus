@@ -31,7 +31,65 @@ final class AppUpdateTests: XCTestCase {
 
         state = state.applying(.installing)
         XCTAssertEqual(state.subtitle, "설치 중 · 곧 다시 시작합니다")
-        XCTAssertEqual(state.applying(.dismissed), .none)
+        XCTAssertNil(state.buttonTitle)
+    }
+
+    /// 진행 중에 오류 없이 과정이 닫히면(관리자 권한 창 취소 등) 띠가 사라지지 않고 처음으로 돌아간다 — 새 버전은 그대로 있다
+    func testDismissedMidwayReturnsToAvailable() {
+        let available = AppUpdate.available(version: "1.2.0")
+        for events: [AppUpdate.Event] in [[.downloadStarted], [.downloadStarted, .expected(9), .received(3)], [.extracting], [.extracting, .readyHeld],
+                                          [.installing], [.failed, .retrying]] {
+            XCTAssertEqual(run(events + [.dismissed], from: available), available, "\(events)")
+        }
+        XCTAssertEqual(available.applying(.dismissed), .none, "아무것도 안 한 채 닫힌 띠만 치운다")
+    }
+
+    /// 받는 사이 새 작업이 생겨 다시 시작을 미룬 상태: [다시 시작] 버튼, 누르면 설치로
+    func testReadyHeld() {
+        let ready = run([.found(version: "1.2.0"), .downloadStarted, .extracting, .readyHeld])
+        XCTAssertEqual(ready, .ready(version: "1.2.0"))
+        XCTAssertEqual(ready.subtitle, "다시 시작하면 적용됩니다")
+        XCTAssertEqual(ready.buttonTitle, "다시 시작")
+        XCTAssertEqual(ready.applying(.found(version: "1.3.0")), ready, "받아 둔 것을 새 발견이 덮지 않는다")
+        XCTAssertEqual(ready.applying(.installing), .installing(version: "1.2.0"))
+        // 확인한 만큼만 끊기는 데 동의했다 — 늘었을 때만 미룬다
+        XCTAssertTrue(AppUpdate.restartsImmediately(confirmed: 0, now: 0))
+        XCTAssertTrue(AppUpdate.restartsImmediately(confirmed: 3, now: 3))
+        XCTAssertTrue(AppUpdate.restartsImmediately(confirmed: 3, now: 1), "그사이 닫은 것은 상관없다")
+        XCTAssertFalse(AppUpdate.restartsImmediately(confirmed: 0, now: 1))
+        XCTAssertFalse(AppUpdate.restartsImmediately(confirmed: 2, now: 3))
+    }
+
+    /// [다시 시도]: 확인 중 → 발견되면 받기로, 없으면 띠를 치우고, 또 실패하면 실패 띠 그대로
+    func testRetry() {
+        let failed = AppUpdate.failed(version: "1.2.0")
+        let checking = failed.applying(.retrying)
+        XCTAssertEqual(checking, .checking(version: "1.2.0"))
+        XCTAssertEqual(checking.subtitle, "확인 중…"); XCTAssertNil(checking.buttonTitle)
+        XCTAssertEqual(run([.found(version: "1.2.1"), .downloadStarted], from: checking), .downloading(version: "1.2.1", received: 0, expected: 0))
+        XCTAssertEqual(checking.applying(.notFound), .none)
+        XCTAssertEqual(run([.failed, .dismissed], from: checking), failed)
+        XCTAssertEqual(AppUpdate.none.applying(.retrying), .none)
+        XCTAssertEqual(AppUpdate.installing(version: "1").applying(.retrying), .installing(version: "1"))
+    }
+
+    /// 받는 중 알림은 조각마다 오지만 보이는 것(퍼센트)이 같으면 다시 그리지 않는다
+    func testLooksSame() {
+        let a = AppUpdate.downloading(version: "1", received: 420, expected: 1000), b = AppUpdate.downloading(version: "1", received: 425, expected: 1000)
+        XCTAssertNotEqual(a, b)
+        XCTAssertTrue(a.looksSame(as: b))
+        XCTAssertFalse(a.looksSame(as: .downloading(version: "1", received: 430, expected: 1000)))
+        XCTAssertFalse(a.looksSame(as: .preparing(version: "1")))
+        XCTAssertFalse(AppUpdate.available(version: "1").looksSame(as: .available(version: "2")))
+    }
+
+    /// 메뉴에서 확인을 눌렀는데 이미 띠가 있을 때의 안내 — 띠를 못 본 사람에게 어디를 누를지
+    func testReminder() {
+        XCTAssertNil(AppUpdate.none.reminder)
+        XCTAssertEqual(AppUpdate.available(version: "1.2.0").reminder, "새 버전 1.2.0 · 사이드바 아래의 [업데이트] 를 누르세요")
+        XCTAssertEqual(AppUpdate.ready(version: "1.2.0").reminder, "새 버전 1.2.0 · 사이드바 아래의 [다시 시작] 를 누르세요")
+        XCTAssertEqual(AppUpdate.downloading(version: "1.2.0", received: 1, expected: 4).reminder, "새 버전 1.2.0 · 받는 중 25%")
+        XCTAssertEqual(AppUpdate.failed(version: "1.2.0").reminder, "새 버전 1.2.0 · 업데이트 실패")
     }
 
     /// 압축 전송은 받은 양이 알린 크기를 넘는다 · 크기가 받은 뒤에 와도 100% 를 넘기지 않는다

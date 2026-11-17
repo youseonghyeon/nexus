@@ -83,4 +83,14 @@ final class MenuBarSwitchTests: XCTestCase {
         await StatusMonitor(config: config, runner: runner, tcpProbe: runner.tcpProbe).collectLocal(into: &snapshot)
         XCTAssertTrue(snapshot.tailscaleChecked)
     }
+
+    /// 네트워크 메뉴 글자 — 켜짐에 따라 동사가 바뀌고, 확인·인증이 따르는 끄기에만 말줄임표
+    func testMenuTitle() {
+        XCTAssertEqual(MenuBarSwitch.wifi(powerOn: true, associated: true).menuTitle(name: "Wi-Fi"), "Wi-Fi 끄기")
+        XCTAssertEqual(MenuBarSwitch.wifi(powerOn: false, associated: false).menuTitle(name: "Wi-Fi"), "Wi-Fi 켜기")
+        XCTAssertEqual(MenuBarSwitch.tailscale(.running, busy: false, changing: false).menuTitle(name: "Tailscale"), "Tailscale 끄기…")
+        XCTAssertEqual(MenuBarSwitch.tailscale(.stopped("Stopped"), busy: false, changing: false).menuTitle(name: "Tailscale"), "Tailscale 켜기")
+        XCTAssertEqual(MenuBarSwitch.lan(.up, busy: false, changing: false)?.menuTitle(name: "Intranet"), "Intranet 끄기…")
+        XCTAssertEqual(MenuBarSwitch.lan(.down, busy: false, changing: false)?.menuTitle(name: "Intranet"), "Intranet 켜기")
+    }
 }
