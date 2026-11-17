@@ -1,0 +1,59 @@
+@NOW
+1792458681
+@LEASES
+1792498352 aa:bb:cc:00:00:01 192.168.8.103 nexus 01:aa:bb:cc:00:00:01
+1792461952 3a:1f:22:9c:41:07 192.168.8.150 iPhone 01:3a:1f:22:9c:41:07
+1792458472 00:11:32:aa:bb:cc 192.168.8.20 * 01:00:11:32:aa:bb:cc
+0 dc:a6:32:12:34:56 192.168.8.5 pi *
+@STATIC
+dhcp.@dnsmasq[0]=dnsmasq
+dhcp.@dnsmasq[0].domainneeded='1'
+dhcp.@dnsmasq[0].boguspriv='1'
+dhcp.@dnsmasq[0].filterwin2k='0'
+dhcp.@dnsmasq[0].localise_queries='1'
+dhcp.@dnsmasq[0].rebind_protection='1'
+dhcp.@dnsmasq[0].rebind_localhost='1'
+dhcp.@dnsmasq[0].local='/lan/'
+dhcp.@dnsmasq[0].domain='lan'
+dhcp.@dnsmasq[0].expandhosts='1'
+dhcp.@dnsmasq[0].nonegcache='0'
+dhcp.@dnsmasq[0].cachesize='1000'
+dhcp.@dnsmasq[0].authoritative='1'
+dhcp.@dnsmasq[0].readethers='1'
+dhcp.@dnsmasq[0].leasefile='/tmp/dhcp.leases'
+dhcp.@dnsmasq[0].resolvfile='/tmp/resolv.conf.d/resolv.conf.auto'
+dhcp.@dnsmasq[0].nonwildcard='1'
+dhcp.@dnsmasq[0].localservice='1'
+dhcp.@dnsmasq[0].ednspacket_max='1232'
+dhcp.@dnsmasq[0].filter_aaaa='0'
+dhcp.@dnsmasq[0].filter_a='0'
+dhcp.lan=dhcp
+dhcp.lan.interface='lan'
+dhcp.lan.start='100'
+dhcp.lan.limit='150'
+dhcp.lan.leasetime='12h'
+dhcp.lan.dhcpv4='server'
+dhcp.lan.dhcpv6='server'
+dhcp.lan.ra='server'
+dhcp.lan.ra_slaac='1'
+dhcp.lan.ra_flags='managed-config' 'other-config'
+dhcp.wan=dhcp
+dhcp.wan.interface='wan'
+dhcp.wan.ignore='1'
+dhcp.odhcpd=odhcpd
+dhcp.odhcpd.maindhcp='0'
+dhcp.odhcpd.leasefile='/tmp/hosts/odhcpd'
+dhcp.odhcpd.leasetrigger='/usr/sbin/odhcpd-update'
+dhcp.odhcpd.loglevel='4'
+dhcp.@host[0]=host
+dhcp.@host[0].name='nas'
+dhcp.@host[0].mac='00:11:32:aa:bb:cc'
+dhcp.@host[0].ip='192.168.8.20'
+dhcp.@host[1]=host
+dhcp.@host[1].name='pi'
+dhcp.@host[1].mac='dc:a6:32:12:34:56' 'dc:a6:32:12:34:57'
+dhcp.@host[1].ip='192.168.8.5'
+@ARP
+IP address       HW type     Flags       HW address            Mask     Device
+172.30.0.1       0x1         0x2         1e:ff:50:39:03:fa     *        eth0
+@END

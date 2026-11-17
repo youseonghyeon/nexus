@@ -1,0 +1,9 @@
+HOSTNAME     74d7d6de74af
+OS           OpenWrt 23.05.5 r24106-10cc5fcd00
+KERNEL       7.2.9-orbstack-00391-g2b298d05fbd4
+ARCH         x86/64
+MODEL        |||
+CPU          VirtualApple @ 2.50GHz (10 threads)
+MEMORY       15.7Gi total, 15.1Gi available
+ROOT DISK    204.4Gi total, 4.0Gi used, 200.4Gi available (2%)
+UPTIME       48277

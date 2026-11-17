@@ -1,0 +1,12 @@
+exit=7
+code=000
+scheme=
+ip=
+port=0
+dns=0.000078
+connect=0.000000
+tls=0.000000
+first=0.000000
+total=0.000189
+redirect=
+error=Failed to connect to 127.0.0.1 port 1 after 0 ms: Couldn't connect to server

@@ -1,0 +1,17 @@
+@NOW
+1792458681
+@WG
+wgclient	-	n7U0XliOig+D3Zz+7IOtGTGtNd2OfO6KzzDyowDcTyk=	35634	off
+wgclient	4Ksb6B9C+FGo3C3h1joJoIoO8yOZtHcKtDeIqrzNw2I=	-	127.0.0.1:51820	10.0.0.1/32	1792458672	368	1200	25
+wgserver	-	4Ksb6B9C+FGo3C3h1joJoIoO8yOZtHcKtDeIqrzNw2I=	51820	off
+wgserver	n7U0XliOig+D3Zz+7IOtGTGtNd2OfO6KzzDyowDcTyk=	-	127.0.0.1:35634	10.0.0.2/32	1792458672	1200	368	off
+wgserver	8zNxNqzcpuNuno/61RJl0Q3ybVhR3f7LHXv1VnM1yyA=	(none)	(none)	10.0.0.3/32	0	0	0	off
+@NAMES
+network.@device[0].name='br-lan'
+network.peer_phone.description='iPhone'
+network.peer_phone.public_key='n7U0XliOig+D3Zz+7IOtGTGtNd2OfO6KzzDyowDcTyk='
+network.peer_laptop.description='MacBook'
+network.peer_laptop.public_key='8zNxNqzcpuNuno/61RJl0Q3ybVhR3f7LHXv1VnM1yyA='
+network.peer_srv.description='brume server'
+network.peer_srv.public_key='4Ksb6B9C+FGo3C3h1joJoIoO8yOZtHcKtDeIqrzNw2I='
+@END

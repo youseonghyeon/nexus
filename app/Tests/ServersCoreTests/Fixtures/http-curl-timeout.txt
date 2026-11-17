@@ -1,0 +1,12 @@
+exit=28
+code=000
+scheme=
+ip=
+port=0
+dns=0.001421
+connect=0.000000
+tls=0.000000
+first=0.000000
+total=3.006783
+redirect=
+error=Failed to connect to 10.255.255.1 port 80 after 3006 ms: Timeout was reached

@@ -1,0 +1,4 @@
+time,,interface,type,bytes_in,bytes_out,rcvsize,tc_class,arch,
+21:38:46.282856,WireGuardNetwor.1260,,,790084512,31925308,,,,
+21:38:46.282600,udp4 *:52786<->*:*,en11,Wired,790084512,31925308,786896,BE,so,
+21:38:46.282614,udp6 *.52786<->*.*,,Unknow,0,0,786896,BE,so,

@@ -1,0 +1,11 @@
+@RULES
+0:	from all lookup local
+1:	from all iif lo lookup 16800
+32766:	from all lookup main
+32767:	from all lookup default
+@ROUTES
+default via 203.0.113.1 dev eth1 proto static src 203.0.113.143 metric 1
+10.1.0.0/24 dev wgserver proto kernel scope link src 10.1.0.1
+203.0.113.0/24 dev eth1 proto static scope link metric 1
+192.168.8.0/24 dev br-lan proto kernel scope link src 192.168.8.1
+@END

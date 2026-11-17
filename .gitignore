@@ -1,0 +1,9 @@
+# 클러스터 자격증명(토큰 포함)은 저장소에 올리지 않는다.
+kube/
+__pycache__/
+app/.build/
+app/build/
+app/Resources/icon/AppIcon-1024.png
+
+# macOS Finder 메타데이터
+.DS_Store

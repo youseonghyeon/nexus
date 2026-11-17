@@ -1,0 +1,12 @@
+exit=0
+code=301
+scheme=HTTP
+ip=20.200.245.247
+port=80
+dns=0.046312
+connect=0.052243
+tls=0.000000
+first=0.056165
+total=0.056178
+redirect=https://github.com/
+error=

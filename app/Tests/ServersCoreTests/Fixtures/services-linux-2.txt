@@ -1,0 +1,83 @@
+UPTIME=601.21
+## UNITS
+Result=exit-code
+NRestarts=0
+MemoryCurrent=[not set]
+Id=broken.service
+Description=Broken test service
+ActiveState=failed
+SubState=failed
+StateChangeTimestampMonotonic=103009593
+ActiveEnterTimestampMonotonic=103007292
+
+Result=success
+NRestarts=0
+MemoryCurrent=319488
+Id=cron.service
+Description=Regular background program processing daemon
+ActiveState=active
+SubState=running
+StateChangeTimestampMonotonic=89181428
+ActiveEnterTimestampMonotonic=89181428
+
+Result=success
+NRestarts=0
+MemoryCurrent=692224
+Id=dbus.service
+Description=D-Bus System Message Bus
+ActiveState=active
+SubState=running
+StateChangeTimestampMonotonic=89185672
+ActiveEnterTimestampMonotonic=89185672
+
+Result=exit-code
+NRestarts=221
+MemoryCurrent=[not set]
+Id=flaky.service
+Description=Flaky worker (restarts)
+ActiveState=activating
+SubState=auto-restart
+StateChangeTimestampMonotonic=600755566
+ActiveEnterTimestampMonotonic=599753368
+
+Result=success
+NRestarts=0
+MemoryCurrent=6676480
+Id=nginx.service
+Description=A high performance web server and a reverse proxy server
+ActiveState=active
+SubState=running
+StateChangeTimestampMonotonic=89188216
+ActiveEnterTimestampMonotonic=89188216
+
+Result=success
+NRestarts=0
+MemoryCurrent=7696384
+Id=systemd-journald.service
+Description=Journal Service
+ActiveState=active
+SubState=running
+StateChangeTimestampMonotonic=89136020
+ActiveEnterTimestampMonotonic=89136020
+
+Result=success
+NRestarts=0
+MemoryCurrent=983040
+Id=systemd-logind.service
+Description=User Login Management
+ActiveState=active
+SubState=running
+StateChangeTimestampMonotonic=89194971
+ActiveEnterTimestampMonotonic=89194971
+
+Result=success
+NRestarts=0
+MemoryCurrent=2215936
+Id=systemd-resolved.service
+Description=Network Name Resolution
+ActiveState=active
+SubState=running
+StateChangeTimestampMonotonic=89179994
+ActiveEnterTimestampMonotonic=89179994
+## CONTAINERS
+## END

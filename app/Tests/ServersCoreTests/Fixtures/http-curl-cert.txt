@@ -1,0 +1,12 @@
+exit=60
+code=000
+scheme=HTTPS
+ip=104.154.89.105
+port=443
+dns=0.101372
+connect=0.277238
+tls=0.000000
+first=0.000000
+total=0.587069
+redirect=
+error=SSL certificate problem: self signed certificate

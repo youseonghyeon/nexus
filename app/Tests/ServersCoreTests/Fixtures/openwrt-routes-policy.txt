@@ -1,0 +1,27 @@
+@RULES
+0:	from all lookup local
+100:	from all fwmark 0x8000/0xf000 lookup 100
+200:	from 192.168.8.50 lookup 200
+300:	not from all fwmark 0xca6c lookup 300
+400:	from all lookup main suppress_prefixlength 0
+500:	from all iif lo lookup 16800
+600:	from all to 192.0.2.9 unreachable
+32766:	from all lookup main
+32767:	from all lookup default
+@ROUTES
+default table 300 
+	nexthop via 203.0.113.1 dev wan0 weight 1 
+	nexthop via 198.51.100.1 dev wan1 weight 2 
+throw 10.0.0.0/8 table 300 
+default dev vpn0 table 100 scope link 
+10.20.0.0/16 via 10.9.0.1 dev vpn0 table 100 
+blackhole default table 200 
+unreachable 192.0.2.0/24 table 200 
+default via 192.168.215.1 dev eth0 
+default via 203.0.113.1 dev wan0 metric 10 
+default via 198.51.100.1 dev wan1 metric 20 
+10.9.0.0/24 dev vpn0 proto kernel scope link src 10.9.0.2 
+192.168.215.0/24 dev eth0 proto kernel scope link src 192.168.215.2 
+198.51.100.0/24 dev wan1 proto kernel scope link src 198.51.100.2 
+203.0.113.0/24 dev wan0 proto kernel scope link src 203.0.113.2 
+@END

@@ -1,0 +1,116 @@
+@INFO
+100
+4096
+@UP
+30.17 292.63
+@CORES
+@STAT
+cpu  204 0 224 29266 22 0 53 0 0 0
+cpu0 118 0 35 2772 16 0 45 0 0 0
+cpu1 12 0 16 2933 0 0 3 0 0 0
+cpu2 18 0 35 2911 0 0 2 0 0 0
+cpu3 9 0 13 2943 0 0 0 0 0 0
+cpu4 12 0 47 2905 0 0 0 0 0 0
+cpu5 8 0 20 2953 0 0 0 0 0 0
+cpu6 5 0 16 2960 0 0 0 0 0 0
+cpu7 8 0 10 2924 1 0 0 0 0 0
+cpu8 10 0 29 2944 0 0 0 0 0 0
+cpu9 0 0 0 3016 0 0 0 0 0 0
+procs_running 2
+procs_blocked 0
+@LOAD
+0.08 0.02 0.01 2/333 16
+@MEM
+MemTotal:       16424796 kB
+MemFree:        15629216 kB
+MemAvailable:   15850876 kB
+Buffers:             416 kB
+Cached:           443360 kB
+SwapCached:            0 kB
+Active:           146040 kB
+Inactive:         396840 kB
+Active(anon):     146040 kB
+Inactive(anon):        0 kB
+Active(file):          0 kB
+Inactive(file):   396840 kB
+Unevictable:           0 kB
+Mlocked:               0 kB
+SwapTotal:      17473364 kB
+SwapFree:       17473364 kB
+Dirty:               152 kB
+Writeback:             0 kB
+AnonPages:         98280 kB
+Mapped:           182800 kB
+Shmem:             46940 kB
+KReclaimable:      40800 kB
+Slab:              82208 kB
+SReclaimable:      40800 kB
+SUnreclaim:        41408 kB
+KernelStack:        5456 kB
+PageTables:         4648 kB
+SecPageTables:         0 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:    25685760 kB
+Committed_AS:    1316680 kB
+VmallocTotal:   135288315904 kB
+VmallocUsed:       70996 kB
+VmallocChunk:          0 kB
+Percpu:             2920 kB
+AnonHugePages:         0 kB
+ShmemHugePages:        0 kB
+ShmemPmdMapped:        0 kB
+FileHugePages:         0 kB
+FilePmdMapped:         0 kB
+Balloon:               0 kB
+GPUActive:             0 kB
+GPUReclaim:            0 kB
+@PSI
+@DISK
+   7       0 loop0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       1 loop1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       2 loop2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       3 loop3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  43       0 nbd0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  43      32 nbd1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  43      64 nbd2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  43      96 nbd3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ 254       0 vda 407 3 221840 85 0 0 0 0 0 303 85 0 0 0 0 0 0
+ 254      16 vdb 2879 1 218897 2081 2508 1219 83216 601 0 1411 3302 557 0 72176 54 944 565
+ 254      17 vdb1 2806 1 218824 2081 2508 1219 83216 601 0 1411 2736 557 0 72176 54 0 0
+ 254      32 vdc 3 0 24 0 1 0 8 0 0 1 0 1 0 2097144 0 0 0
+ 253       0 zram0 2 0 16 0 1 0 8 0 0 0 0 0 0 0 0 0 0
+@BLK
+vda 0 1 840328 
+vdb 0 1 965597217 
+vdc 0 1 2097152 
+@MD
+@FREQ
+2000000
+2000000
+2000000
+2000000
+2000000
+2000000
+2000000
+2000000
+2000000
+2000000
+@THROTTLE
+@NET
+@DF
+Filesystem     Type    1024-blocks    Used Available Capacity Mounted on
+overlay        overlay   205717504 9829360 195888144       5% /
+tmpfs          tmpfs         65536       0     65536       0% /dev
+shm            tmpfs       8211456       0   8211456       0% /dev/shm
+/dev/vdb1      btrfs     205717504 9829360 195888144       5% /etc/hosts
+tmpfs          tmpfs             4       0         4       0% /proc/asound
+@TEMP
+@PROC
+1	S	0	1	354	2912	sh
+26	R	0	1	271	3018	cat
+27	R	0	1	108	3018	awk
+7	R	101	1	358	2916	sh
+9	S	0	1	390	3017	sh
+@END

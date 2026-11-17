@@ -1,0 +1,98 @@
+Routing tables
+
+Internet:
+Destination        Gateway            Flags               Netif Expire
+default            link#26            UCSg                utun6       
+default            192.168.8.1        UGScIg               en11       
+default            192.168.8.1        UGScIg                en0       
+default            link#30            UCSIg           bridge100      !
+default            link#32            UCSIg           bridge101      !
+10.1/24            10.1.0.2           UGSc                utun6       
+10.1.0.2           10.1.0.2           UH                  utun6       
+17.57.145.138      link#26            UHWIig              utun6       
+17.137.170.2       link#26            UHW3Ig              utun6      6
+17.248.221.10      link#26            UHWIig              utun6       
+17.248.221.21      link#26            UHWIig              utun6       
+17.248.221.64      link#26            UHWIig              utun6       
+17.248.221.65      link#26            UHWIig              utun6       
+17.248.221.66      link#26            UHWIig              utun6       
+17.248.221.67      link#26            UHWIig              utun6       
+17.248.221.68      link#26            UHWIig              utun6       
+17.248.221.69      link#26            UHWIig              utun6       
+17.253.115.133     link#26            UHW3Ig              utun6      !
+17.253.115.135     link#26            UHWIig              utun6       
+17.253.115.136     link#26            UHWIig              utun6       
+17.253.115.137     link#26            UHWIig              utun6       
+17.253.115.138     link#26            UHWIig              utun6       
+17.253.115.197     link#26            UHWIig              utun6       
+17.253.145.10      link#26            UHWIig              utun6       
+17.253.150.10      link#26            UHWIig              utun6       
+23.32.56.90        link#26            UHWIig              utun6       
+23.32.56.152       link#26            UHWIig              utun6       
+23.67.53.171       link#26            UHWIig              utun6       
+23.67.53.217       link#26            UHWIig              utun6       
+34.149.66.165      link#26            UHWIig              utun6       
+35.190.46.17       link#26            UHWIig              utun6       
+52.220.188.161     link#26            UHWIig              utun6       
+54.65.27.74        link#26            UHWIig              utun6       
+104.16.8.34        link#26            UHWIig              utun6       
+104.18.35.233      link#26            UHWIig              utun6       
+104.26.13.205      link#26            UHW3Ig              utun6      !
+108.156.22.48      link#26            UHWIig              utun6       
+108.156.22.123     link#26            UHWIig              utun6       
+127                127.0.0.1          UCS                   lo0       
+127.0.0.1          127.0.0.1          UH                    lo0       
+142.251.150.4      link#26            UHWIig              utun6       
+142.251.151.4      link#26            UHWIig              utun6       
+142.251.152.4      link#26            UHWIig              utun6       
+142.251.154.4      link#26            UHWIig              utun6       
+142.251.155.4      link#26            UHWIig              utun6       
+142.251.156.4      link#26            UHWIig              utun6       
+142.251.157.4      link#26            UHWIig              utun6       
+160.79.104.10      link#26            UHWIig              utun6       
+169.254            link#9             UCS                  en11      !
+169.254            link#15            UCSI                  en0      !
+172.217.115.4      link#26            UHWIig              utun6       
+172.217.116.4      link#26            UHWIig              utun6       
+172.217.117.4      link#26            UHWIig              utun6       
+172.217.119.4      link#26            UHWIig              utun6       
+172.217.209.102    link#26            UHWIig              utun6       
+172.217.209.113    link#26            UHWIig              utun6       
+172.217.213.113    link#26            UHWIig              utun6       
+192.168.8          link#9             UCS                  en11      !
+192.168.8          link#15            UCSI                  en0      !
+192.168.8.1/32     link#9             UCS                  en11      !
+192.168.8.1        0:0:0:0:0:0        UHLWIir              en11   1194
+192.168.8.1        0:0:0:0:0:0        UHLWIir               en0   1194
+192.168.8.1/32     link#15            UCSI                  en0      !
+192.168.8.1        link#30            UHRLWIg         bridge100      !
+192.168.8.1        da.9b.d0.a2.b2.80  UHLWIg          bridge101    844
+192.168.8.101/32   link#9             UCS                  en11      !
+192.168.8.101      0:0:0:0:0:0        UHLWI                 lo0       
+192.168.8.101      0:0:0:0:0:0        UHLWIi                en0   1178
+192.168.8.102      link#9             UHRLWI               en11      !
+192.168.8.103      0:0:0:0:0:0          UHLWI                en11    838
+192.168.8.104/32   link#15            UCS                   en0      !
+192.168.8.104      0:0:0:0:0:0           UHLWI                 lo0       
+192.168.8.105      0:0:0:0:0:0        UHLWI                en11    830
+192.168.8.105      link#15            UHLWI                 en0      !
+192.168.8.106      0:0:0:0:0:0        UHLWI                en11    830
+192.168.8.106      0:0:0:0:0:0        UHLWIi                en0    830
+192.168.107        link#32            UC              bridge101      !
+192.168.107.0      ae.7.75.a3.b2.65   UHLWbI                lo0       
+192.168.138/23     link#30            UC              bridge100      !
+192.168.139.3      ae.7.75.a4.b2.64   UHLWIi                lo0       
+199.232.193.91     link#26            UHWIig              utun6       
+203.69.141.10      link#26            UHWIig              utun6       
+203.69.141.43      link#26            UHWIig              utun6       
+203.251.234.107    link#26            UHWIig              utun6       
+224.0.0/4          link#26            UmCS                utun6       
+224.0.0/4          link#9             UmCSI                en11      !
+224.0.0/4          link#15            UmCSI                 en0      !
+224.0.0.251        0:0:0:0:0:0            UHmLWI               en11       
+224.0.0.251        0:0:0:0:0:0            UHmLWI                en0       
+224.0.0.251        0:0:0:0:0:0            UHmLWIg         bridge100       
+224.0.0.251        0:0:0:0:0:0            UHmLWIg         bridge101       
+255.255.255.255/32 link#26            UCS                 utun6       
+255.255.255.255/32 link#9             UCSI                 en11      !
+255.255.255.255/32 link#15            UCSI                  en0      !

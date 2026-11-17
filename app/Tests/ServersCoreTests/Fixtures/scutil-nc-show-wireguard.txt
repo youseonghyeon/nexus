@@ -1,0 +1,16 @@
+* (Connected)      11111111-1111-4111-8111-111111111111 VPN (com.wireguard.macos) "MacBook"                        [VPN:com.wireguard.macos]
+VPN <dictionary> {
+  DisconnectOnFastUserSwitch : 0
+  DisconnectOnIdle : 0
+  DisconnectOnIdleTimer : 0
+  DisconnectOnLogout : 0
+  DisconnectOnSleep : 0
+  DisconnectOnWake : 0
+  DisconnectOnWakeTimer : 0
+  NEProviderBundleIdentifier : com.wireguard.macos.network-extension
+  OnDemandEnabled : FALSE
+  RemoteAddress : 203.0.113.10:51820
+}
+com.wireguard.macos <dictionary> {
+  UID : 501
+}

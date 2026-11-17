@@ -1,0 +1,252 @@
+// 원격 정보 Services 탭: 실패(맨 위) · 실행 중(기본 서비스는 접음) · 컨테이너(파드는 네임스페이스별, 끝난 작업은 접음). 파싱은 ServersCore ServicesReport.
+// 숫자(가동·메모리·재시작·준비·나이)는 오른쪽 고정 폭 열로 맞춘다 — 이름 길이에 따라 들쭉날쭉하지 않게.
+// 리눅스는 서비스 줄을 누르면 최근 로그 시트. Windows 는 로그가 없어 누를 수 없다 (이유 문구 없이).
+
+import ServersCore
+import SwiftUI
+
+/// 오른쪽 열 폭 (서비스·파드 공통)
+private enum Column {
+    static let uptime: CGFloat = 92
+    static let memory: CGFloat = 72
+    static let restarts: CGFloat = 72
+    static let ready: CGFloat = 36
+    static let status: CGFloat = 140
+}
+
+struct ServicesView: View {
+    @Environment(AppModel.self) private var model
+    let server: Server
+    let lines: [String]
+    let report: ServicesReport?
+    @State private var showBasic = false
+    /// 끝난 작업을 펼친 묶음 (네임스페이스 · "docker")
+    @State private var openFinished: Set<String> = []
+
+    var body: some View {
+        if let report {
+            VStack(alignment: .leading, spacing: 16) {
+                if !report.failed.isEmpty {
+                    section("실패 \(report.failed.count)") {
+                        ForEach(report.failed) { unit in
+                            ServiceRow(unit: unit, dot: unit.removed ? .secondary : .red, canOpenLog: canOpenLog, openLog: { openLog(unit) }) {
+                                Text(ServicesFormat.failure(unit)).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        }
+                    }
+                }
+                if report.noSystemd {
+                    Text("systemd 가 없는 서버라 서비스 목록을 만들지 못했습니다").foregroundStyle(.secondary)
+                } else {
+                    section("실행 중 \(report.running.count)") {
+                        ForEach(report.mainRunning) { unit in runningRow(unit) }
+                        if report.mainRunning.isEmpty, report.basicRunning.isEmpty {
+                            Text("실행 중인 서비스가 없습니다").foregroundStyle(.secondary)
+                        }
+                        if !report.basicRunning.isEmpty {
+                            FoldButton(title: "기본 서비스 \(report.basicRunning.count)개", open: showBasic) { showBasic.toggle() }
+                            if showBasic {
+                                ForEach(report.basicRunning) { unit in runningRow(unit) }
+                            }
+                        }
+                    }
+                }
+                if !report.sources.isEmpty {
+                    containers(report)
+                }
+            }
+            .font(.callout)
+        } else {
+            // 예전 형식·엉뚱한 출력: 원문 그대로
+            Text(lines.isEmpty ? "(출력 없음)" : lines.joined(separator: "\n"))
+                .font(.callout.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+        }
+    }
+
+    private var canOpenLog: Bool { server.type == .linux }
+
+    private func openLog(_ unit: ServiceUnit) { model.showServiceLog(server, unit: unit.name) }
+
+    private func runningRow(_ unit: ServiceUnit) -> some View {
+        ServiceRow(unit: unit, dot: (unit.restarts ?? 0) > 0 ? StatusTone.warn.color : StatusTone.good.color, canOpenLog: canOpenLog, openLog: { openLog(unit) }) {
+            Text(unit.uptime.map(ServicesFormat.duration) ?? "").frame(width: Column.uptime, alignment: .trailing)
+            Text(unit.memory.map { DiskFormat.bytes($0) } ?? "").frame(width: Column.memory, alignment: .trailing)
+            Text((unit.restarts ?? 0) > 0 ? "재시작 \(unit.restarts!)" : "").frame(width: Column.restarts, alignment: .trailing)
+        }
+    }
+
+    // MARK: 컨테이너
+
+    @ViewBuilder
+    private func containers(_ report: ServicesReport) -> some View {
+        let pods = report.containers.filter { $0.kind == .pod }
+        let dockers = report.containers.filter { $0.kind == .docker }
+        // 네임스페이스마다 다시 거르지 않게 한 번에 묶는다 (묶음 안 순서는 원래 순서 그대로)
+        let podsByNamespace = Dictionary(grouping: pods, by: \.namespace)
+        if let state = report.sources["k3s"] {
+            section("k3s 파드 \(pods.count)") {
+                if let note = sourceNote("k3s", state, empty: pods.isEmpty) { note }
+                if let total = report.truncated["k3s"] { Text("파드가 \(total)개라 앞 200개만 보입니다").foregroundStyle(.secondary) }
+                // 네임스페이스는 kubectl 이 준 순서대로 (이름 순)
+                ForEach(namespaces(pods), id: \.self) { ns in
+                    let items = podsByNamespace[ns] ?? []
+                    Text("\(ns)  \(items.count)").font(.caption).foregroundStyle(.secondary).padding(.top, 4)
+                    group(items, key: "k3s|\(ns)", foldTitle: "끝난 작업")
+                }
+            }
+        }
+        if let state = report.sources["docker"] {
+            section("docker 컨테이너 \(dockers.count)") {
+                if let note = sourceNote("docker", state, empty: dockers.isEmpty) { note }
+                if let total = report.truncated["docker"] { Text("컨테이너가 \(total)개라 앞 200개만 보입니다").foregroundStyle(.secondary) }
+                group(dockers, key: "docker", foldTitle: "멈춘 컨테이너")
+            }
+        }
+    }
+
+    /// 살아 있는 것 → 끝난 것은 "끝난 작업 N개" 로 접기
+    @ViewBuilder
+    private func group(_ items: [ContainerItem], key: String, foldTitle: String) -> some View {
+        let active = items.filter { !$0.finished }
+        let finished = items.filter(\.finished)
+        ForEach(active) { item in containerRow(item) }
+        if !finished.isEmpty {
+            FoldButton(title: "\(foldTitle) \(finished.count)개", open: openFinished.contains(key)) {
+                if openFinished.contains(key) { openFinished.remove(key) } else { openFinished.insert(key) }
+            }
+            if openFinished.contains(key) {
+                ForEach(finished) { item in containerRow(item) }
+            }
+        }
+    }
+
+    /// 리눅스의 docker 컨테이너는 누르면 최근 로그(이름 복사는 우클릭 메뉴), 파드·Windows 는 누르면 이름 복사
+    private func containerRow(_ item: ContainerItem) -> some View {
+        let opensLog = item.kind == .docker && canOpenLog
+        return ContainerRow(item: item, opensLog: opensLog, copy: { model.copy(item.copyName) }) {
+            if opensLog { model.showContainerLog(server, container: item.name) } else { model.copy(item.copyName) }
+        }
+    }
+
+    private func namespaces(_ pods: [ContainerItem]) -> [String] {
+        var seen: [String] = []
+        for ns in pods.compactMap(\.namespace) where !seen.contains(ns) { seen.append(ns) }
+        return seen
+    }
+
+    private func sourceNote(_ source: String, _ state: ServicesReport.ContainerSource, empty: Bool) -> Text? {
+        switch state {
+        case .denied: return Text("권한이 없어 읽지 못했습니다").foregroundStyle(.secondary)
+        case .off: return Text("응답이 없습니다 (꺼져 있거나 설정이 없음)").foregroundStyle(.secondary)
+        case .ok: return empty ? Text(source == "k3s" ? "파드가 없습니다" : "컨테이너가 없습니다").foregroundStyle(.secondary) : nil
+        }
+    }
+
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.caption).foregroundStyle(.secondary).padding(.bottom, 2)
+            content()
+        }
+    }
+}
+
+/// "› 기본 서비스 22개" 접기·펼치기
+private struct FoldButton: View {
+    let title: String
+    let open: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            Label(title, systemImage: open ? "chevron.down" : "chevron.right")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .padding(.leading, 6).padding(.vertical, 3)
+    }
+}
+
+/// 서비스 한 줄: 점 · 이름 · 설명(남는 폭) · 오른쪽 열들. 리눅스면 마우스를 올리면 옅은 면, 누르면 최근 로그.
+private struct ServiceRow<Trailing: View>: View {
+    let unit: ServiceUnit
+    let dot: Color
+    let canOpenLog: Bool
+    let openLog: () -> Void
+    @ViewBuilder let trailing: Trailing
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle().fill(dot).frame(width: 8, height: 8)
+            Text(unit.name).lineLimit(1).layoutPriority(1)
+            Text(unit.description).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 8)
+            HStack(spacing: 0) { trailing }.foregroundStyle(.secondary).monospacedDigit()
+        }
+        .padding(.horizontal, 6).padding(.vertical, 3)
+        .background(canOpenLog && hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .onTapGesture { if canOpenLog { openLog() } }
+        .modifier(LogHelp(enabled: canOpenLog))
+    }
+}
+
+/// 로그를 열 수 있는 줄에만 도움말 (Windows 줄엔 아무것도 — 이유 문구 없이)
+private struct LogHelp: ViewModifier {
+    let enabled: Bool
+    func body(content: Content) -> some View {
+        if enabled { content.help("누르면 최근 로그") } else { content }
+    }
+}
+
+/// 컨테이너·파드 한 줄: 점 · 이름(꼬리 해시는 흐리게) · 상태(Running 이 아닐 때만) · 준비 · 재시작 · 나이. 누르면 최근 로그(리눅스 docker) 또는 전체 이름 복사.
+private struct ContainerRow: View {
+    let item: ContainerItem
+    let opensLog: Bool
+    let copy: () -> Void
+    let tap: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        let name = item.displayName
+        HStack(spacing: 8) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            (Text(name.base) + Text(name.hash).foregroundStyle(.tertiary))
+                .lineLimit(1).truncationMode(.middle).layoutPriority(1)
+            if item.kind == .docker, !item.detail.isEmpty {
+                Text(item.detail).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.middle)
+            }
+            Spacer(minLength: 8)
+            // 서비스 줄과 같은 간격(0)으로 — 재시작·나이 열이 두 구역에서 같은 자리에 오게
+            HStack(spacing: 0) {
+                if item.kind == .pod {
+                    Text(item.statusWorthShowing ? item.status : "").frame(width: Column.status, alignment: .trailing)
+                    Text(item.ready ?? "").frame(width: Column.ready, alignment: .trailing)
+                    Text((item.restarts ?? 0) > 0 ? "재시작 \(item.restarts!)" : "").frame(width: Column.restarts, alignment: .trailing)
+                    Text(ServicesFormat.podAge(item.age)).frame(width: Column.uptime, alignment: .trailing)
+                } else {
+                    Text(item.status)
+                }
+            }
+            .lineLimit(1).truncationMode(.tail)
+            .foregroundStyle(.secondary).monospacedDigit()
+        }
+        .padding(.horizontal, 6).padding(.vertical, 3)
+        .background(hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .onTapGesture(perform: tap)
+        .contextMenu { if opensLog { Button("이름 복사", action: copy) } }
+        .help(opensLog ? "누르면 최근 로그" : "누르면 이름 복사")
+    }
+
+    private var color: Color {
+        switch item.tone {
+        case .good: return .green
+        case .warn: return StatusTone.warn.color   // 라이트에서 읽히는 노랑
+        case .bad: return .red
+        case .muted: return .secondary
+        }
+    }
+}

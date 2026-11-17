@@ -1,0 +1,10 @@
+<dictionary> {
+  VPN : <dictionary> {
+    BytesIn : 280669198
+    BytesOut : 12338891
+    ErrorsIn : 0
+    ErrorsOut : 0
+    PacketsIn : 226578
+    PacketsOut : 108047
+  }
+}

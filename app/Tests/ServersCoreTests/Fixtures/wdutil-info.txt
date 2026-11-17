@@ -1,0 +1,79 @@
+————————————————————————————————————————————————————————————————————
+NETWORK
+————————————————————————————————————————————————————————————————————
+    Primary IPv4         : en11 (TPlink 2.5G Ethernet / 00000000-0000-0000-0000-000000000001)
+                         : 192.168.8.189
+    Primary IPv6         : None
+    DNS Addresses        : 192.168.8.1
+    Apple                : Reachable
+————————————————————————————————————————————————————————————————————
+WIFI
+————————————————————————————————————————————————————————————————————
+    MAC Address          : <redacted> (hw=<redacted>)
+    Interface Name       : en0
+    Power                : On [On]
+    Op Mode              : STA
+    SSID                 : <redacted>
+    BSSID                : <redacted>
+    RSSI                 : -34 dBm
+    CCA                  : 4 %
+    Noise                : -93 dBm
+    Tx Rate              : 866.0 Mbps
+    Security             : WPA2 Personal
+    PHY Mode             : 11ac
+    MCS Index            : 9
+    Guard Interval       : 400
+    NSS                  : 2
+    Channel              : 5g40/80
+    Country Code         : KR
+    Scan Cache Count     : 7
+    NetworkServiceID     : 00000000-0000-0000-0000-000000000002
+    IPv4 Config Method   : DHCP
+    IPv4 Address         : 192.168.0.241
+    IPv4 Router          : 192.168.0.1
+    IPv6 Config Method   : Automatic
+    IPv6 Address         : fe80::1
+    IPv6 Router          : None
+    DNS                  : 168.126.63.1
+                         : 168.126.63.2
+    BTC Mode             : Off
+    Desense              :
+    Chain Ack            : []
+    BTC Profile 2.4GHz   : Disabled
+    BTC Profile 5GHz     : Disabled
+    Sniffer Supported    : YES
+    Supports 6e          : Yes
+    Supported Channels   : 2g1/20,2g2/20,5g36/80,5g40/80,6g1/160
+————————————————————————————————————————————————————————————————————
+BLUETOOTH
+————————————————————————————————————————————————————————————————————
+    Power                : On
+    Address              : 00:00:00:00:00:01
+    Discoverable         : No
+    Connectable          : Yes
+    Scanning             : No
+    Devices              : 2 (paired=2 cloud=0 connected=1)
+
+    AirPods Pro
+    Address          : 00:00:00:00:00:02
+    Paired           : Yes
+    CloudPaired      : No
+    Connected        : No
+
+————————————————————————————————————————————————————————————————————
+AWDL
+————————————————————————————————————————————————————————————————————
+    MAC Address            : 00:00:00:00:00:03 (hw=00:00:00:00:00:03)
+    Interface Name         : awdl0
+    Power                  : On
+    Op Mode                : n/a
+    Master Channel         : n/a
+————————————————————————————————————————————————————————————————————
+POWER
+————————————————————————————————————————————————————————————————————
+    Power Source         : AC
+    Battery Warning Level: None
+————————————————————————————————————————————————————————————————————
+WIFI FAULTS LAST HOUR
+————————————————————————————————————————————————————————————————————
+    None

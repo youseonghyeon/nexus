@@ -1,0 +1,16 @@
+Disconnected
+Extended Status <dictionary> {
+  ConnectionStatistics : <dictionary> {
+    ConnectCount : 0
+    ConnectedCount : 0
+    DisconnectedCount : 0
+    MaxConnectTime : 0
+  }
+  IsPrimaryInterface : 0
+  NEStatus : 1
+  SessionState : 1
+  Status : 0
+  VPN : <dictionary> {
+    LastCause : 0
+  }
+}

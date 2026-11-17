@@ -1,0 +1,12 @@
+exit=0
+code=200
+scheme=HTTPS
+ip=104.20.23.154
+port=443
+dns=0.041611
+connect=0.073989
+tls=0.111533
+first=0.152606
+total=0.152931
+redirect=
+error=

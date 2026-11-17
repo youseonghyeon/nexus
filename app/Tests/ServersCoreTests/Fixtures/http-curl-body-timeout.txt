@@ -1,0 +1,12 @@
+exit=28
+code=200
+scheme=HTTP
+ip=127.0.0.1
+port=18080
+dns=0.000128
+connect=0.000354
+tls=0.000000
+first=0.000521
+total=4.006484
+redirect=
+error=Operation timed out after 4006 milliseconds with 3 out of 100000 bytes received

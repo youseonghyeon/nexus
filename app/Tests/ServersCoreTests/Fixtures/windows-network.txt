@@ -1,0 +1,43 @@
+@ADAPTER
+19|Up|2500000000|02-00-00-AA-BB-01|False|True|이더넷|Realtek Gaming 2.5GbE Family Controller
+11|Up|10000000000|00-15-5D-00-00-02|True|False|vEthernet (Default Switch)|Hyper-V Virtual Ethernet Adapter
+25|Up|10000000000|00-15-5D-00-00-03|True|False|vEthernet (WSL (Hyper-V firewall))|Hyper-V Virtual Ethernet Adapter #2
+4|Disconnected|3000000|02-00-00-AA-BB-04|True|False|Bluetooth 네트워크 연결|Bluetooth Device (Personal Area Network)
+@IP
+25|IPv6|fe80::1:25%25|64|WellKnown|vEthernet (WSL (Hyper-V firewall))
+11|IPv6|fe80::1:11%11|64|WellKnown|vEthernet (Default Switch)
+4|IPv6|fe80::1:4%4|64|WellKnown|Bluetooth 네트워크 연결
+19|IPv6|fe80::1:19%19|64|WellKnown|이더넷
+1|IPv6|::1|128|WellKnown|Loopback Pseudo-Interface 1
+25|IPv4|172.20.80.1|20|Manual|vEthernet (WSL (Hyper-V firewall))
+11|IPv4|172.25.80.1|20|Manual|vEthernet (Default Switch)
+4|IPv4|169.254.95.140|16|WellKnown|Bluetooth 네트워크 연결
+19|IPv4|192.168.8.102|24|Dhcp|이더넷
+1|IPv4|127.0.0.1|8|WellKnown|Loopback Pseudo-Interface 1
+@ROUTE
+255.255.255.255/32|0.0.0.0|25|256|5000|vEthernet (WSL (Hyper-V firewall))
+255.255.255.255/32|0.0.0.0|11|256|5000|vEthernet (Default Switch)
+255.255.255.255/32|0.0.0.0|4|256|65|Bluetooth 네트워크 연결
+255.255.255.255/32|0.0.0.0|19|256|20|이더넷
+255.255.255.255/32|0.0.0.0|1|256|75|Loopback Pseudo-Interface 1
+224.0.0.0/4|0.0.0.0|25|256|5000|vEthernet (WSL (Hyper-V firewall))
+224.0.0.0/4|0.0.0.0|11|256|5000|vEthernet (Default Switch)
+224.0.0.0/4|0.0.0.0|4|256|65|Bluetooth 네트워크 연결
+224.0.0.0/4|0.0.0.0|19|256|20|이더넷
+224.0.0.0/4|0.0.0.0|1|256|75|Loopback Pseudo-Interface 1
+192.168.8.255/32|0.0.0.0|19|256|20|이더넷
+192.168.8.102/32|0.0.0.0|19|256|20|이더넷
+192.168.8.0/24|0.0.0.0|19|256|20|이더넷
+172.25.95.255/32|0.0.0.0|11|256|5000|vEthernet (Default Switch)
+172.25.80.1/32|0.0.0.0|11|256|5000|vEthernet (Default Switch)
+172.25.80.0/20|0.0.0.0|11|256|5000|vEthernet (Default Switch)
+172.20.95.255/32|0.0.0.0|25|256|5000|vEthernet (WSL (Hyper-V firewall))
+172.20.80.1/32|0.0.0.0|25|256|5000|vEthernet (WSL (Hyper-V firewall))
+172.20.80.0/20|0.0.0.0|25|256|5000|vEthernet (WSL (Hyper-V firewall))
+127.255.255.255/32|0.0.0.0|1|256|75|Loopback Pseudo-Interface 1
+127.0.0.1/32|0.0.0.0|1|256|75|Loopback Pseudo-Interface 1
+127.0.0.0/8|0.0.0.0|1|256|75|Loopback Pseudo-Interface 1
+0.0.0.0/0|192.168.8.1|19|0|20|이더넷
+@DNS
+19|192.168.8.1|이더넷
+@END

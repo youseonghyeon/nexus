@@ -1,0 +1,25 @@
+Network information
+
+IPv4 network interface information
+   utun6 : flags      : 0x7 (IPv4,IPv6,DNS)
+           address    : 10.1.0.2
+           VPN server : 127.0.0.1
+           reach      : 0x00000003 (Reachable,Transient Connection)
+    en11 : flags      : 0x5 (IPv4,DNS)
+           address    : 192.168.8.101
+           reach      : 0x00000002 (Reachable)
+     en0 : flags      : 0x5 (IPv4,DNS)
+           address    : 192.168.8.104
+           reach      : 0x00000002 (Reachable)
+
+   REACH : flags 0x00000003 (Reachable,Transient Connection)
+
+IPv6 network interface information
+   utun6 : flags      : 0x7 (IPv4,IPv6,DNS)
+           address    : fd00:1111:2222:3333::2
+           VPN server : 127.0.0.1
+           reach      : 0x00000003 (Reachable,Transient Connection)
+
+   REACH : flags 0x00000003 (Reachable,Transient Connection)
+
+Network interfaces: utun6 en11 en0

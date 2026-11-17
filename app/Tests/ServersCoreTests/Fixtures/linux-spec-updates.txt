@@ -1,0 +1,4 @@
+UPDATES      3;3
+UPDATE       apt/noble-updates,noble-security 2.8.4ubuntu0.1 arm64 [upgradable from: 2.8.3]
+UPDATE       libapt-pkg6.0t64/noble-updates,noble-security 2.8.4ubuntu0.1 arm64 [upgradable from: 2.8.3]
+UPDATE       libpcre2-8-0/noble-updates,noble-security 10.42-4ubuntu2.2 arm64 [upgradable from: 10.42-4ubuntu2.1]

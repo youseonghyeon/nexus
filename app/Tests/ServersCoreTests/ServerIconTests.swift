@@ -1,0 +1,20 @@
+// ServerIcon: 서버 종류 → 사이드바 아이콘 (SF Symbols 이름).
+
+import XCTest
+@testable import ServersCore
+
+final class ServerIconTests: XCTestCase {
+    func testSymbolByType() {
+        XCTAssertEqual(ServerIcon.symbol(for: .linux), "server.rack")
+        XCTAssertEqual(ServerIcon.symbol(for: .windows), "desktopcomputer")
+        XCTAssertEqual(ServerIcon.symbol(for: .openwrt), "wifi.router")
+    }
+
+    func testServerUsesItsType() {
+        func server(_ type: ServerType) -> Server {
+            Server(key: "s", group: "g", network: .direct, type: type, ip: "10.0.0.1", user: "u", port: 22, check: .ssh, role: nil, env: nil, wolMac: nil)
+        }
+        XCTAssertEqual(server(.openwrt).iconSymbol, "wifi.router")
+        XCTAssertEqual(server(.windows).iconSymbol, "desktopcomputer")
+    }
+}

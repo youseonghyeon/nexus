@@ -1,0 +1,67 @@
+Connected
+Extended Status <dictionary> {
+  ConnectionStatistics : <dictionary> {
+    ConnectCount : 1
+    ConnectedCount : 1
+    DisconnectedCount : 0
+    MaxConnectTime : 0
+  }
+  DNSSearchDomains : <array> {
+    0 : example.ts.net
+  }
+  DNSServers : <array> {
+    0 : 10.1.0.1
+    1 : fd00:1111:2222:3333::1
+  }
+  DNSSupplementalMatchDomains : <array> {
+    0 : 
+  }
+  IPv4 : <dictionary> {
+    AdditionalRoutes : <array> {
+      0 : <dictionary> {
+        DestinationAddress : 10.1.0.0
+        GatewayAddress : 10.1.0.2
+        SubnetMask : 255.255.255.0
+      }
+    }
+    Addresses : <array> {
+      0 : 10.1.0.2
+    }
+    InterfaceName : utun7
+    Router : 10.1.0.2
+    ServerAddress : 127.0.0.1
+  }
+  IPv6 : <dictionary> {
+    AdditionalRoutes : <array> {
+      0 : <dictionary> {
+        DestinationAddress : fd00:1111:2222:3333::
+        GatewayAddress : fd00:1111:2222:3333::2
+        PrefixLength : 64
+      }
+    }
+    Addresses : <array> {
+      0 : fd00:1111:2222:3333::2
+    }
+    InterfaceName : utun7
+    PrefixLength : <array> {
+      0 : 64
+    }
+    Router : fd00:1111:2222:3333::
+    ServerAddress : 127.0.0.1
+  }
+  IsPrimaryInterface : 1
+  LastStatusChangeTime : 10/15/2026 09:31:20
+  NEStatus : 3
+  SessionState : 4
+  StartMessage : <dictionary> {
+    SessionCommandType : 2
+    SessionGroupID : 20
+    SessionPID : 2265
+    SessionUserID : 501
+  }
+  Status : 2
+  VPN : <dictionary> {
+    ConnectTime : 1547
+    RemoteAddress : 127.0.0.1
+  }
+}

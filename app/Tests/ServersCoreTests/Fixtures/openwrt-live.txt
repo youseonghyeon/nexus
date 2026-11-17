@@ -1,0 +1,140 @@
+@INFO
+100
+4096
+VirtualApple @ 2.50GHz
+@UP
+48830.84 486090.00
+@STAT
+cpu  61457 0 44714 48609004 109 0 4617 0 0 0
+cpu0 7066 0 5880 4856227 40 0 2428 0 0 0
+cpu1 7191 0 5871 4847356 10 0 818 0 0 0
+cpu2 6913 0 5426 4852954 7 0 451 0 0 0
+cpu3 6974 0 5519 4858054 8 0 290 0 0 0
+cpu4 6833 0 5229 4860752 9 0 196 0 0 0
+cpu5 6638 0 4379 4862074 10 0 142 0 0 0
+cpu6 6749 0 4070 4863080 6 0 113 0 0 0
+cpu7 6642 0 4269 4862593 8 0 95 0 0 0
+cpu8 6447 0 4066 4862828 6 0 80 0 0 0
+cpu9 0 0 1 4883080 0 0 0 0 0 0
+procs_running 1
+procs_blocked 0
+@LOAD
+0.27 0.13 0.04 1/334 3468
+@MEM
+MemTotal:       16424732 kB
+MemFree:        15609680 kB
+MemAvailable:   15774852 kB
+Buffers:             156 kB
+Cached:           407408 kB
+SwapCached:            0 kB
+Active:           176828 kB
+Inactive:         353352 kB
+Active(anon):     166608 kB
+Inactive(anon):    25764 kB
+Active(file):      10220 kB
+Inactive(file):   327588 kB
+Unevictable:           0 kB
+Mlocked:               0 kB
+SwapTotal:      17473300 kB
+SwapFree:       17473300 kB
+Dirty:               160 kB
+Writeback:             0 kB
+AnonPages:        117500 kB
+Mapped:           105740 kB
+Shmem:             69760 kB
+KReclaimable:      45888 kB
+Slab:             101616 kB
+SReclaimable:      45888 kB
+SUnreclaim:        55728 kB
+KernelStack:        5488 kB
+PageTables:         6536 kB
+SecPageTables:         0 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:    25685664 kB
+Committed_AS:    8637364 kB
+VmallocTotal:   135288315904 kB
+VmallocUsed:       71172 kB
+VmallocChunk:          0 kB
+Percpu:             3040 kB
+AnonHugePages:         0 kB
+ShmemHugePages:        0 kB
+ShmemPmdMapped:        0 kB
+FileHugePages:         0 kB
+FilePmdMapped:         0 kB
+Balloon:               0 kB
+GPUActive:             0 kB
+GPUReclaim:            0 kB
+@PSI
+@DISK
+   7       0 loop0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       1 loop1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       2 loop2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+   7       3 loop3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  43       0 nbd0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  43      32 nbd1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  43      64 nbd2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  43      96 nbd3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ 254       0 vda 301926 427 40252448 3740 0 0 0 0 0 313761 3740 0 0 0 0 0 0
+ 254      16 vdb 196357 2386 26575457 2968 5890 3351 406784 2449 0 13937 7700 2883 0 666696 266 1558 2015
+ 254      17 vdb1 196284 2386 26575384 2968 5890 3351 406784 2449 0 12878 5684 2883 0 666696 266 0 0
+ 254      32 vdc 3 0 24 0 1 0 8 0 0 5 5 1 0 2097144 5 0 0
+ 253       0 zram0 2 0 16 0 1 0 8 0 0 0 0 0 0 0 0 0 0
+@BLK
+loop0 0 0 0 
+loop1 0 0 0 
+loop2 0 0 0 
+loop3 0 0 0 
+nbd0 0 0 0 
+nbd1 0 0 0 
+nbd2 0 0 0 
+nbd3 0 0 0 
+vda 0 1 840256 
+vdb 0 1 965597217 
+vdc 0 1 2097152 
+zram0 0 0 32849464 
+@MD
+@FREQ
+2000000
+2000000
+2000000
+2000000
+2000000
+2000000
+2000000
+2000000
+2000000
+2000000
+@THROTTLE
+@NET
+wgclient 0 unknown - 736 2624
+wgserver 0 unknown - 2624 736
+@DF
+Filesystem           Type       1024-blocks    Used Available Capacity Mounted on
+overlay              overlay    211550208   4295912 207254296   2% /
+tmpfs                tmpfs          65536         4     65532   0% /dev
+shm                  tmpfs        8211456         0   8211456   0% /dev/shm
+/dev/vdb1            btrfs      211550208   4295912 207254296   2% /etc/hostname
+/dev/vdb1            btrfs      211550208   4295912 207254296   2% /etc/hosts
+/dev/vdb1            btrfs      211550208   4295912 207254296   2% /etc/resolv.conf
+tmpfs                tmpfs              4         0         4   0% /proc/asound
+tmpfs                tmpfs          65536         4     65532   0% /proc/interrupts
+tmpfs                tmpfs          65536         4     65532   0% /proc/keys
+tmpfs                tmpfs          65536         4     65532   0% /proc/timer_list
+tmpfs                tmpfs              4         0         4   0% /sys/firmware
+@TEMP
+@PROC
+1	S	4	1	433	4783766	procd
+107	S	4	1	307	4784061	urngd
+1083	S	0	1	338	4784332	uhttpd
+2380	S	9	1	455	4789220	netifd
+3460	S	1	1	563	4883081	sh
+3538	R	0	1	428	4883102	cat
+3539	R	0	1	457	4883102	awk
+392	S	0	1	311	4784232	logd
+446	S	1	1	548	4784238	rpcd
+655	S	0	1	324	4784281	dropbear
+73	S	2	1	311	4784047	ubusd
+927	S	8	1	381	4784315	odhcpd
+@END

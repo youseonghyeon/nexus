@@ -1,0 +1,12 @@
+exit=28
+code=000
+scheme=HTTPS
+ip=127.0.0.1
+port=18443
+dns=0.000102
+connect=0.000234
+tls=0.000000
+first=0.000000
+total=3.006821
+redirect=
+error=SSL connection timeout

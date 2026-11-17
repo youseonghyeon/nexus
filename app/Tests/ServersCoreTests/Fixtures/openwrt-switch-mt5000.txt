@@ -1,0 +1,39 @@
+@BOARD
+{
+	"switch": {
+		"switch0": {
+			"enable": true,
+			"reset": false,
+			"ports": [
+				{
+					"num": 0,
+					"role": "lan"
+				},
+				{
+					"num": 1,
+					"role": "lan"
+				},
+				{
+					"num": 17,
+					"device": "eth0",
+					"need_tag": false,
+					"want_untag": false
+				}
+			],
+			"roles": [
+				{
+					"role": "lan",
+					"ports": "0 1 17t",
+					"device": "eth0.1"
+				}
+			]
+		}
+	}
+}
+@SWITCH
+switch switch0
+	link: port:0 link:up speed:2500baseT full-duplex
+	link: port:1 link:up speed:1000baseT full-duplex
+	link: port:2 link:down
+	link: port:3 link:down
+@END
