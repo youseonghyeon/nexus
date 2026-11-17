@@ -20,8 +20,8 @@
 - 사용자의 서버 목록에 있는 실제 장비(집·회사 서버)로 ssh·scp·nc·TCP 확인이 나가는 명령을 실행하지 않는다. 실제 동작 확인은 사용자가 한다.
 - 앱을 `--conf <픽스처>` 로 띄우지 않고, 검증용 인스턴스를 따로 띄우지 않는다 — 2026-09-16 픽스처 실행이 passwords.bin 을 지웠다(복구 불가).
   예외는 데모 모드 하나 (`--demo`, 2026-11-17 사용자 승인 — README 스크린샷용, ServersCore `DemoMode`): 상태 폴더는 임시 폴더, 금고 키는 메모리, 명령은 프로세스를 띄우지 않는 `DemoRunner`, 값은 모두 가상.
-  찍는 법: `make release` → `open -g -n build/Nexus.app --args --demo --sample-hidden --select <서버 키|lan|system…>` → 창 크기 1360×940 → `screencapture -x -o -l <창 번호>` → `docs/images/`. 끝나면 데모만 끈다.
-  데모에서 SSH 탭·터널·전송·패킷 캡처를 열지 않는다(러너를 거치지 않고 프로세스를 직접 띄운다). UserDefaults 는 실제 앱과 같이 쓰므로 설정을 바꾸지 않고, 창 크기를 바꿨으면 `NSSplitView Subview Frames …` 값을 되돌린다.
+  찍는 법: `make release` → `open -g -n build/Nexus.app --args --demo --sample-hidden --select <서버 키|lan|system…> -ApplePersistenceIgnoreState YES`(실제 앱의 창을 닫아 둔 상태면 이 옵션 없이는 데모 창이 안 뜬다) → 창 크기 1360×940 → `screencapture -x -o -l <창 번호>` → `docs/images/`. 끝나면 데모만 끈다.
+  데모에서 SSH 탭·터널·전송·패킷 캡처를 열지 않는다(러너를 거치지 않고 프로세스를 직접 띄운다). UserDefaults 는 실제 앱과 같이 쓰므로 설정을 바꾸지 않는다. 데모가 남긴 창 크기 기억값은 그대로 둔다 — `defaults write` 로 되돌리지 않는다 (2026-11-17 되돌리는 스크립트가 문자열 값을 배열로 써서, 떠 있던 실제 앱이 창 위치를 저장하다 죽었다).
   새 화면이 실제 값(SSID·기기 이름·공인 IP)을 러너 밖에서 읽으면 데모 분기를 함께 넣는다 (`WiFiMonitor.refresh`).
 - Intranet(내부망) 켜기·끄기 토글(사이드바 NETWORK·메뉴바)은 AI 가 내부망에 닿지 못하게 하는 물리 차단기다. 켜지 말고, 없애거나 상시 켜 두자고 제안하지 않는다.
 - 커밋 전 게이트는 종료 코드로 본다: `make test` 를 `| grep`·`| tail` 에 넣지 않는다 (파이프 종료 코드는 tail 의 0 — 깨진 커밋이 두 번 나갔다).

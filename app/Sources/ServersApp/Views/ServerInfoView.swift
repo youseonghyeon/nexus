@@ -107,7 +107,7 @@ struct StatusPipeline: View {
     let server: Server
 
     var body: some View {
-        // 단계마다 알약, 사이는 가는 선 — 망에서 SSH 까지 한 줄로 이어진 길로 읽힌다. 확인 방법은 같은 줄 끝에 흐리게.
+        // 단계마다 알약, 사이는 가는 선 — 망에서 SSH 까지 한 줄로 이어진 길로 읽힌다. 확인 간격·방법 문구는 두지 않는다 (2026-11-17).
         HStack(spacing: 0) {
             ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                 if index > 0 { Rectangle().fill(Palette.hairline).frame(width: 18, height: 1) }
@@ -121,15 +121,11 @@ struct StatusPipeline: View {
                 .background(Palette.well, in: Capsule())
                 .overlay(Capsule().strokeBorder(Palette.hairline))
             }
-            HStack(spacing: 10) {
-                if let at = model.status.lastFailAt[server.key] {
-                    Text("마지막 실패 \(at.formatted(date: .omitted, time: .standard))")
-                }
-                Text("\(Int(model.checkInterval))초 간격")
-                Text((server.check == .tcp ? "포트 응답으로 확인" : "SSH 로그인으로 확인") + (server.type == .windows ? "" : " · 안 되면 ping"))
+            if let at = model.status.lastFailAt[server.key] {
+                Text("마지막 실패 \(at.formatted(date: .omitted, time: .standard))")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    .padding(.leading, 14)
             }
-            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            .padding(.leading, 14)
             Spacer(minLength: 0)
         }
     }

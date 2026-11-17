@@ -193,12 +193,18 @@ public enum StatusText {
         case .direct:
             break   // 망 설정 없음: 망 단계 없이 SSH 만
         }
-        // 라벨은 항상 SSH: check=tcp 도 같은 포트(server.port)를 확인 방식만 다르게 본다 (화면 캡션이 방식을 설명한다).
+        // 라벨은 항상 SSH: check=tcp 도 같은 포트(server.port)를 확인 방식만 다르게 본다.
+        // SSH 가 안 될 때만 그 앞에 ping 단계: 응답하면 켜져 있는데 SSH 만 안 되는 것, 없으면 꺼진 것 (2026-11-17 — 설명 문구 대신 단계로).
+        // Windows 는 실패해도 ping 을 보내지 않으므로(StatusMonitor.checkRemote) ping 단계가 없다.
         // 값은 "ok" 대신 "up": 이 단계가 말하는 건 검사 성공 여부가 아니라 서비스가 떠 있는가다.
         switch snapshot.remote(server.key) {
         case let .ok(ms): out.append(PipelineStep(label: "SSH", value: "up \(ms)ms", level: .good))
-        case let .fail(ms): out.append(PipelineStep(label: "SSH", value: "fail \(ms)ms", level: .bad))
-        case .off: out.append(PipelineStep(label: "SSH", value: "down", level: .muted))
+        case let .fail(ms):
+            out.append(PipelineStep(label: "ping", value: "up", level: .good))
+            out.append(PipelineStep(label: "SSH", value: "fail \(ms)ms", level: .bad))
+        case .off:
+            if server.type != .windows { out.append(PipelineStep(label: "ping", value: "down", level: .muted)) }
+            out.append(PipelineStep(label: "SSH", value: "down", level: .muted))
         case .needsAuth: out.append(PipelineStep(label: "SSH", value: "auth required", level: .warn))
         case .skip: out.append(PipelineStep(label: "SSH", value: "skip", level: .muted))
         case .pending: out.append(PipelineStep(label: "SSH", value: "…", level: .warn))

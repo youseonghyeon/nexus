@@ -227,19 +227,26 @@ final class StatusTextTests: XCTestCase {
 
     func testPipelineSSHStepTable() {
         // 마지막 단계는 망과 무관하게 라벨 SSH (check=tcp 도)
-        let rows: [(RemoteState, Step)] = [
-            (.pending, Step(label: "SSH", value: "…", level: .warn)),
-            (.ok(latencyMs: 3), Step(label: "SSH", value: "up 3ms", level: .good)),
-            (.fail(latencyMs: 120), Step(label: "SSH", value: "fail 120ms", level: .bad)),
-            (.off(latencyMs: 8000), Step(label: "SSH", value: "down", level: .muted)),
-            (.needsAuth(url: nil), Step(label: "SSH", value: "auth required", level: .warn)),
-            (.skip(reason: "lan down"), Step(label: "SSH", value: "skip", level: .muted)),
+        // SSH 가 되면 SSH 하나, 안 될 때만 그 앞에 ping (응답 = 켜져 있음 · 없음 = 꺼짐)
+        let rows: [(RemoteState, [Step])] = [
+            (.pending, [Step(label: "SSH", value: "…", level: .warn)]),
+            (.ok(latencyMs: 3), [Step(label: "SSH", value: "up 3ms", level: .good)]),
+            (.fail(latencyMs: 120), [Step(label: "ping", value: "up", level: .good), Step(label: "SSH", value: "fail 120ms", level: .bad)]),
+            (.off(latencyMs: 8000), [Step(label: "ping", value: "down", level: .muted), Step(label: "SSH", value: "down", level: .muted)]),
+            (.needsAuth(url: nil), [Step(label: "SSH", value: "auth required", level: .warn)]),
+            (.skip(reason: "lan down"), [Step(label: "SSH", value: "skip", level: .muted)]),
         ]
-        for (state, step) in rows {
+        for (state, expected) in rows {
             for check in [CheckMethod.ssh, .tcp] {
-                XCTAssertEqual(steps(server(.direct, key: "was", check: check)) { $0.remote["was"] = state }, [step], "\(state) · \(check)")
+                XCTAssertEqual(steps(server(.direct, key: "was", check: check)) { $0.remote["was"] = state }, expected, "\(state) · \(check)")
             }
         }
+        // Windows 는 ping 을 보내지 않는다 — 꺼짐이어도 SSH 하나
+        XCTAssertEqual(steps(server(.direct, key: "win", type: .windows)) { $0.remote["win"] = .off(latencyMs: 3000) },
+                       [Step(label: "SSH", value: "down", level: .muted)])
+        // 망 단계가 있으면 망 → ping → SSH, 망이 꺼져 있으면 확인하지 않으므로 ping 없이 망 → SSH skip
+        XCTAssertEqual(steps(server(.lan, key: "was")) { $0.lan = .up; $0.remote["was"] = .fail(latencyMs: 9) }.map(\.label), ["Intranet", "ping", "SSH"])
+        XCTAssertEqual(steps(server(.lan, key: "was")) { $0.lan = .down; $0.remote["was"] = .skip(reason: "lan down") }.map(\.label), ["Intranet", "SSH"])
     }
 
     // MARK: 터널
