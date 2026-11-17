@@ -66,4 +66,10 @@ final class BrowserPolicyTests: XCTestCase {
             XCTAssertFalse(BrowserPolicy.isLoopback(no), no)
         }
     }
+
+    /// User-Agent 꼬리는 Safari 와 같은 꼴 — 이것이 없으면 사이트가 모르는 브라우저로 본다
+    func testUserAgentSuffixLooksLikeSafari() {
+        XCTAssertEqual(BrowserPolicy.userAgentSuffix(osMajor: 27, osMinor: 2), "Version/27.2 Safari/605.1.15")
+        XCTAssertEqual(BrowserPolicy.userAgentSuffix(osMajor: 28, osMinor: 0), "Version/28.0 Safari/605.1.15")
+    }
 }

@@ -175,6 +175,8 @@ final class AppModel {
     @ObservationIgnored var browserProbes: [String: [Int: WebProbeResult]] = [:]
     @ObservationIgnored var browserProbed: Set<String> = []
     @ObservationIgnored var browserProbing: Set<String> = []
+    /// 앱 안 브라우저의 즐겨찾기 (bookmarks.json — 서버마다 따로). 바꾸는 것은 AppModel+Browser 의 메서드로, 화면은 탭(BrowserSession)이 다시 그린다
+    @ObservationIgnored var browserBookmarks = BookmarkStore.load()
     var tunnelPrompt: TunnelPromptRequest?
     /// 서버 추가 입력창 (servers.conf 에 블록을 붙인다)
     var addServerPrompt: AddServerRequest?

@@ -23,6 +23,14 @@ final class BrowserSession: NSObject, ObservableObject {
     private let onStartShown: @MainActor () -> Void
     /// 시작 페이지에서 ↻ 를 눌렀다 — 모델이 포트 목록을 다시 읽는다
     private let onStartReload: @MainActor () -> Void
+    /// 즐겨찾기(서버별 — 모델이 들고 있다)로 가는 길: 시작 페이지의 즐겨찾기 부분 · 이 주소가 들어 있는가 · 넣기/빼기(주소·제목·아이콘) · 빼기(주소)
+    struct BookmarkHooks {
+        let startHTML: @MainActor () -> String
+        let contains: @MainActor (URL) -> Bool
+        let toggle: @MainActor (URL, String, String?) -> Void
+        let remove: @MainActor (String) -> Void
+    }
+    private let bookmarks: BookmarkHooks
     /// 지금 시작 페이지를 보고 있는가 (포트 목록이 오면 다시 그린다 · 주소창은 비운다)
     private(set) var showingStart = false { didSet { updateCanGoBack() } }
     /// 시작 페이지를 한 번이라도 띄웠는가 (프록시 연결 중에는 뒤로 갈 곳이 없다)
@@ -45,6 +53,8 @@ final class BrowserSession: NSObject, ObservableObject {
     @Published private(set) var isLoading = false
     /// 받은 정도 0…1 (WebKit 의 estimatedProgress) — 주소창 아래 진행 줄. 서버가 답을 안 주면 0.1 근처에 멈춰 있다
     @Published private(set) var progress = 0.0
+    /// 보고 있는 주소가 이 서버의 즐겨찾기에 있는가 (주소창의 별)
+    @Published private(set) var bookmarked = false
     /// SOCKS 터널이 열리기 전(또는 못 열었을 때)의 안내. 페이지가 뜨면 nil.
     @Published private(set) var notice: String? = "프록시 터널 연결 중…"
 
@@ -52,22 +62,29 @@ final class BrowserSession: NSObject, ObservableObject {
     private var downloads: [WKDownload: URL] = [:]
 
     init(server: Server, socksPort: Int, startPage: @escaping @MainActor () -> String, startPorts: @escaping @MainActor () -> String,
-         onStartShown: @escaping @MainActor () -> Void, onStartReload: @escaping @MainActor () -> Void, onStatus: @escaping @MainActor (String) -> Void) {
+         onStartShown: @escaping @MainActor () -> Void, onStartReload: @escaping @MainActor () -> Void, bookmarks: BookmarkHooks,
+         onStatus: @escaping @MainActor (String) -> Void) {
         self.server = server
         self.socksPort = socksPort
         self.startPage = startPage
         self.startPorts = startPorts
         self.onStartShown = onStartShown
         self.onStartReload = onStartReload
+        self.bookmarks = bookmarks
         self.onStatus = onStatus
         relay = SocksRelay(upstreamPort: socksPort) { host, port in BrowserPolicy.route(host: host, port: port) }
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = WKWebsiteDataStore(forIdentifier: Self.storeIdentifier(for: server.key))
+        // 사이트가 Safari 로 알아보게 (이름 없는 기본 User-Agent 에는 구글 등이 옛 화면을 내준다)
+        let os = ProcessInfo.processInfo.operatingSystemVersion
+        configuration.applicationNameForUserAgent = BrowserPolicy.userAgentSuffix(osMajor: os.majorVersion, osMinor: os.minorVersion)
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.isInspectable = true
         super.init()
         webView.navigationDelegate = self
         webView.uiDelegate = self
+        // 시작 페이지의 즐겨찾기 ✕ 가 보내는 것 (약한 참조로 — 컨트롤러가 처리기를 붙들어 탭이 닫혀도 남는 것을 막는다)
+        configuration.userContentController.add(MessageRelay(self), name: "nexus")
         Task {
             do {
                 let port = try await relay.start()
@@ -84,6 +101,7 @@ final class BrowserSession: NSObject, ObservableObject {
                 Task { @MainActor in
                     guard let self else { return }
                     self.url = self.showingStart ? nil : view.url.map(BrowserPolicy.displayed)   // 시작 페이지(about:blank)는 주소창을 비운다
+                    self.updateBookmarked()
                 }
             },
             webView.observe(\.canGoBack) { [weak self] _, _ in Task { @MainActor in self?.updateCanGoBack() } },
@@ -145,6 +163,61 @@ final class BrowserSession: NSObject, ObservableObject {
         guard showingStart, notice == nil else { return }
         guard let json = try? JSONEncoder().encode(startPorts()), let literal = String(data: json, encoding: .utf8) else { return }
         webView.evaluateJavaScript("var p=document.getElementById('ports');if(p){p.innerHTML=\(literal)}", completionHandler: nil)
+    }
+
+    // MARK: 즐겨찾기
+
+    /// 별을 누를 수 있는가: 웹 페이지를 보고 있을 때 (시작 페이지·연결 중에는 넣을 주소가 없다)
+    var canBookmark: Bool { url.map { BookmarkStore.isBookmarkable($0.absoluteString) } ?? false }
+
+    private func updateBookmarked() { bookmarked = url.map(bookmarks.contains) ?? false }
+
+    /// 모델이 부른다 — 이 서버의 즐겨찾기가 바뀌었다 (이 탭·같은 서버의 다른 탭에서): 별과 시작 페이지의 즐겨찾기 줄을 다시 맞춘다
+    func bookmarksChanged() {
+        updateBookmarked()
+        guard showingStart, notice == nil else { return }
+        guard let json = try? JSONEncoder().encode(bookmarks.startHTML()), let literal = String(data: json, encoding: .utf8) else { return }
+        webView.evaluateJavaScript("var m=document.getElementById('marks');if(m){m.innerHTML=\(literal)}", completionHandler: nil)
+    }
+
+    /// 주소창의 별: 들어 있으면 빼고, 없으면 그 페이지의 제목·아이콘과 함께 넣는다. 아이콘은 그 페이지 안에서 받아 data: 주소로 (같은 쿠키·같은 길).
+    func toggleBookmark() {
+        guard let url, canBookmark else { return }
+        let title = self.title
+        if bookmarked { bookmarks.toggle(url, title, nil); return }
+        Task {
+            let icon = try? await webView.callAsyncJavaScript(Self.iconScript, arguments: ["limit": BookmarkStore.iconLimit], in: nil, contentWorld: .defaultClient) as? String
+            guard self.url == url else { return }   // 받는 사이 다른 페이지로 갔으면 넣지 않는다
+            bookmarks.toggle(url, title, icon)
+        }
+    }
+
+    /// <link rel="icon"> → 없으면 /favicon.ico. 64KB 이하의 그림만, 2초 안에. 못 받으면 null (아이콘 없이 넣는다).
+    private static let iconScript = """
+        const link = [...document.querySelectorAll('link[rel]')].find(l => l.rel.toLowerCase().split(/\\s+/).includes('icon'));
+        const urls = [];
+        if (link && link.href) urls.push(link.href);
+        urls.push(new URL('/favicon.ico', location.href).href);
+        for (const u of urls) {
+            try {
+                if (u.startsWith('data:')) { if (u.startsWith('data:image/') && u.length <= limit) return u; continue; }
+                const stop = new AbortController(); const timer = setTimeout(() => stop.abort(), 2000);
+                const response = await fetch(u, { credentials: 'include', signal: stop.signal });
+                if (!response.ok) { clearTimeout(timer); continue; }
+                const blob = await response.blob(); clearTimeout(timer);
+                if (blob.size === 0 || blob.size > 65536 || !(blob.type || '').startsWith('image/')) continue;
+                const data = await new Promise(done => { const r = new FileReader(); r.onload = () => done(r.result); r.onerror = () => done(null); r.readAsDataURL(blob); });
+                if (data && data.length <= limit) return data;
+            } catch (e) {}
+        }
+        return null;
+        """
+
+    /// 시작 페이지가 보낸 것만 받는다 — 이 탭이 여는 다른 웹 페이지도 같은 이름으로 보낼 수 있다
+    fileprivate func received(_ message: WKScriptMessage) {
+        guard showingStart, message.frameInfo.isMainFrame, webView.url?.absoluteString == "about:blank",
+              let body = message.body as? [String: Any], let address = body["remove"] as? String else { return }
+        bookmarks.remove(address)
     }
 
     func goBack() {
@@ -321,5 +394,14 @@ extension BrowserSession: WKUIDelegate {
         panel.canChooseDirectories = parameters.allowsDirectories
         panel.canChooseFiles = true
         return panel.runModal() == .OK ? panel.urls : nil
+    }
+}
+
+/// 스크립트 메시지를 탭에 넘기는 약한 다리 (WKUserContentController 는 처리기를 강하게 붙든다)
+private final class MessageRelay: NSObject, WKScriptMessageHandler {
+    private weak var session: BrowserSession?
+    init(_ session: BrowserSession) { self.session = session }
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        MainActor.assumeIsolated { session?.received(message) }
     }
 }

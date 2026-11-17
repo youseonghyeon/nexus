@@ -13,6 +13,13 @@ public enum BrowserPolicy {
     /// 루프백 별칭의 꼬리. 앞은 원래 호스트의 점을 줄표로 (127.0.0.1 → 127-0-0-1.server.localhost, localhost → localhost.server.localhost)
     static let aliasSuffix = ".server.localhost"
 
+    /// User-Agent 의 꼬리 — Safari 가 붙이는 것과 같은 꼴 ("Version/27.1 Safari/605.1.15").
+    /// WebKit 기본값은 "… AppleWebKit/605.1.15 (KHTML, like Gecko)" 에서 끝나 브라우저 이름이 없다 — 구글이 모르는 브라우저로 보고 옛 기본 HTML 판을 내줬다 (2026-11-17).
+    /// Safari 버전은 macOS 버전을 따라간다 (26 부터). 605.1.15 는 Safari 가 고정해 쓰는 값.
+    public static func userAgentSuffix(osMajor: Int, osMinor: Int) -> String {
+        "Version/\(osMajor).\(osMinor) Safari/605.1.15"
+    }
+
     /// 127.0.0.0/8·localhost 인가. IPv6 루프백(::1)은 다루지 않는다 (별칭으로 바꾸지 않고 그대로 둔다).
     public static func isLoopback(_ host: String) -> Bool {
         let h = host.lowercased()

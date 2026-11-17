@@ -1,4 +1,4 @@
-// 브라우저 탭 화면: 주소창(◀ ▶ ↻ ⌂ · URL, 아래에 진행 줄) + WKWebView. 통신은 BrowserSession/BrowserPolicy — 그 서버에서 켠 브라우저처럼.
+// 브라우저 탭 화면: 주소창(◀ ▶ ↻ ⌂ · URL · ☆ 즐겨찾기, 아래에 진행 줄) + WKWebView. 통신은 BrowserSession/BrowserPolicy — 그 서버에서 켠 브라우저처럼.
 
 import ServersCore
 import SwiftUI
@@ -28,6 +28,11 @@ struct BrowserPane: View {
                     .onSubmit { browser.load(address); addressFocused = false }
                     .onChange(of: browser.url) { _, url in if !addressFocused { address = url?.absoluteString ?? "" } }
                     .onAppear { address = browser.url?.absoluteString ?? "" }
+                // 즐겨찾기 별: 이 서버의 즐겨찾기에 넣고 뺀다 (시작 페이지 맨 위에 보인다)
+                Button { browser.toggleBookmark() } label: { Image(systemName: browser.bookmarked ? "star.fill" : "star") }
+                    .accessibilityLabel(browser.bookmarked ? "즐겨찾기에서 빼기" : "즐겨찾기에 넣기")
+                    .help(browser.bookmarked ? "즐겨찾기에서 빼기" : "즐겨찾기에 넣기 — \(browser.server.key) 의 시작 페이지에 보입니다")
+                    .disabled(!browser.canBookmark)
                 Text("프록시: \(browser.server.key)")
                     .font(.caption).foregroundStyle(.secondary)
                     .help("이 탭은 \(browser.server.key) 서버(\(browser.server.ip))에서 브라우저를 켠 것처럼 동작합니다. 127.0.0.1 은 그 서버 자신입니다")

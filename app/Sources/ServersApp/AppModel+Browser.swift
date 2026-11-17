@@ -30,7 +30,41 @@ extension AppModel {
         let state = status.remote(current.key)
         let hero = BrowserStartPage.Hero(key: current.key, target: current.target, role: current.role, tags: ServerTags.parse(current.env),
                                          status: StatusText.conclusion(state, lanName: networkName(.lan)), level: StatusText.remoteLevel(state))
-        return BrowserStartPage.html(hero: hero, portsHTML: browserStartPorts(for: server))
+        return BrowserStartPage.html(hero: hero, bookmarksHTML: browserStartMarks(for: server), portsHTML: browserStartPorts(for: server))
+    }
+
+    // MARK: 즐겨찾기 (서버마다 따로 — BookmarkStore)
+
+    /// 시작 페이지의 즐겨찾기 부분 (넣고 뺄 때마다 이 부분만 갈아 끼운다)
+    func browserStartMarks(for server: Server) -> String {
+        BrowserStartPage.bookmarksHTML(browserBookmarks.servers[server.key] ?? [])
+    }
+
+    func isBookmarked(_ url: URL, on server: Server) -> Bool {
+        BookmarkStore.contains(url.absoluteString, serverKey: server.key, in: browserBookmarks)
+    }
+
+    /// 주소창의 별: 있으면 빼고 없으면 넣는다
+    func toggleBookmark(_ url: URL, title: String, icon: String?, on server: Server) {
+        let address = url.absoluteString
+        if BookmarkStore.contains(address, serverKey: server.key, in: browserBookmarks) {
+            saveBookmarks(BookmarkStore.removing(url: address, serverKey: server.key, from: browserBookmarks), for: server.key)
+        } else {
+            saveBookmarks(BookmarkStore.adding(url: address, title: title, icon: icon, serverKey: server.key, to: browserBookmarks), for: server.key)
+        }
+    }
+
+    /// 시작 페이지 타일의 ✕
+    func removeBookmark(_ address: String, on server: Server) {
+        saveBookmarks(BookmarkStore.removing(url: address, serverKey: server.key, from: browserBookmarks), for: server.key)
+    }
+
+    /// 저장하고, 그 서버의 브라우저 탭(시작 페이지의 즐겨찾기 줄 · 주소창의 별)을 다시 맞춘다. 바뀐 것이 없으면 아무것도 안 한다.
+    func saveBookmarks(_ state: BookmarkState, for serverKey: String? = nil) {
+        guard state != browserBookmarks else { return }
+        browserBookmarks = state
+        do { try BookmarkStore.save(state) } catch { statusMessage = "즐겨찾기 저장 실패: \(error.localizedDescription)" }
+        for tab in tabs where serverKey == nil || tab.owner == serverKey { tab.browser?.bookmarksChanged() }
     }
 
     /// 포트 목록이 새로 왔다 — 그 서버의 시작 페이지를 보고 있는 탭의 포트 부분을 다시 그리고, 아직 안 물었으면 웹 확인을 시작한다
@@ -77,6 +111,11 @@ extension AppModel {
                                      startPorts: { [weak self] in self?.browserStartPorts(for: server) ?? "" },
                                      onStartShown: { [weak self] in self?.probeBrowserPorts(server.key) },
                                      onStartReload: { [weak self] in self?.reloadBrowserStart(server) },
+                                     bookmarks: BrowserSession.BookmarkHooks(
+                                        startHTML: { [weak self] in self?.browserStartMarks(for: server) ?? "" },
+                                        contains: { [weak self] in self?.isBookmarked($0, on: server) ?? false },
+                                        toggle: { [weak self] url, title, icon in self?.toggleBookmark(url, title: title, icon: icon, on: server) },
+                                        remove: { [weak self] in self?.removeBookmark($0, on: server) }),
                                      onStatus: { [weak self] in self?.statusMessage = $0 })
         // 시작 페이지에 보일 열린 포트 — 아직 읽은 적 없으면 조용히 읽는다 (인증이 필요하면 안내만, ↻ 가 창을 띄운다)
         if info(server, .ports).fetchedAt == nil { fetchInfo(server, .ports, allowPrompt: false) }

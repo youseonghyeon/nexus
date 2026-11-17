@@ -1,4 +1,4 @@
-// 앱 안 브라우저 탭의 시작 페이지 (2026-11-17 시안 D → 같은 날 타일을 다듬음): 대표 카드(서버·태그·상태) + 주소칸 + 웹 타일 + 제목 없는 응답 칩 + 그 밖 포트 목록.
+// 앱 안 브라우저 탭의 시작 페이지 (2026-11-17 시안 D → 같은 날 타일을 다듬음): 대표 카드(서버·태그·상태) + 주소칸 + 즐겨찾기 타일(BookmarkStore) + 웹 타일 + 제목 없는 응답 칩 + 그 밖 포트 목록.
 // 서버에 띄우는 것이 아니라 앱이 그려 탭에 넣는다. 타일을 누르면 그 탭에서 서버 쪽 주소(localhost:<포트>)로 연다 — 탭은 그 서버에서 켠 브라우저처럼 동작한다 (BrowserPolicy).
 // 포트 목록은 서버 화면 Ports 탭과 같은 값(PortItem). "웹" 타일은 화면이 있는 것 — 제목이 있는 응답(WebProbe).
 // HTTP 로 답했지만 제목이 없는 포트(API·리다이렉트·오류)는 칩 한 줄, 답이 없는 포트는 "그 밖".
@@ -145,11 +145,24 @@ public enum BrowserStartPage {
         return out
     }
 
+    /// 즐겨찾기 부분 (<div id="marks"> 안) — 넣고 뺄 때마다 이 부분만 갈아 끼운다. 없으면 빈 문자열(줄 자체가 없다).
+    /// 타일은 웹 타일과 같은 꼴(아이콘 · 제목 · 아랫줄에 짧은 주소), 마우스를 올리면 ✕ — 누르면 앱에 알린다 (script 의 messageHandlers.nexus).
+    public static func bookmarksHTML(_ marks: [BrowserBookmark]) -> String {
+        let usable = marks.filter { BookmarkStore.isBookmarkable($0.url) }
+        guard !usable.isEmpty else { return "" }
+        return "<h2>즐겨찾기</h2><div class=\"grid\">" + usable.map { mark in
+            let icon = mark.icon.map { "<img class=\"i\" src=\"\(escape($0))\" alt=\"\">" } ?? placeholderIcon
+            return "<a class=\"tile\" href=\"\(escape(mark.url))\">\(icon)<div class=\"x\"><div class=\"t\">\(escape(mark.title))</div>"
+                + "<div class=\"b\"><span class=\"u\">\(escape(BookmarkStore.shortAddress(mark.url)))</span></div></div>"
+                + "<button class=\"rm\" data-u=\"\(escape(mark.url))\" title=\"즐겨찾기에서 빼기\">✕</button></a>"
+        }.joined() + "</div>"
+    }
+
     /// 아이콘이 없는 타일의 자리 그림 (무채색 지구본) — 비워 두면 그 타일만 글자 시작 위치가 어긋난다
     static let placeholderIcon = "<svg class=\"i ph\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.1\"><circle cx=\"8\" cy=\"8\" r=\"4.6\"/>"
         + "<path d=\"M3.4 8h9.2M8 3.4c-1.8 1.4-1.8 7.8 0 9.2M8 3.4c1.8 1.4 1.8 7.8 0 9.2\"/></svg>"
 
-    public static func html(hero: Hero, portsHTML: String) -> String {
+    public static func html(hero: Hero, bookmarksHTML: String = "", portsHTML: String) -> String {
         let tags = hero.tags.map { tag -> String in
             let tone: String
             switch ServerTags.tone(tag) { case .production: tone = " prod"; case .staging: tone = " stg"; case .plain: tone = "" }
@@ -183,7 +196,7 @@ public enum BrowserStartPage {
         .box input::placeholder{color:var(--faint)}
         h2{font-size:11px;font-weight:600;color:var(--dim);margin:0 0 8px 4px}
         .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:22px}
-        .tile{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;color:inherit;text-decoration:none;min-width:0}
+        .tile{position:relative;display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;color:inherit;text-decoration:none;min-width:0}
         .tile:hover,.chip:hover{background:color-mix(in srgb,var(--card),var(--text) 4%)}
         .i{width:24px;height:24px;border-radius:5px;flex:none;object-fit:contain}
         .i.ph{background:var(--well);color:var(--faint);padding:4px}
@@ -196,6 +209,9 @@ public enum BrowserStartPage {
         .k{font:600 9.5px ui-monospace,Menlo,monospace;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:1px 4px;flex:none}
         .s{font:600 11px ui-monospace,Menlo,monospace;color:var(--dim);flex:none}.s.warn{color:var(--warn)}
         .tile .s{margin-left:auto}
+        .tile .u{font:11.5px ui-monospace,Menlo,monospace;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+        .rm{position:absolute;top:7px;right:7px;width:20px;height:20px;border:0;border-radius:6px;background:var(--well);color:var(--dim);font-size:10px;line-height:20px;padding:0;cursor:pointer;opacity:0}
+        .tile:hover .rm{opacity:1}.rm:hover{color:var(--text)}
         .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}
         .chip{display:flex;gap:8px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:inherit;text-decoration:none}
         .chip em{font-style:normal;font-size:12px;color:var(--dim)}
@@ -209,12 +225,15 @@ public enum BrowserStartPage {
         <div class="right"><span class="pill \(level)"><i></i>\(escape(hero.status))</span></div></div>
         <form onsubmit="return go()"><label class="box"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
         <input id="q" placeholder="주소 또는 포트 번호" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus></label></form>
+        <div id="marks">\(bookmarksHTML)</div>
         <div id="ports">\(portsHTML)</div>
         </main>
         <script>
         function go(){var v=document.getElementById('q').value.trim();if(!v)return false;
           if(/^[0-9]{1,5}$/.test(v))v='http://localhost:'+v+'/';else if(!/^[a-z][a-z0-9+.-]*:\\/\\//i.test(v))v='http://'+v;
           location.href=v;return false}
+        document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.rm');if(!b)return;e.preventDefault();e.stopPropagation();
+          try{window.webkit.messageHandlers.nexus.postMessage({remove:b.dataset.u})}catch(_){}} ,true);
         </script></html>
         """
     }
