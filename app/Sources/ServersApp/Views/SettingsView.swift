@@ -1,4 +1,4 @@
-// 설정 창 (⌘,): 흩어져 있던 설정(화면 모드 · 서버 이름 터널 · 숨김 파일)과 갱신 간격 · 코어 막대 애니메이션 · 비밀번호 키 · 부팅 경로 · 버전.
+// 설정 창 (⌘,): 흩어져 있던 설정(화면 모드 · 숨김 파일)과 갱신 간격 · 코어 막대 애니메이션 · 비밀번호 키 · 부팅 경로 · 버전.
 // 값은 UserDefaults — 키·고를 수 있는 값·기본값은 ServersCore AppPreferences. 바꾸면 바로 반영된다 (다음 갱신부터).
 
 import AppKit
@@ -8,7 +8,6 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @AppStorage(AppearanceMode.defaultsKey) private var appearance = AppearanceMode.system
-    @AppStorage(AppPreferences.namedTunnelsKey) private var namedTunnels = true
     @AppStorage(AppPreferences.remoteShowHiddenKey) private var showHidden = false
     @AppStorage(AppPreferences.statusInterval.key) private var statusInterval = AppPreferences.statusInterval.defaultValue
     @AppStorage(AppPreferences.systemInterval.key) private var systemInterval = AppPreferences.systemInterval.defaultValue
@@ -30,10 +29,9 @@ struct SettingsView: View {
                 SectionHeader("화면")
             }
             Section {
-                Toggle("터널을 localhost 대신 서버 이름으로 열기", isOn: $namedTunnels)
                 Toggle("원격 파일 탐색에서 숨김 파일 보기", isOn: $showHidden)
             } header: {
-                SectionHeader("터널 · 파일")
+                SectionHeader("파일")
             }
             Section {
                 intervalPicker("서버 상태 확인", AppPreferences.statusInterval, $statusInterval)

@@ -28,8 +28,6 @@ public enum AppPreferences {
 
     /// 시스템 화면 코어 막대가 값 사이를 이어 움직이는가 (기본 켬)
     public static let coreAnimationKey = "coreBarAnimation"
-    /// 터널을 localhost 대신 서버 이름(루프백 별칭)으로 열기 — 터널 입력창 체크박스와 같은 값 (기본 켬)
-    public static let namedTunnelsKey = "namedTunnels"
     /// 원격 파일 탐색에서 숨김 파일 보기 — 탐색 창 체크박스와 같은 값 (기본 끔)
     public static let remoteShowHiddenKey = "remoteBrowserShowHidden"
 

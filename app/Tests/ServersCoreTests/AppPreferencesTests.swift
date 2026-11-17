@@ -26,11 +26,10 @@ final class AppPreferencesTests: XCTestCase {
     }
 
     func testKeysMatchExistingStoredSettings() {
-        // 터널 입력창·원격 탐색 창의 체크박스가 이미 이 키로 저장해 왔다 — 설정 창도 같은 값을 본다
-        XCTAssertEqual(AppPreferences.namedTunnelsKey, "namedTunnels")
+        // 원격 탐색 창의 체크박스가 이미 이 키로 저장해 왔다 — 설정 창도 같은 값을 본다
         XCTAssertEqual(AppPreferences.remoteShowHiddenKey, "remoteBrowserShowHidden")
         let keys = [AppPreferences.statusInterval.key, AppPreferences.systemInterval.key, AppPreferences.diskInterval.key,
-                    AppPreferences.bluetoothInterval.key, AppPreferences.serverLiveInterval.key, AppPreferences.coreAnimationKey, AppPreferences.namedTunnelsKey, AppPreferences.remoteShowHiddenKey]
+                    AppPreferences.bluetoothInterval.key, AppPreferences.serverLiveInterval.key, AppPreferences.coreAnimationKey, AppPreferences.remoteShowHiddenKey]
         XCTAssertEqual(Set(keys).count, keys.count, "키가 겹치지 않는다")
     }
 

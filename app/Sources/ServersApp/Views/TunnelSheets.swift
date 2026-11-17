@@ -124,8 +124,9 @@ struct TunnelPromptSheet: View {
     @State private var local: String
     /// 원격 호스트 입력. 비우면 서버 자신(localhost), IP·이름을 쓰면 서버를 거쳐 그 주소로.
     @State private var host: String
-    /// 서버 주소로 열기 (루프백 별칭 + hosts 이름). 마지막 선택을 기억한다.
-    @AppStorage(AppPreferences.namedTunnelsKey) private var named = true   // 설정 창에도 같은 값
+    /// 서버 주소로 열기 (루프백 별칭 + hosts 이름). 늘 localhost 에서 시작하고, 여기서 고른 것은 이 터널에만 쓴다 (2026-11-17) —
+    /// 서버 이름 방식은 /etc/hosts 를 고치느라 처음 한 번·재부팅 뒤 관리자 인증을 묻는다. 예전엔 기본이 서버 이름이고 마지막 선택을 설정에 기억했다.
+    @State private var named = false
     /// hosts 이름 입력. 비우면 기본 이름(<서버키>.<그룹>).
     @State private var name = ""
 
@@ -133,9 +134,8 @@ struct TunnelPromptSheet: View {
         self.request = request
         _remote = State(initialValue: request.remotePort.map(String.init) ?? "")
         _host = State(initialValue: request.remoteHost == "127.0.0.1" ? "" : request.remoteHost)
-        // 제안 로컬 포트(127.0.0.1 기준 다음 빈 포트)는 localhost 모드용. 서버 주소 모드는 별칭 주소라 원격과 같은 포트가 기본 — 비워서 placeholder 로 보인다.
-        let namedOn = UserDefaults.standard.object(forKey: AppPreferences.namedTunnelsKey) as? Bool ?? true
-        _local = State(initialValue: namedOn ? "" : request.localPort.map(String.init) ?? "")
+        // 제안 로컬 포트(127.0.0.1 기준 다음 빈 포트)를 채워 둔다 — 창은 localhost 방식으로 열린다
+        _local = State(initialValue: request.localPort.map(String.init) ?? "")
     }
 
     private var server: Server { request.server }
@@ -162,48 +162,65 @@ struct TunnelPromptSheet: View {
         return draft.nameProblem(defaultName: preview.name) { model.namedTunnelConflict(name: $0, address: address) }
     }
 
+    private enum Field { case remotePort, localPort }
+    @FocusState private var focus: Field?
+
+    /// 터널의 한쪽 (이 Mac · 서버) — 머리 줄(이름 · 오른쪽 조작부) + 주소 줄(호스트 : 포트) + 안내 한 줄
+    private func side<Trailing: View, Address: View>(_ title: String, hint: String, @ViewBuilder trailing: () -> Trailing, @ViewBuilder address: () -> Address) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(verbatim: title).font(.cardTitle).foregroundStyle(.secondary).lineLimit(1)
+                Spacer(minLength: 0)
+                trailing()
+            }
+            .frame(height: 26)   // 고르개가 있는 쪽과 없는 쪽의 주소 줄 높이를 맞춘다
+            HStack(spacing: 6) { address() }
+            Text(verbatim: hint).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.content, in: RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous).strokeBorder(Palette.hairline))
+    }
+
+    private var colon: some View { Text(verbatim: ":").font(.body.monospaced().weight(.semibold)).foregroundStyle(.tertiary) }
+
+    // 창이 곧 터널 그림이다 (2026-11-17 시안 A): 왼쪽 이 Mac → 오른쪽 서버. 예전엔 안내문(`…:<로컬> → … 127.0.0.1:<원격>`)과 아래 칸들이 같은 것을 다른 순서로 두 번 말했고,
+    // 꼭 넣어야 하는 원격 포트가 맨 아래였다. 커서는 원격 포트에서 시작한다 (DB 터널은 원격이 고정이라 로컬 포트).
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(isDB ? "\(server.key) DB 터널" : "\(server.key) 로컬 포트 터널").font(.title3.weight(.semibold))
-            // 안내문은 입력을 따라 바로 바뀐다: 로컬 쪽은 모드(db.acme / localhost)와 로컬 포트(비우면 기본값), 원격 포트는 비어 있으면 <원격>
-            let localSide = "\(named ? hostName : "localhost"):\(localPort.map(String.init) ?? "<로컬>")"
-            if let dbTarget = request.dbTarget {
-                Text(verbatim: "\(localSide) → \(server.key) 경유 → \(dbTarget.host):\(dbTarget.port)\(dbTarget.name.map { " (\($0))" } ?? "")")
-                    .font(.callout).foregroundStyle(.secondary)
-            } else {
-                // 서버 너머 주소면 DB 터널처럼 "nexus 경유 → 10.0.0.5:9090"
-                let port = remotePort.map(String.init) ?? "<원격>"
-                let route = switch remoteHost {
-                case nil: "\(server.key) 경유 → <원격 호스트>:\(port)"
-                case "127.0.0.1": "\(server.key) 127.0.0.1:\(port)"
-                case let h?: "\(server.key) 경유 → \(h.contains(":") ? "[\(h)]" : h):\(port)"
+            Text(isDB ? "\(server.key) DB 터널" : "\(server.key) 포트 터널").font(.title3.weight(.semibold))
+            HStack(alignment: .top, spacing: 10) {
+                side("이 Mac", hint: "포트를 비우면 원격과 같은 번호") {
+                    PlainSegmented(items: [false, true], selection: $named, title: { $0 ? "서버 이름" : "localhost" })
+                        .help("서버 이름: 127.0.0.1 이 아니라 서버별 루프백 주소에 열고, /etc/hosts 에 \(hostName) 이름을 등록합니다. 서버마다 같은 포트를 써도 겹치지 않습니다. 처음 한 번·재부팅 뒤 관리자 인증.")
+                } address: {
+                    if named {
+                        TextField(preview.name, text: $name).font(.body.monospaced()).accessibilityLabel("이름")
+                    } else {
+                        Text(verbatim: "localhost").font(.body.monospaced()).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    colon
+                    TextField(remotePort.map { String(PortAllocator.suggestedLocalPort(forRemote: $0)) } ?? "자동", text: $local)
+                        .font(.body.monospaced()).frame(width: 76).focused($focus, equals: .localPort).accessibilityLabel("로컬 포트")
                 }
-                Text(verbatim: "\(localSide) → \(route)")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-            Toggle(isOn: $named) {
-                Text("localhost 대신 서버 이름으로 열기")
-            }
-            .toggleStyle(.checkbox)
-            .help("127.0.0.1 이 아니라 서버별 루프백 주소에 열고, /etc/hosts 에 \(hostName) 이름을 등록합니다. 서버마다 같은 포트를 써도 겹치지 않습니다. 처음 한 번·재부팅 뒤 관리자 인증.")
-            Grid(alignment: .leading) {
-                // 서버 주소 모드는 이름을 먼저. 그다음 로컬 포트: 안내문(localhost:<로컬> → …)과 같은 순서. 비우면 원격과 같은 포트(특권 포트면 +8000).
-                if named {
-                    GridRow {
-                        Text("이름")
-                        TextField(preview.name, text: $name).frame(width: 200)
+                Image(systemName: "arrow.right").foregroundStyle(.tertiary).padding(.top, 12 + 26 + 8 + 4)   // 주소 줄 높이에 (칸 안 여백 + 머리 줄 + 간격)
+                if let dbTarget = request.dbTarget {
+                    side("\(server.key) 경유", hint: dbTarget.name.map { "데이터베이스 \($0)" } ?? "servers.conf 의 DB 주소") { EmptyView() } address: {
+                        Text(verbatim: "\(dbTarget.host):\(dbTarget.port)").font(.body.monospaced()).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.middle).frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+                    }
+                } else {
+                    side("\(server.key) 에서", hint: "호스트를 비우면 서버 자신") { EmptyView() } address: {
+                        TextField("127.0.0.1", text: $host).font(.body.monospaced()).accessibilityLabel("원격 호스트")
+                        colon
+                        TextField("포트", text: $remote).font(.body.monospaced()).frame(width: 76).focused($focus, equals: .remotePort).accessibilityLabel("원격 포트")
                     }
                 }
-                GridRow {
-                    Text("로컬 포트")
-                    TextField(remotePort.map { String(PortAllocator.suggestedLocalPort(forRemote: $0)) } ?? "원격과 같음", text: $local).frame(width: 120)
-                }
-                if let dbTarget = request.dbTarget {
-                    GridRow { Text("원격"); Text(verbatim: "\(dbTarget.host):\(dbTarget.port)").foregroundStyle(.secondary) }
-                } else {
-                    GridRow { Text("원격 호스트"); TextField("127.0.0.1", text: $host).frame(width: 200) }
-                    GridRow { Text("원격 포트"); TextField("예: 6443", text: $remote).frame(width: 120) }
-                }
+            }
+            if let l = localPort, draft.canOpen(nameProblem: nameProblem) {
+                (Text("열리면 ") + Text(verbatim: "\(named ? hostName : "localhost"):\(l)").font(.callout.monospaced()).foregroundStyle(.primary) + Text(" 으로 접속합니다"))
+                    .font(.callout).foregroundStyle(.secondary)
             }
             if localIsPrivileged {
                 let suggested = localPort.map { PortAllocator.suggestedLocalPort(forRemote: $0) } ?? 8443
@@ -239,6 +256,7 @@ struct TunnelPromptSheet: View {
             }
         }
         .padding(16)
-        .frame(width: 440)
+        .frame(width: 620)
+        .onAppear { focus = isDB ? .localPort : .remotePort }
     }
 }

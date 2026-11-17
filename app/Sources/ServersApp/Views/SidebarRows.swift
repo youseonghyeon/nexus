@@ -353,9 +353,6 @@ struct ServerContextMenu: View {
         if let settings = model.config?.settings(for: server.group), settings.dbJump == server.key {
             Button("DB Tunnel") { model.promptDBTunnel(server) }.disabled(!reachable)
         }
-        ForEach(server.tunnelPorts, id: \.self) { quick in
-            Button("\(quick.label)…") { model.promptTunnelToPort(server, port: quick.port) }.disabled(!reachable)
-        }
         Button("Upload…") { model.chooseUpload(server) }.disabled(!reachable)
         Button("Download…") { model.promptDownload(server) }.disabled(!reachable)
         // Spec·Services·Ports·실시간은 정보 화면 탭에만 둔다

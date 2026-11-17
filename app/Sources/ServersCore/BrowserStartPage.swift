@@ -1,6 +1,6 @@
 // 앱 안 브라우저 탭의 시작 페이지 (2026-11-17 시안 D → 같은 날 타일을 다듬음): 대표 카드(서버·태그·상태) + 주소칸 + 웹 타일 + 제목 없는 응답 칩 + 그 밖 포트 목록.
 // 서버에 띄우는 것이 아니라 앱이 그려 탭에 넣는다. 타일을 누르면 그 탭에서 서버 쪽 주소(localhost:<포트>)로 연다 — 탭은 그 서버에서 켠 브라우저처럼 동작한다 (BrowserPolicy).
-// 포트 목록은 서버 화면 Ports 탭과 같은 값(PortItem). "웹" 타일은 화면이 있는 것 — 이름 붙인 포트(tunnel_ports)와 제목이 있는 응답(WebProbe).
+// 포트 목록은 서버 화면 Ports 탭과 같은 값(PortItem). "웹" 타일은 화면이 있는 것 — 제목이 있는 응답(WebProbe).
 // HTTP 로 답했지만 제목이 없는 포트(API·리다이렉트·오류)는 칩 한 줄, 답이 없는 포트는 "그 밖".
 // 타일은 아이콘(24) | 제목 · 아랫줄(포트 · https · 상태 코드). 주소는 적지 않는다 — 포트가 이미 말하고 거의 다 127.0.0.1 이라 중복이었다 (특정 주소에 묶인 포트만 그 주소).
 // 이 파일은 나누기와 HTML 만들기만 (순수 함수, 테스트 대상).
@@ -11,7 +11,7 @@ public enum BrowserStartPage {
     public enum PortsState: Sendable, Equatable {
         case loading
         case loaded([PortItem])
-        /// 못 읽음 (인증 필요·접속 실패) — 이름 붙은 포트만 보인다
+        /// 못 읽음 (인증 필요·접속 실패)
         case failed
     }
 
@@ -30,10 +30,8 @@ public enum BrowserStartPage {
 
     public struct Tile: Sendable, Equatable {
         public let port: Int
-        /// 큰 글씨: 붙인 이름 → 페이지 제목 → 알려진 서비스 이름
+        /// 큰 글씨: 페이지 제목
         public let title: String
-        /// 작은 글씨: 이름을 붙였으면 페이지 제목
-        public let detail: String
         public let url: String
         /// 웹 확인이 받은 상태 코드 — 2xx 가 아닐 때만 보인다 (badge)
         public var status: Int? = nil
@@ -71,26 +69,18 @@ public enum BrowserStartPage {
     }
 
     /// 웹 타일 · 제목 없는 응답 칩 · 그 밖 목록으로 나눈다.
-    ///   이름 붙인 포트(tunnel_ports, 적은 순서)는 늘 타일 — 목록에 없어도(아직 못 읽었거나 지금 안 떠 있음) localhost 로 연다.
     ///   물어볼 포트(WebProbe.isCandidate): 제목과 함께 답했으면 타일, 제목 없이 답했거나 아직 묻는 중이면 칩, 다 물었는데 답이 없으면 그 밖.
     ///   번호로 아는 비웹 포트와 서버 자신도 닿지 못하는 대기는 그 밖.
-    public static func sections(named: [QuickTunnel], ports: [PortItem], probes: [Int: WebProbeResult], probed: Bool) -> (web: [Tile], bare: [Chip], other: [Other]) {
-        let byPort = Dictionary(ports.map { ($0.port, $0) }, uniquingKeysWith: { first, _ in first })
+    public static func sections(ports: [PortItem], probes: [Int: WebProbeResult], probed: Bool) -> (web: [Tile], bare: [Chip], other: [Other]) {
         var seen: Set<Int> = []
         var web: [Tile] = [], bare: [Chip] = [], other: [Other] = []
         func host(_ item: PortItem?) -> String { item.flatMap(host(for:)) ?? "localhost" }
         func url(_ port: Int, _ item: PortItem?) -> String { "\(probes[port]?.scheme ?? "http")://\(host(item)):\(port)/" }
         func address(_ item: PortItem?) -> String { ["localhost", "127.0.0.1"].contains(host(item)) ? "" : host(item) }
-        for quick in named where seen.insert(quick.port).inserted {
-            let item = byPort[quick.port], result = probes[quick.port]
-            let fallback = item?.label ?? "포트 \(quick.port)"
-            web.append(Tile(port: quick.port, title: quick.name ?? result?.title ?? fallback, detail: quick.name == nil ? "" : (result?.title ?? ""),
-                            url: url(quick.port, item), status: result?.status, icon: result?.icon, address: address(item)))
-        }
         for item in ports.sorted(by: { $0.port < $1.port }) where seen.insert(item.port).inserted {
             if WebProbe.isCandidate(item), let result = probes[item.port] {
                 if let title = result.title {
-                    web.append(Tile(port: item.port, title: title, detail: "", url: url(item.port, item), status: result.status, icon: result.icon, address: address(item)))
+                    web.append(Tile(port: item.port, title: title, url: url(item.port, item), status: result.status, icon: result.icon, address: address(item)))
                 } else {
                     bare.append(Chip(port: item.port, label: item.label ?? "", url: url(item.port, item), status: result.status))
                 }
@@ -110,21 +100,19 @@ public enum BrowserStartPage {
         return address == "*" ? "localhost" : (address.contains(":") ? "[\(address)]" : address)
     }
 
-    /// 물어볼 대상 (WebProbe.probeAll 에 넘긴다): 이름 붙인 포트 + 물어볼 포트
-    public static func probeTargets(named: [QuickTunnel], ports: [PortItem]) -> [(port: Int, host: String)] {
-        let byPort = Dictionary(ports.map { ($0.port, $0) }, uniquingKeysWith: { first, _ in first })
+    /// 물어볼 대상 (WebProbe.probeAll 에 넘긴다)
+    public static func probeTargets(ports: [PortItem]) -> [(port: Int, host: String)] {
         var seen: Set<Int> = []
         var out: [(port: Int, host: String)] = []
-        for quick in named where seen.insert(quick.port).inserted { out.append((quick.port, byPort[quick.port].flatMap(host(for:)) ?? "localhost")) }
         for item in ports where WebProbe.isCandidate(item) && seen.insert(item.port).inserted { out.append((item.port, host(for: item) ?? "localhost")) }
         return out
     }
 
     /// 포트 부분 (<div id="ports"> 안) — 포트 목록·확인 결과가 올 때마다 이 부분만 갈아 끼운다 (주소칸에 치던 글자가 지워지지 않게)
-    public static func portsHTML(named: [QuickTunnel], state: PortsState, probes: [Int: WebProbeResult], probed: Bool) -> String {
+    public static func portsHTML(state: PortsState, probes: [Int: WebProbeResult], probed: Bool) -> String {
         let ports: [PortItem]
         if case let .loaded(items) = state { ports = items } else { ports = [] }
-        let (web, bare, other) = sections(named: named, ports: ports, probes: probes, probed: probed)
+        let (web, bare, other) = sections(ports: ports, probes: probes, probed: probed)
         func marks(https: Bool, badge: (text: String, warn: Bool)?) -> String {
             (https ? "<span class=\"k\">https</span>" : "") + (badge.map { "<span class=\"s\($0.warn ? " warn" : "")\">\($0.text)</span>" } ?? "")
         }
@@ -132,7 +120,7 @@ public enum BrowserStartPage {
         if !web.isEmpty {
             out += "<h2>웹</h2><div class=\"grid\">" + web.map { tile in
                 let icon = tile.icon.map { "<img class=\"i\" src=\"\(escape($0))\" alt=\"\">" } ?? placeholderIcon
-                let extra = [tile.address, tile.detail].filter { !$0.isEmpty }.map { "<span class=\"e\">\(escape($0))</span>" }.joined()
+                let extra = tile.address.isEmpty ? "" : "<span class=\"e\">\(escape(tile.address))</span>"
                 return "<a class=\"tile\" href=\"\(escape(tile.url))\">\(icon)<div class=\"x\"><div class=\"t\">\(escape(tile.title))</div>"
                     + "<div class=\"b\"><span class=\"n\">\(tile.port)</span>\(extra)\(marks(https: tile.isHTTPS, badge: tile.badge))</div></div></a>"
             }.joined() + "</div>"

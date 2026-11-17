@@ -425,12 +425,6 @@ struct ConnectActions: View {
                 Button { model.promptDBTunnel(server) } label: { Label("DB Tunnel", systemImage: "cylinder") }
                     .disabled(!reachable)
             }
-            // servers.conf tunnel_ports= — Ports 카드의 [터널…] 과 같은 입력창이 그 포트로 채워져 뜬다
-            ForEach(server.tunnelPorts, id: \.self) { quick in
-                Button { model.promptTunnelToPort(server, port: quick.port) } label: { Label(quick.label, systemImage: "arrow.left.arrow.right.circle") }
-                    .disabled(!reachable)
-                    .help("원격 \(quick.port) 포트 터널 입력창")
-            }
             if server.type == .windows, model.moonlightInstalled {
                 Button { model.openMoonlight() } label: { Label("Moonlight", systemImage: "display") }
                     .disabled(!reachable)

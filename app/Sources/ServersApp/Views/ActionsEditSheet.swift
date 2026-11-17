@@ -1,10 +1,11 @@
-// 서버별 액션 편집 시트 (tunnel_ports · proxy_port · wol_mac/wol_via).
+// 서버별 액션 편집 시트 (proxy_port · wol_mac/wol_via).
 
 import AppKit
 import ServersCore
 import SwiftUI
 
-/// 서버별 액션 목록: 터널 바로가기(tunnel_ports) · Chrome 프록시(proxy_port) · 깨우기(wol_mac/wol_via — 경로마다 한 줄).
+/// 서버별 액션 목록: Chrome 프록시(proxy_port) · 깨우기(wol_mac/wol_via — 경로마다 한 줄).
+/// 터널 바로가기(tunnel_ports)는 뺐다 (2026-11-17 — Tunnels 목록의 [다시 연결]·Ports 카드의 [Tunnel…]·브라우저 탭과 겹쳤다). 파일에 적힌 줄은 건드리지 않는다.
 /// 각각 별개 — 한 줄에 하나씩 보이고, 추가·빼기는 하나씩 바로 servers.conf 에 쓴다.
 /// 확정 버튼은 오른쪽 아래 한 자리에 하나만: 입력 중이면 [취소][추가], 아니면 [완료].
 /// 예전엔 입력칸 아래 [추가]와 오른쪽 아래 [완료]가 같이 보여, 값을 넣고 [완료]를 누르면 입력이 말없이 버려졌다 (2026-11-10 사용자 지적).
@@ -12,10 +13,8 @@ struct ActionsEditSheet: View {
     @Environment(AppModel.self) private var model
     let server: Server
 
-    private enum Kind { case tunnel, proxy, wake }
+    private enum Kind { case proxy, wake }
     @State private var adding: Kind?
-    @State private var tunnelName = ""
-    @State private var tunnelPort = ""
     @State private var proxyPort = "1080"
     @State private var wolMac = ""
     @State private var wolVia = ""
@@ -32,10 +31,6 @@ struct ActionsEditSheet: View {
     /// 입력 중인 액션 하나 (저장할 때는 파일에서 읽은 값에 이것만 적용한다)
     private var draftChange: ((inout ServerConfigEditor.Actions) -> Void)? {
         switch adding {
-        case .tunnel:
-            guard let port = Int(tunnelPort.trimmingCharacters(in: .whitespaces)) else { return nil }
-            let name = tunnelName.trimmingCharacters(in: .whitespaces)
-            return { $0.tunnelPorts.append(QuickTunnel(name: name.isEmpty ? nil : name, port: port)) }
         case .proxy:
             guard let port = Int(proxyPort.trimmingCharacters(in: .whitespaces)) else { return nil }
             return { $0.proxyPort = port }
@@ -67,11 +62,6 @@ struct ActionsEditSheet: View {
             let actions = ServerConfigEditor.Actions(current)
             // 지금 있는 액션: 우묵한 면 하나에 줄마다
             VStack(spacing: 0) {
-                ForEach(actions.tunnelPorts, id: \.self) { t in
-                    row(icon: "arrow.left.arrow.right.circle", title: t.label, detail: "원격 \(t.port)") {
-                        save { $0.tunnelPorts.removeAll { $0.port == t.port } }
-                    }
-                }
                 if let port = actions.proxyPort {
                     row(icon: "globe", title: "Chrome 프록시", detail: "로컬 \(port)") {
                         save { $0.proxyPort = nil }
@@ -85,7 +75,7 @@ struct ActionsEditSheet: View {
                         }
                     }
                 }
-                if actions == ServerConfigEditor.Actions() {
+                if actions.proxyPort == nil, actions.wolMac == nil {
                     Text("추가한 액션이 없습니다").foregroundStyle(.secondary).padding(.vertical, 6)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -103,7 +93,6 @@ struct ActionsEditSheet: View {
                     .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Palette.hairline))
             } else {
                 Menu {
-                    Button("터널 바로가기") { start(.tunnel) }
                     Button("Chrome 프록시") { start(.proxy) }.disabled(actions.proxyPort != nil)
                     Button("부팅 (Wake-on-LAN)") { start(.wake) }.disabled(wakeTargets.isEmpty)
                 } label: {
@@ -159,12 +148,6 @@ struct ActionsEditSheet: View {
     private func form(_ kind: Kind) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             switch kind {
-            case .tunnel:
-                Text("터널 바로가기 추가").font(.cardTitle).foregroundStyle(.secondary)
-                HStack {
-                    TextField("이름 (비워도 됨)", text: $tunnelName).frame(width: 150)
-                    TextField("원격 포트", text: $tunnelPort).frame(width: 90)
-                }
             case .proxy:
                 Text("Chrome 프록시 추가").font(.cardTitle).foregroundStyle(.secondary)
                 HStack { Text("로컬 SOCKS 포트"); TextField("1080", text: $proxyPort).frame(width: 90) }
@@ -192,7 +175,7 @@ struct ActionsEditSheet: View {
     }
 
     private func start(_ kind: Kind) {
-        tunnelName = ""; tunnelPort = ""; proxyPort = "1080"; wolMac = current.wolMac ?? ""; wolVia = ""; wolIface = ""
+        proxyPort = "1080"; wolMac = current.wolMac ?? ""; wolVia = ""; wolIface = ""
         error = nil
         adding = kind
     }

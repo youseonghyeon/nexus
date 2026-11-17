@@ -35,7 +35,7 @@ public struct Server: Sendable, Identifiable, Hashable {
     public let wolRoutes: [WakeRoute]
     /// SOCKS 프록시(ssh -D)용 로컬 포트. 있으면 서버 정보에 [Chrome] 이 보인다 — 이 서버를 거쳐 브라우징.
     public let proxyPort: Int?
-    /// 자주 여는 원격 포트 (tunnel_ports=). 포트마다 서버 정보에 [<이름> Tunnel] — Ports 카드의 [터널…] 과 같은 입력창이 그 포트로 채워져 뜬다.
+    /// 예전의 터널 바로가기 (tunnel_ports=). 앱은 더 쓰지 않는다 (2026-11-17) — 이미 적은 파일이 오류 없이 읽히고, 액션을 고칠 때 그 줄이 지워지지 않게 읽기만 한다.
     public let tunnelPorts: [QuickTunnel]
     /// 켜짐·꺼짐을 macOS 알림으로 (notify=on). 판정은 PowerWatch.
     public let notify: Bool

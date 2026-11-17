@@ -70,7 +70,6 @@ public enum DemoMode {
     port=22
     role=CI/CD
     env=PROD, Jenkins
-    tunnel_ports=Jenkins:9090
 
     [router]
     group=home

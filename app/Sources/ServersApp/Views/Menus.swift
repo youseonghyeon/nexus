@@ -25,9 +25,6 @@ struct ServerActionsMenu: View {
             if let settings = model.config?.settings(for: server.group), settings.dbJump == server.key {
                 Button("DB Tunnel") { model.promptDBTunnel(server) }.disabled(!reachable)
             }
-            ForEach(server.tunnelPorts, id: \.self) { quick in
-                Button("\(quick.label)…") { model.promptTunnelToPort(server, port: quick.port) }.disabled(!reachable)
-            }
             if server.type == .windows, model.moonlightInstalled {
                 Button("Moonlight") { model.openMoonlight() }.disabled(!reachable)
             }

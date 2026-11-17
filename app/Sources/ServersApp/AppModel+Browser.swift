@@ -20,7 +20,7 @@ extension AppModel {
     /// 시작 페이지의 포트 부분 (포트 목록·웹 확인 결과가 올 때마다 이 부분만 갈아 끼운다)
     func browserStartPorts(for server: Server) -> String {
         let current = currentServer(server)
-        return BrowserStartPage.portsHTML(named: current.tunnelPorts, state: browserPortsState(current),
+        return BrowserStartPage.portsHTML(state: browserPortsState(current),
                                           probes: browserProbes[current.key] ?? [:], probed: browserProbed.contains(current.key))
     }
 
@@ -45,7 +45,7 @@ extension AppModel {
               let browser = tabs.first(where: { $0.owner == serverKey && $0.browser?.probePort != nil })?.browser, let relayPort = browser.probePort else { return }
         let server = currentServer(browser.server)
         guard case let .loaded(ports) = browserPortsState(server) else { return }
-        let targets = BrowserStartPage.probeTargets(named: server.tunnelPorts, ports: ports)
+        let targets = BrowserStartPage.probeTargets(ports: ports)
         browserProbing.insert(serverKey)
         Task {
             let found = await WebProbe.probeAll(targets, proxyPort: relayPort)
