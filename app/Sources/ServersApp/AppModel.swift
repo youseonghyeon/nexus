@@ -171,6 +171,10 @@ final class AppModel {
     var lanSettings: LanSettings?
     /// 고를 수 있는 네트워크 서비스 목록 (망 Dashboard 를 볼 때 읽는다)
     var lanServices: [LanServiceEntry] = []
+    /// 브라우저 시작 페이지의 웹 확인 결과 (서버 키 → 포트 → 응답한 스킴·제목, WebProbe). 다 물은 서버는 browserProbed 에.
+    @ObservationIgnored var browserProbes: [String: [Int: WebProbeResult]] = [:]
+    @ObservationIgnored var browserProbed: Set<String> = []
+    @ObservationIgnored var browserProbing: Set<String> = []
     var tunnelPrompt: TunnelPromptRequest?
     /// 서버 추가 입력창 (servers.conf 에 블록을 붙인다)
     var addServerPrompt: AddServerRequest?

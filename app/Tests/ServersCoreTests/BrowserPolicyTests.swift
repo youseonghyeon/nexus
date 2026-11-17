@@ -66,18 +66,4 @@ final class BrowserPolicyTests: XCTestCase {
             XCTAssertFalse(BrowserPolicy.isLoopback(no), no)
         }
     }
-
-    /// 시작 주소는 터널이 가리키는 서버 쪽 주소 (서버에서 본 주소) — 이 Mac 의 터널 포트가 아니다
-    func testStartURLIsTheTunnelTargetSeenFromTheServer() {
-        let was = try! ServerConfigParser.parse(fixture).server("was")!
-        let named = TunnelSpec(server: was, kind: .port(remotePort: 9090), localPort: 9090, bindAddress: "127.0.0.2", hostName: "jenkins.acme")
-        XCTAssertEqual(BrowserPolicy.startURL(firstTunnel: named)?.absoluteString, "http://localhost:9090/")
-        let plain = TunnelSpec(server: was, kind: .port(remotePort: 9090), localPort: 19090)
-        XCTAssertEqual(BrowserPolicy.startURL(firstTunnel: plain)?.absoluteString, "http://localhost:9090/", "로컬 포트(19090)가 아니라 원격 포트")
-        let other = TunnelSpec(server: was, kind: .port(remotePort: 8080, remoteHost: "10.20.3.6"), localPort: 8080)
-        XCTAssertEqual(BrowserPolicy.startURL(firstTunnel: other)?.absoluteString, "http://10.20.3.6:8080/", "서버 너머 호스트로 가는 터널은 그 호스트")
-        XCTAssertNil(BrowserPolicy.startURL(firstTunnel: nil), "터널이 없으면 빈 탭")
-        XCTAssertNil(BrowserPolicy.startURL(firstTunnel: TunnelSpec(server: was, kind: .socks, localPort: 1080)), "proxy 터널은 웹 주소가 아니다")
-        XCTAssertNil(BrowserPolicy.startURL(firstTunnel: TunnelSpec(server: was, kind: .db(host: "h", port: 5432, name: nil), localPort: 15432)), "DB 터널도 웹 주소가 아니다")
-    }
 }

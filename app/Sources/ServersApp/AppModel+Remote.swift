@@ -124,6 +124,7 @@ extension AppModel {
                 entry.error = RemoteFailure.infoError(result, serverKey: server.key, type: server.type, allowPrompt: allowPrompt)
             }
             remoteInfo[server.key, default: [:]][query] = entry
+            if query == .ports { refreshBrowserStartPages(server.key) }   // 브라우저 시작 페이지의 포트 목록
         }
     }
 

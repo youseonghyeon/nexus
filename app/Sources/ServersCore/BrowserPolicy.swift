@@ -36,7 +36,7 @@ public enum BrowserPolicy {
     }
 
     /// 웹 주소(http·https·ws·wss)인가 — 별칭 바꾸기는 이 스킴에만 한다
-    static func isWeb(_ url: URL) -> Bool {
+    public static func isWeb(_ url: URL) -> Bool {
         ["http", "https", "ws", "wss"].contains(url.scheme?.lowercased() ?? "")
     }
 
@@ -67,12 +67,5 @@ public enum BrowserPolicy {
     public static func route(host: String, port: Int) -> SocksRoute {
         if let original = loopback(fromAlias: host) { return .upstreamTo(host: original == "localhost" ? "127.0.0.1" : original) }
         return .upstream
-    }
-
-    /// 시작 주소 = 사용자가 그 서버로 열어 둔 첫 포트 터널이 가리키는 **서버 쪽 주소** (서버에서 본 주소 — 127.0.0.1 대상이면 localhost:<원격 포트>).
-    /// 터널이 없으면 nil (빈 탭). proxy·DB 터널은 웹 주소가 아니다.
-    public static func startURL(firstTunnel: TunnelSpec?) -> URL? {
-        guard let spec = firstTunnel, case let .port(remote, host) = spec.kind else { return nil }
-        return URL(string: "http://\(host == "127.0.0.1" ? "localhost" : host):\(remote)/")
     }
 }
