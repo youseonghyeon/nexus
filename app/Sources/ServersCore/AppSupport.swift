@@ -5,6 +5,8 @@ import Foundation
 
 enum AppSupport {
     static var baseURL: URL {
+        // 데모(`--demo`)는 임시 폴더 — 실제 상태 파일을 읽지도 쓰지도 않는다 (DemoMode)
+        if DemoMode.active { return DemoMode.directory }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory() + "/Library/Application Support")
         return base.appendingPathComponent("Servers")
     }

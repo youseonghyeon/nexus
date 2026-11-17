@@ -9,6 +9,8 @@
 
 *A native macOS dashboard for your servers — status, SSH terminal, tunnels, file transfer and network diagnostics in one window.*
 
+![서버 화면 — 상태, 접속 버튼, 원격 정보](docs/images/server.png)
+
 ## 왜 만들었나
 
 집 서버, 회사 내부망 서버, VPN 너머 장비가 섞여 있으면 "지금 저 서버에 닿는가"부터 헷갈립니다. Nexus 는 서버마다 **어느 망으로 가는지**(직접 · 내부망 · VPN · Tailscale)를 알고 있어서, 망이 꺼져 있으면 접속 버튼을 끄고 켜져 있으면 그 망으로만 연결합니다.
@@ -39,6 +41,8 @@
 **그 밖**
 - 메뉴바 패널: 창을 닫아 둔 채 망 스위치·서버 상태·터널 확인
 - 앱 안 업데이트
+
+![망 화면 — 내부망 어댑터의 게이트웨이·링크·그 망의 서버](docs/images/network.png)
 
 ## 설치
 

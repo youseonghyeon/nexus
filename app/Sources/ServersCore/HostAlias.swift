@@ -14,10 +14,7 @@ public struct HostAliasState: Codable, Sendable, Equatable {
 public enum HostAliasStore {
     public static let hostsPath = "/etc/hosts"
 
-    public static var defaultURL: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory() + "/Library/Application Support")
-        return base.appendingPathComponent("Servers/hosts.json")
-    }
+    public static var defaultURL: URL { AppSupport.baseURL.appendingPathComponent("hosts.json") }
 
     /// 없거나 깨졌으면 빈 배정표 (다음 배정부터 다시 시작 — hosts 의 옛 줄은 표식으로 남아 있어 겹치면 교체된다)
     public static func load(from url: URL = defaultURL) -> HostAliasState {

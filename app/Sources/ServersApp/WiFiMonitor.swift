@@ -46,7 +46,7 @@ final class WiFiMonitor: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     /// 시스템 권한 창 (아직 안 물었을 때만 뜬다)
     func requestLocationIfNeeded() {
-        guard authorization == .notDetermined else { return }
+        guard authorization == .notDetermined, !DemoMode.active else { return }
         location.requestWhenInUseAuthorization()
     }
 
@@ -59,6 +59,12 @@ final class WiFiMonitor: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
 
     func refresh() {
+        // 데모: 실제 SSID·BSSID 를 읽지 않고 가상의 값 (DemoMode)
+        if DemoMode.active {
+            info = WiFiInfo(interface: "en0", powerOn: true, ssid: "home_5G", bssid: "02:00:5e:10:0a:01", rssi: -52, noise: -94,
+                            channel: "149 (5GHz, 80MHz)", phyMode: "802.11ax", txRate: 1200, security: "WPA3 Personal")
+            return
+        }
         guard let iface = CWWiFiClient.shared().interface() else { info = nil; return }
         let channel = iface.wlanChannel().map { ch -> String in
             let band = Self.bandName(ch.channelBand) ?? "?"
@@ -125,7 +131,7 @@ final class WiFiMonitor: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     /// 주변 네트워크 직접 검색. 2~3초 막히므로 메인 스레드 밖에서. 꺼져 있거나 이미 검색 중이면 하지 않는다.
     func scanNearby() {
-        guard !scanning, info?.powerOn == true else { return }
+        guard !scanning, info?.powerOn == true, !DemoMode.active else { return }
         scanning = true
         Task {
             let found = await withCheckedContinuation { continuation in
@@ -161,6 +167,7 @@ final class WiFiMonitor: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     /// 전원 켜기/끄기 (권한·sudo 불필요)
     func setPower(_ on: Bool) throws {
+        guard !DemoMode.active else { return }
         guard let iface = CWWiFiClient.shared().interface() else { return }
         try iface.setPower(on)
         refresh()

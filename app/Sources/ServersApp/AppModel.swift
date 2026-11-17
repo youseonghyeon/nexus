@@ -166,7 +166,7 @@ final class AppModel {
     private(set) var chromeInstalled = false
     /// passwords.bin 키 (로그인 키체인, 없으면 시작 때 만든다). 설정의 [키 새로 만들기]로 바뀐다.
     @ObservationIgnored var vaultKey: VaultKey
-    let vaultKeyStore: VaultKeyStore = KeychainKeyStore()
+    let vaultKeyStore: VaultKeyStore = DemoMode.active ? MemoryKeyStore() : KeychainKeyStore()
     /// 내부망 서비스·대역 (lan.json). 파일이 없으면 servers.conf 값으로 만든다 (loadConfig). 못 읽으면 nil — servers.conf 값을 쓴다.
     var lanSettings: LanSettings?
     /// 고를 수 있는 네트워크 서비스 목록 (망 Dashboard 를 볼 때 읽는다)
@@ -229,10 +229,14 @@ final class AppModel {
 
     /// 지정 경로(`--conf <경로>` · 환경변수 SERVERS_CONF, 테스트용). 없으면 nil — 앱 저장소의 servers.conf (ConfigLocation)
     static var configOverride: String? {
-        ConfigLocation.override(arguments: CommandLine.arguments, environment: ProcessInfo.processInfo.environment)
+        // 데모(`--demo`): 임시 폴더의 가상 목록 (DemoMode — 실제 상태 폴더·키체인·명령을 쓰지 않는다)
+        if DemoMode.active { return DemoMode.confPath }
+        return ConfigLocation.override(arguments: CommandLine.arguments, environment: ProcessInfo.processInfo.environment)
     }
 
-    init(configPath: String? = AppModel.configOverride, runner: any CommandRunner = ProcessRunner()) {
+    static var defaultRunner: any CommandRunner { DemoMode.active ? DemoRunner() : ProcessRunner() }
+
+    init(configPath: String? = AppModel.configOverride, runner: any CommandRunner = AppModel.defaultRunner) {
         // 기본 경로는 없으면 만든다 (옛 ~/.config/servers 에 있으면 복사). 지정 경로는 만들지 않는다.
         var prepared: Result<ConfigLocation.Prepared, ConfigError>?
         if configPath == nil {
@@ -425,7 +429,8 @@ final class AppModel {
         let reads = SharedReads(runner)
         roundReads = reads
         defer { if roundReads === reads { roundReads = nil } }
-        let monitor = StatusMonitor(config: config.replacingLan(lan), runner: reads)
+        // 데모는 소켓을 열지 않는 가짜 확인 (DemoRunner.tcpProbe)
+        let monitor = StatusMonitor(config: config.replacingLan(lan), runner: reads, tcpProbe: DemoMode.active ? DemoRunner().tcpProbe : TCPProbe.probe)
         let previous = status
         // 서버 확인과 이 Mac 읽기를 함께 돈다 — 화면 값이 가장 느린 서버(타임아웃)를 기다리지 않게
         async let checked = monitor.refresh(previous: previous) { [weak self] partial in
