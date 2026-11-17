@@ -95,7 +95,7 @@
   명령 안의 `{{이름}}` 은 빈칸 — 누를 때 값을 묻고(앱이 켜져 있는 동안 이름별로 마지막 값을 채워 둠) 채운 뒤 입력. 중괄호 하나는 셸 문법, docker `{{.Names}}` 같은 Go 템플릿도 빈칸이 아니다. `~/Library/Application Support/Servers/snippets.json` 에 저장 — 깨진 파일은 덮지 않고 편집을 막는다
 - 원격 동작은 BatchMode 로 조용히 먼저 시도하고, 비밀번호가 필요하면 macOS 경고창(`servers-askpass` 헬퍼, `SSH_ASKPASS`·`SUDO_ASKPASS`)으로
   받음. 취소하면 즉시 중단, 오답은 두 번까지. 한 번 인증하면 공유 연결이 10분간 유지
-- 접속 카드의 네트워크 줄: `Direct · utun6` 처럼 나가는 장치를 함께 — Intranet·VPN 은 연결을 묶는 장치, Direct·Tailscale 은 `route -n get <ip>` 가 고르는 장치(VPN 이 경로를 가져가면 utun). 상태 확인 라운드마다 다시 본다
+- 접속 카드의 네트워크 줄: 어느 길로 나가는가 — Direct 는 길만(`Ethernet (en11)` · `Wi-Fi (en0)`, 사이드바 행과 같은 이름), 나머지는 `Intranet · Ethernet (en10)` · `VPN · <이름> · utun6` 처럼 망 이름 뒤에. 서비스 목록에 없는 장치(utun)는 장치 이름 그대로, 길을 모르면 망 이름만(`NetworkPathText`) — Intranet·VPN 은 연결을 묶는 장치, Direct·Tailscale 은 `route -n get <ip>` 가 고르는 장치(VPN 이 경로를 가져가면 utun). 상태 확인 라운드마다 다시 본다
 - 서버 정보 화면 접속 카드에 비밀번호를 넣어 두면 그 서버의 SSH 탭·spec/services/ports·터널·전송·Boot 경유가 창 없이 대입한다.
   `~/Library/Application Support/Servers/passwords.bin` 에 AES-GCM 으로 저장(0600). 키는 설치마다 무작위로 만들어 로그인 키체인
   ("Nexus 비밀번호 키")에 둔다 — 파일·앱만으로는 못 푼다. 옛 고정 키 파일은 첫 실행에 새 키로 옮기고, 키체인을 못 쓰면 고정 키로 돌아간다.

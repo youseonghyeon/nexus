@@ -237,7 +237,7 @@ struct ConnectionCard: View {
     }
 
     private var networkText: String {
-        ([model.networkName(server.network), server.vpn, device] as [String?]).compactMap { $0 }.joined(separator: " · ")
+        NetworkPathText.text(network: server.network, networkName: model.networkName(server.network), vpn: server.vpn, device: device, services: model.lanServices)
     }
 }
 
