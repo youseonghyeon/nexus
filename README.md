@@ -45,7 +45,9 @@
 macOS 27 이상, Apple silicon 이 필요합니다.
 
 ```zsh
-brew install --cask youseonghyeon/nexus/nexus
+brew tap youseonghyeon/nexus
+brew trust youseonghyeon/nexus    # 공식 저장소가 아닌 tap 은 한 번 신뢰 등록이 필요합니다
+brew install --cask nexus
 ```
 
 Homebrew 를 쓰지 않으면 [Releases](https://github.com/youseonghyeon/nexus/releases/latest) 에서 `Nexus-<버전>.zip` 을 받아 풀고 `Nexus.app` 을 응용 프로그램 폴더로 옮깁니다. 공증된 앱이라 바로 열립니다.

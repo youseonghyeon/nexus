@@ -6,7 +6,7 @@
 
 ### 추가
 - **앱 안 업데이트**: 켤 때와 하루 한 번 새 버전을 확인하고, 있으면 사이드바 아래에 띠가 뜬다. [업데이트]를 누르면 받아서 바꾼 뒤 다시 시작한다 (열린 탭·터널·전송이 있으면 먼저 확인). 메뉴 Nexus ▸ 업데이트 확인…
-- **Homebrew 설치**: `brew install --cask youseonghyeon/nexus/nexus`.
+- **Homebrew 설치**: `brew tap youseonghyeon/nexus` → `brew trust youseonghyeon/nexus` → `brew install --cask nexus`.
 - **메뉴바 패널**: 메뉴 대신 본창과 같은 면·상태 점의 패널. Network 스위치·VPN · Servers(누르면 그 서버 화면) · Tunnels. Intranet 이 켜져 있으면 메뉴바 아이콘이 채워진다.
 - **사이드바 아이콘**: 행 머리에 무채색 아이콘 + 모서리 상태 점. 서버는 종류(Linux · Windows · OpenWrt)에 따라.
 - **터미널 링크**: http(s) 주소를 ⌘+클릭으로 열기 — 마우스를 잡는 프로그램(tmux 등) 안에서도, 화면 폭에 꺾인 주소도 이어서.

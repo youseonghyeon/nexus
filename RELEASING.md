@@ -43,7 +43,7 @@
 
 ## 확인
 
-- `brew install --cask youseonghyeon/nexus/nexus` 로 새로 설치되는지.
+- README 의 설치 명령(`brew tap` → `brew trust` → `brew install --cask nexus`)으로 새로 설치되는지. cask 를 고쳤으면 `brew style youseonghyeon/nexus` · `brew audit --cask youseonghyeon/nexus/nexus`.
 - 이전 버전 앱을 켰을 때 사이드바 아래에 업데이트 띠가 뜨고, 누르면 새 버전으로 다시 시작하는지.
 
 ## 주의
