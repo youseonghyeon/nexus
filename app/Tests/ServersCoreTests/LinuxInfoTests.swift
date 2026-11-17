@@ -15,7 +15,7 @@ final class LinuxInfoTests: XCTestCase {
         let spec = try lines("linux-spec-updates")
         let items = RemoteInfo.parseSpec(spec)
         XCTAssertEqual(items.map(\.key), ["UPDATES"], "UPDATE 줄은 Spec 항목이 아니다")
-        XCTAssertEqual(items.first?.value, "3개 (보안 3)")
+        XCTAssertEqual(items.first?.value, "3개 · 보안 3")
         XCTAssertTrue(items.first?.warning == true)
         let updates = RemoteInfo.parseUpdates(spec)
         XCTAssertEqual(updates.map(\.name), ["apt", "libapt-pkg6.0t64", "libpcre2-8-0"])
@@ -30,7 +30,7 @@ final class LinuxInfoTests: XCTestCase {
         let spec = try lines("linux-spec-updates-held")
         let items = RemoteInfo.parseSpec(spec)
         XCTAssertEqual(items.map(\.key), ["UPDATES"], "UPDATE · INSTALLS 줄은 Spec 항목이 아니다")
-        XCTAssertEqual(items.first?.value, "4개 (보안 4 · 보류 2)")
+        XCTAssertEqual(items.first?.value, "4개 · 보안 4 · 보류 2")
         let updates = RemoteInfo.parseUpdates(spec)
         XCTAssertEqual(updates.map(\.name), ["libc-bin", "libc6", "libpcre2-8-0", "perl-base", "apt", "libapt-pkg6.0t64"], "보류는 뒤로")
         XCTAssertEqual(updates.map(\.deferred), [false, false, false, false, true, true])
@@ -48,7 +48,7 @@ final class LinuxInfoTests: XCTestCase {
         XCTAssertEqual(RemoteInfo.parseUpdates([update, "INSTALLS     snapd-extra"]).map(\.deferred), [true])
         XCTAssertEqual(RemoteInfo.parseUpdates([update, "INSTALLS     snapd"]).map(\.deferred), [false])
         // 보안 없이 보류만
-        XCTAssertEqual(RemoteInfo.parseSpec(["UPDATES      3;0", update, "INSTALLS     docker-ce"]).first?.value, "3개 (보류 1)")
+        XCTAssertEqual(RemoteInfo.parseSpec(["UPDATES      3;0", update, "INSTALLS     docker-ce"]).first?.value, "3개 · 보류 1")
     }
 
     func testUpdatesSecurityFirst() {

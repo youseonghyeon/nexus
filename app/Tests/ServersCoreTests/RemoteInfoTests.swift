@@ -40,7 +40,7 @@ final class RemoteInfoTests: XCTestCase {
         XCTAssertEqual(one("REBOOT       yes")?.value, "필요")
         XCTAssertEqual(one("REBOOT       yes")?.warning, true)
         XCTAssertEqual(one("REBOOT       no")?.warning, false)
-        XCTAssertEqual(one("UPDATES      12;3")?.value, "12개 (보안 3)")
+        XCTAssertEqual(one("UPDATES      12;3")?.value, "12개 · 보안 3")
         XCTAssertEqual(one("UPDATES      12;3")?.warning, true)
         XCTAssertEqual(one("UPDATES      5;0")?.warning, false)
         XCTAssertEqual(one("UPDATES      0;0")?.value, "최신")
