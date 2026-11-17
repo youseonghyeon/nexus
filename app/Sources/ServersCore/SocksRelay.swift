@@ -1,7 +1,9 @@
 // 앱 안 SOCKS5 중계. 브라우저 탭(WebKit)이 여기로 오면 "어디로 연결할지" 를 앱이 정한다 — 시스템 리졸버·/etc/hosts 를 거치지 않는다.
-//   .direct(host, port)  이 Mac 의 터널 리스너로 바로 (jenkins.acme → 127.0.0.2, 127.0.0.x, localhost)
-//   .upstream            서버로 연 ssh -D(SOCKS) 에 요청을 그대로 넘긴다 (서버 IP)
-//   .deny                즉시 거절 (그 밖 전부)
+//   .direct(host, port)  이 Mac 에서 바로 연결
+//   .upstream            서버로 연 ssh -D(SOCKS) 에 요청을 그대로 넘긴다
+//   .upstreamTo(host)    같되 대상 호스트만 바꿔서 (루프백 별칭 → 서버의 127.0.0.1)
+//   .deny                즉시 거절
+// 브라우저 탭은 upstream·upstreamTo 만 쓴다 (BrowserPolicy.route).
 // SOCKS5 CONNECT 만, 인증 없음, 127.0.0.1 에만 바인딩. 한 연결 = 클라이언트 NWConnection 하나 + 원격 NWConnection 하나, 양방향 그대로 복사.
 
 import Foundation
@@ -10,6 +12,8 @@ import Network
 public enum SocksRoute: Sendable, Equatable {
     case direct(host: String, port: Int)
     case upstream
+    /// 상류로 넘기되 대상 호스트만 바꾼다 (포트는 그대로) — 브라우저의 루프백 별칭 → 서버의 127.0.0.1
+    case upstreamTo(host: String)
     case deny
 }
 
@@ -147,6 +151,9 @@ public final class SocksRelay: @unchecked Sendable {
                         case .deny: self.reply(2)                              // connection not allowed by ruleset
                         case let .direct(host, targetPort): self.connectDirect(host: host, port: targetPort)
                         case .upstream: self.connectUpstream(requestBytes)
+                        case let .upstreamTo(host):
+                            let name = Data(host.utf8.prefix(255))
+                            self.connectUpstream(Data([5, 1, 0, 3, UInt8(name.count)]) + name + portData)
                         }
                     }
                 }

@@ -123,7 +123,6 @@ extension AppModel {
         let record = RecentTunnel(serverKey: server.key, kind: kind, localPort: localPort, bindAddress: bindAddress, hostName: hostName, user: server.user)
         tunnels.removeAll { !$0.isActive && $0.matches(record) }
         tunnels.append(session)
-        refreshBrowserScopes()
         if localPort != preferredLocalPort {
             statusMessage = "로컬 포트 \(preferredLocalPort) 는 사용 중이라 \(localPort) 로 열었습니다."
         }
@@ -222,7 +221,6 @@ extension AppModel {
         guard let session = tunnels.first(where: { $0.id == id }) else { return }
         session.process.stop()
         tunnels.removeAll { $0.id == id }
-        refreshBrowserScopes()
         let record = RecentTunnel(serverKey: session.spec.server.key, kind: session.spec.kind, localPort: session.spec.localPort,
                                   bindAddress: session.spec.bindAddress, hostName: session.spec.hostName)
         if tunnels.allSatisfy({ !$0.matches(record) }) { saveRecent(RecentStore.remove(id: record.id, from: recent)) }

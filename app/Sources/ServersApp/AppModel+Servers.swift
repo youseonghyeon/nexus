@@ -68,7 +68,6 @@ extension AppModel {
         let matches: (Server) -> Bool = { $0.key == server.key && (account == nil || $0.user == account) }
         for session in tunnels where matches(session.spec.server) { session.process.stop() }
         tunnels.removeAll { matches($0.spec.server) }
-        refreshBrowserScopes()
         let kept = RecentState(tunnels: recent.tunnels.filter { !($0.serverKey == server.key && (account == nil || $0.user == account)) })
         if kept != recent { saveRecent(kept) }
     }
@@ -264,7 +263,6 @@ extension AppModel {
         }
         for session in tunnels where session.spec.server.key == old { session.process.stop() }
         tunnels.removeAll { $0.spec.server.key == old }
-        refreshBrowserScopes()
         // 먼저 옮겨 둔다 — 보고 있던 서버가 목록에서 사라졌다고 첫 서버로 옮겨 가지 않게
         if selectedKey == old { selectedKey = new }
     }

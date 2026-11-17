@@ -1,19 +1,10 @@
 // 앱 안 브라우저 탭: [Browser] → 그 서버로 SOCKS 터널(없으면 열기) → 탭 추가 → 터널이 열리면 시작 주소 로드.
-// 범위(BrowserScope)는 그 서버 IP + 그 서버의 터널 루프백 이름·주소. 터널 목록이 바뀌면 열린 브라우저 탭에 다시 알려 준다.
+// 탭은 그 서버에서 브라우저를 켠 것처럼 동작한다 — 모든 요청이 그 서버로 가고 막는 주소는 없다 (BrowserPolicy).
 
 import Foundation
 import ServersCore
 
 extension AppModel {
-    /// 그 서버로의 브라우저 탭 허용 범위. 터널 이름 → 루프백 주소(jenkins.acme → 127.0.0.2)는 그 서버의 서버 이름 터널에서 온다.
-    func browserScope(for server: Server) -> BrowserScope {
-        var names: [String: String] = [:]
-        for session in tunnels where session.server.key == server.key {
-            if let name = session.spec.hostName, let address = session.spec.bindAddress { names[name] = address }
-        }
-        return BrowserScope(serverIP: server.ip, loopbackNameAddresses: names)
-    }
-
     /// 시작 주소의 근거: 그 서버에 열어 둔 첫 활성 포트 터널 (대시보드 터널 카드 순서 = sortedTunnels). proxy·DB 터널은 웹 주소가 아니라 건너뛴다.
     private func firstPortTunnel(for server: Server) -> TunnelSession? {
         sortedTunnels.first { $0.server.key == server.key && $0.isActive && { if case .port = $0.spec.kind { return true } else { return false } }($0) }
@@ -29,9 +20,7 @@ extension AppModel {
             socks = started
         }
         let startURL = BrowserPolicy.startURL(firstTunnel: firstPortTunnel(for: server)?.spec)   // 없으면 빈 탭
-        let browser = BrowserSession(server: server, socksPort: socks.spec.localPort,
-                                     scope: { [weak self] in self?.browserScope(for: server) ?? BrowserScope(serverIP: server.ip) },
-                                     onStatus: { [weak self] in self?.statusMessage = $0 })
+        let browser = BrowserSession(server: server, socksPort: socks.spec.localPort, onStatus: { [weak self] in self?.statusMessage = $0 })
         add(TerminalTab(server: server, browser: browser))
         Task {
             guard await waitTunnelOpen(socks) else {
@@ -40,11 +29,6 @@ extension AppModel {
             }
             browser.start(url: startURL)
         }
-    }
-
-    /// 터널이 생기거나 없어졌을 때: 열린 브라우저 탭의 허용 범위(프록시 예외·차단 규칙)를 갱신한다.
-    func refreshBrowserScopes() {
-        for tab in tabs { tab.browser?.refreshScope() }
     }
 
     /// 그 서버의 브라우저 탭이 0개가 되면 브라우저가 직접 연 proxy(SOCKS) 터널(openedByBrowser)을 끊고 목록에서도 지운다 — 브라우저와 함께 사라진다.

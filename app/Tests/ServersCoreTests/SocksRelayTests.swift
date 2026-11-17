@@ -43,42 +43,41 @@ final class SocksRelayTests: XCTestCase {
         return (p.terminationStatus, String(decoding: data, as: UTF8.self))
     }
 
-    func testDirectUpstreamAndDeny() async throws {
-        let (loopServer, loopPort) = try await httpServer(body: "LOOPBACK")
-        let (farServer, farPort) = try await httpServer(body: "VIA-UPSTREAM")
-        defer { loopServer.cancel(); farServer.cancel() }
+    /// 브라우저 판정(BrowserPolicy.route)을 건 중계: 루프백 별칭은 상류에 127.0.0.1 로, 그 밖은 받은 이름 그대로 넘어간다
+    func testBrowserRouteSendsAliasToUpstreamLoopback() async throws {
+        let (loopServer, loopPort) = try await httpServer(body: "SERVER-LOOPBACK")
+        defer { loopServer.cancel() }
 
-        // 상류 역할: 무엇이든 직접 연결해 주는 중계 (실제로는 ssh -D)
-        let upstream = SocksRelay(upstreamPort: nil) { host, port in .direct(host: host, port: port) }
+        // 상류 역할(실제로는 ssh -D — 서버에서 연결한다): 받은 대상을 적고, 127.0.0.1 만 실제로 연결해 준다
+        let seen = Seen()
+        let upstream = SocksRelay(upstreamPort: nil) { host, port in
+            seen.add("\(host):\(port)")
+            return host == "127.0.0.1" ? .direct(host: host, port: port) : .deny
+        }
         let upstreamPort = try await upstream.start()
         defer { upstream.stop() }
-
-        // 시험 대상: 이름 → 루프백 직접, "서버 IP"(여기선 198.51.100.7 라는 가짜) → 상류, 그 외 거절
-        let scope = BrowserScope(serverIP: "198.51.100.7", loopbackNameAddresses: ["jenkins.acme": "127.0.0.1"])
-        let relay = SocksRelay(upstreamPort: upstreamPort) { host, port in
-            // 상류는 진짜 198.51.100.7 에 못 가니, 상류로 넘길 때 실제로는 far 서버로 가도록 상류 쪽 판정을 흉내 낸다
-            BrowserPolicy.route(host: host, port: port, scope: scope)
-        }
+        let relay = SocksRelay(upstreamPort: upstreamPort) { host, port in BrowserPolicy.route(host: host, port: port) }
         let relayPort = try await relay.start()
         defer { relay.stop() }
-        XCTAssertGreaterThan(relayPort, 0)
 
-        // 1) 터널 이름: 앱이 직접 127.0.0.1 로 (시스템 리졸버 없이 — jenkins.acme 는 hosts 에 없다)
-        let named = try curl(via: relayPort, "http://jenkins.acme:\(loopPort)/")
-        XCTAssertEqual(named.0, 0); XCTAssertEqual(named.1, "LOOPBACK")
+        // 1) 별칭(127.0.0.1 · localhost) → 상류가 127.0.0.1:<포트> 로 받아 서버 루프백의 응답이 온다
+        for alias in ["127-0-0-1.server.localhost", "localhost.server.localhost"] {
+            let result = try curl(via: relayPort, "http://\(alias):\(loopPort)/")
+            XCTAssertEqual(result.0, 0, alias); XCTAssertEqual(result.1, "SERVER-LOOPBACK", alias)
+        }
+        XCTAssertEqual(Set(seen.all), ["127.0.0.1:\(loopPort)"])
 
-        // 2) 루프백 IP 리터럴·localhost 도 직접
-        XCTAssertEqual(try curl(via: relayPort, "http://127.0.0.1:\(loopPort)/").1, "LOOPBACK")
-        XCTAssertEqual(try curl(via: relayPort, "http://localhost:\(loopPort)/").1, "LOOPBACK")
+        // 2) 그 밖의 이름·주소는 막지 않고 받은 그대로 상류에 넘긴다 (이름 풀이도 상류 = 서버가 한다)
+        _ = try curl(via: relayPort, "http://intranet.example.test:8080/")
+        _ = try curl(via: relayPort, "http://198.51.100.7:80/")
+        XCTAssertTrue(seen.all.contains("intranet.example.test:8080"), "\(seen.all)")
+        XCTAssertTrue(seen.all.contains("198.51.100.7:80"), "\(seen.all)")
+    }
 
-        // 3) 거절: 다른 호스트는 SOCKS 오류로 즉시 (curl 종료 코드 97 = 프록시가 거절)
-        let denied = try curl(via: relayPort, "http://192.168.112.11:80/")
-        XCTAssertNotEqual(denied.0, 0); XCTAssertEqual(denied.1, "")
-
-        // 4) 상류 전달: 서버 IP 요청은 상류 SOCKS 로 그대로 넘어간다. 상류(직접 연결 중계)가 198.51.100.7 에 닿을 수 없으니
-        //    여기서는 "상류가 응답 실패를 돌려주면 클라이언트도 실패로 끝난다" 까지만 확인한다 (성공 경로는 WebKit 진단 테스트에서 실제 ssh -D 없이 확인 불가)
-        let far = try curl(via: relayPort, "http://198.51.100.7:\(farPort)/")
-        XCTAssertNotEqual(far.0, 0, "상류가 못 가면 실패로 끝나야 한다 (매달리지 않음)")
+    private final class Seen: @unchecked Sendable {
+        private let lock = NSLock(); private var items: [String] = []
+        func add(_ s: String) { lock.withLock { items.append(s) } }
+        var all: [String] { lock.withLock { items } }
     }
 
     /// 127.0.0.1 의 지금 닫혀 있는 포트 (빈 포트에 묶었다 바로 닫는다)

@@ -1,4 +1,4 @@
-// 브라우저 탭 화면: 주소창(◀ ▶ ↻ · URL · 차단 안내) + WKWebView. 통신 범위는 BrowserSession/BrowserPolicy 가 정한다.
+// 브라우저 탭 화면: 주소창(◀ ▶ ↻ · URL) + WKWebView. 통신은 BrowserSession/BrowserPolicy — 그 서버에서 켠 브라우저처럼.
 
 import ServersCore
 import SwiftUI
@@ -28,20 +28,11 @@ struct BrowserPane: View {
                     .onAppear { address = browser.url?.absoluteString ?? "" }
                 Text("프록시: \(browser.server.key)")
                     .font(.caption).foregroundStyle(.secondary)
-                    .help("이 탭의 통신은 \(browser.server.key) 서버(\(browser.server.ip))로 연 SOCKS 프록시만 지납니다. 갈 수 있는 곳은 그 서버 IP 와 루프백(터널)뿐입니다")
+                    .help("이 탭은 \(browser.server.key) 서버(\(browser.server.ip))에서 브라우저를 켠 것처럼 동작합니다. 127.0.0.1 은 그 서버 자신입니다")
             }
             .buttonStyle(.borderless)
             .padding(.horizontal, 8).padding(.vertical, 6)
             .background(Palette.content)   // 위 탭줄과 한 면으로 이어진다
-            if let blocked = browser.blocked {
-                HStack(spacing: 6) {
-                    Image(systemName: "hand.raised.fill").foregroundStyle(StatusTone.warn.color)
-                    Text("차단: \(blocked)").lineLimit(1).truncationMode(.middle)
-                    Spacer()
-                }
-                .font(.caption).padding(.horizontal, 10).padding(.vertical, 4)
-                .background(StatusTone.warn.color.opacity(0.12))
-            }
             Divider()
             ZStack {
                 WebViewRepresentable(webView: browser.webView)

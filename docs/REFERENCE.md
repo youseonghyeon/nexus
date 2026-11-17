@@ -118,10 +118,10 @@
   System 3초(CPU·코어·메모리 구성·GPU·온도·팬 RPM(AppleSMC, C 모듈 `CSMC`)·전원(배터리 충전·방전 W, 최대 용량·충전 사이클)·상위 프로세스 `ps`), Disk 2초(입출력·볼륨, 30초마다 `diskutil`·`tmutil`),
   Bluetooth 5초(`system_profiler -json`, HID 배터리, 전원 소스 배터리 `pmset -g accps` — 소니 헤드셋 등, 60초마다 GATT 배터리 — 처음 열 때 macOS 블루투스 권한을 묻는다). 사이드바 요약은 창이 보일 때만
   (System·Disk 5초, Bluetooth 30초). Disk 는 읽기 전용(볼륨이 모두 읽기 전용인 APFS 컨테이너·이미지 — 시뮬레이터 런타임 등 늘 가득 — 는 사용량 막대 회색), Bluetooth 는 연결/끊기·전원(끄기·끊기는 확인). `--sample-hidden` 으로 띄우면 창이 가려져도 읽는다(화면 확인용)
-- 서버 정보의 [Browser] 는 **앱 안 브라우저 탭**(WKWebView). 탭의 모든 요청은 **앱 안 SOCKS 중계**(`SocksRelay`, 127.0.0.1)로 가고 중계가 갈 곳을 정한다:
-  그 서버 IP(포트 무관) → 그 서버로 연 `ssh -D`(Tunnels 에 "<서버> proxy") · 루프백(127.0.0.0/8·localhost) → 이 Mac 의 터널 리스너로 직접 ·
-  그 서버의 터널 이름(`jenkins.acme`) → 그 이름의 127.0.0.x 로 직접(이름 풀이를 앱이 하므로 hosts·시스템 리졸버와 무관, 주소창은 이름 그대로) ·
-  그 밖은 거절. WebKit 쪽에서도 페이지 이동(내비게이션 정책)·하위 요청(WKContentRuleList)을 막는다. 마지막 브라우저 탭을 닫으면 proxy 터널도 끊는다.
+- 서버 정보의 [Browser] 는 **앱 안 브라우저 탭**(WKWebView) — **그 서버에서 브라우저를 켠 것처럼** 동작한다(2026-11-17). 탭의 모든 요청은 **앱 안 SOCKS 중계**(`SocksRelay`, 127.0.0.1)를 거쳐
+  그 서버로 연 `ssh -D`(Tunnels 에 "<서버> proxy")로 가고, 이름 풀이도 서버가 한다. 막는 주소는 없다(서버가 닿는 다른 내부 서버·인터넷도 열린다). 이 Mac 의 터널은 관여하지 않는다.
+  `127.0.0.1`·`localhost` 는 그 서버 자신: WebKit 이 루프백을 프록시에 보내지 않으므로 앱이 별칭 이름(`127-0-0-1.server.localhost`)으로 바꿔 열고 중계가 서버의 루프백으로 연결한다 —
+  주소창엔 입력한 주소 그대로, `/etc/hosts`·관리자 인증과 무관(`BrowserPolicy`). 서버가 받는 Host 헤더는 별칭이고, 페이지 안에 루프백 절대 주소로 박힌 하위 요청은 못 바꾼다. 마지막 브라우저 탭을 닫으면 proxy 터널도 끊는다.
   시작 주소는 그 서버로 열린 첫 포트 터널의 원격 포트로 `http://<IP>:<포트>/`. 쿠키·로그인은 서버별 영구 스토어, 다운로드는 ~/Downloads,
   Safari Web Inspector 사용 가능. 확장 프로그램(Bitwarden 등)은 없다. 판정은 `BrowserPolicy`(순수), WebKit 연결은 `BrowserSession`
 - 내부망은 **시스템 경로(분할 라우팅)를 넣지 않는다**. 대신 이 앱이 `network=lan` 서버로 여는 연결(SSH 탭·터널의 바깥쪽·scp·sftp·상태 확인)만

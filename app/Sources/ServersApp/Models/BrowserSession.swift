@@ -1,7 +1,6 @@
-// 앱 안 브라우저 탭 하나 (WKWebView). 통신은 앱 안 SOCKS 중계(SocksRelay)로만 — 중계가 서버 IP 는 ssh -D 로, 루프백·터널 이름은 직접, 그 밖은 거절.
-//   프록시: 데이터 스토어의 proxyConfigurations 를 127.0.0.1:<중계 포트> 로. 이름 풀이는 중계(앱)가 하므로 시스템 리졸버·hosts 와 무관.
-//   페이지 이동: decidePolicyFor(navigationAction) 에서 범위 밖이면 즉시 취소하고 "차단" 을 표시 (기다리지 않는다 → 타임아웃 없음)
-//   하위 요청(CSS·스크립트·이미지·웹소켓): WKContentRuleList 로 차단. 터널 목록이 바뀌면 프록시 예외·규칙을 다시 건다.
+// 앱 안 브라우저 탭 하나 (WKWebView) — 그 서버에서 브라우저를 켠 것처럼: 모든 요청이 앱 안 SOCKS 중계(SocksRelay)를 거쳐 그 서버의 ssh -D 로 간다.
+//   프록시: 데이터 스토어의 proxyConfigurations 를 127.0.0.1:<중계 포트> 로. 이름 풀이는 서버가 한다. 막는 주소는 없다.
+//   루프백(127.0.0.1·localhost): WebKit 이 프록시에 안 보내므로 별칭 이름으로 바꿔 열고 주소창엔 원래 주소를 보인다 (BrowserPolicy 머리 주석).
 //   쿠키·로그인: 서버별 영구 데이터 스토어 (재실행해도 유지). 다운로드는 ~/Downloads. 파일 선택·alert/confirm/prompt 도 받는다.
 
 import AppKit
@@ -15,11 +14,7 @@ final class BrowserSession: NSObject, ObservableObject {
     /// 그 서버로 연 ssh -D 포트 (중계의 상류)
     let socksPort: Int
     let webView: WKWebView
-    /// 지금 허용 범위. 모델이 터널 목록으로 계산해 준다 (터널 이름·바인딩 주소가 바뀌면 달라진다).
-    private let scope: @MainActor () -> BrowserScope
     private let onStatus: @MainActor (String) -> Void
-    /// 중계가 (자기 큐에서) 읽는 범위 스냅샷. refreshScope 가 갱신한다.
-    private let scopeBox: ScopeBox
     private let relay: SocksRelay
     private var relayPort: Int?
 
@@ -28,23 +23,17 @@ final class BrowserSession: NSObject, ObservableObject {
     @Published private(set) var canGoBack = false
     @Published private(set) var canGoForward = false
     @Published private(set) var isLoading = false
-    /// 마지막으로 막은 주소 (주소창 아래 한 줄). 다음 이동이 성공하면 지운다.
-    @Published private(set) var blocked: String?
     /// SOCKS 터널이 열리기 전(또는 못 열었을 때)의 안내. 페이지가 뜨면 nil.
     @Published private(set) var notice: String? = "프록시 터널 연결 중…"
 
     private var observers: [NSKeyValueObservation] = []
-    private var ruleListIdentifier: String { "servers-browser-\(server.key)" }
     private var downloads: [WKDownload: URL] = [:]
 
-    init(server: Server, socksPort: Int, scope: @escaping @MainActor () -> BrowserScope, onStatus: @escaping @MainActor (String) -> Void) {
+    init(server: Server, socksPort: Int, onStatus: @escaping @MainActor (String) -> Void) {
         self.server = server
         self.socksPort = socksPort
-        self.scope = scope
         self.onStatus = onStatus
-        let box = ScopeBox(scope())
-        scopeBox = box
-        relay = SocksRelay(upstreamPort: socksPort) { host, port in BrowserPolicy.route(host: host, port: port, scope: box.current) }
+        relay = SocksRelay(upstreamPort: socksPort) { host, port in BrowserPolicy.route(host: host, port: port) }
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = WKWebsiteDataStore(forIdentifier: Self.storeIdentifier(for: server.key))
         webView = WKWebView(frame: .zero, configuration: configuration)
@@ -63,7 +52,8 @@ final class BrowserSession: NSObject, ObservableObject {
         }
         observers = [
             webView.observe(\.title) { [weak self] view, _ in Task { @MainActor in self?.title = view.title ?? "" } },
-            webView.observe(\.url) { [weak self] view, _ in Task { @MainActor in self?.url = view.url } },
+            // 주소창에는 별칭이 아니라 입력한 루프백 주소 그대로
+            webView.observe(\.url) { [weak self] view, _ in Task { @MainActor in self?.url = view.url.map(BrowserPolicy.displayed) } },
             webView.observe(\.canGoBack) { [weak self] view, _ in Task { @MainActor in self?.canGoBack = view.canGoBack } },
             webView.observe(\.canGoForward) { [weak self] view, _ in Task { @MainActor in self?.canGoForward = view.canGoForward } },
             webView.observe(\.isLoading) { [weak self] view, _ in Task { @MainActor in self?.isLoading = view.isLoading } },
@@ -81,15 +71,14 @@ final class BrowserSession: NSObject, ObservableObject {
 
     // MARK: 동작
 
-    /// SOCKS 터널이 열린 뒤 모델이 부른다. 중계·규칙이 준비된 뒤 시작 주소를 연다. url 이 nil 이면(터널 없음) 빈 탭으로 둔다.
+    /// SOCKS 터널이 열린 뒤 모델이 부른다. 중계가 준비된 뒤 시작 주소를 연다. url 이 nil 이면(터널 없음) 빈 탭으로 둔다.
     func start(url: URL?) {
         Task {
             let deadline = Date().addingTimeInterval(5)
             while relayPort == nil, Date() < deadline { try? await Task.sleep(for: .milliseconds(50)) }
             guard relayPort != nil else { notice = notice ?? "브라우저 중계가 준비되지 않았습니다"; return }
-            await applyContentRules()   // 첫 로드 전에 규칙이 걸려 있어야 하위 요청이 새지 않는다
             notice = nil
-            if let url { webView.load(URLRequest(url: url)) }
+            if let url { webView.load(URLRequest(url: BrowserPolicy.proxied(url))) }
         }
     }
 
@@ -105,8 +94,8 @@ final class BrowserSession: NSObject, ObservableObject {
     func load(_ text: String) {
         var candidate = text.trimmingCharacters(in: .whitespaces)
         if !candidate.contains("://") { candidate = "http://" + candidate }
-        guard let url = URL(string: candidate) else { return }
-        webView.load(URLRequest(url: url))
+        guard let url = URL(string: candidate), BrowserPolicy.isOpenable(url) else { return }
+        webView.load(URLRequest(url: BrowserPolicy.proxied(url)))
     }
 
     func goBack() { webView.goBack() }
@@ -121,38 +110,10 @@ final class BrowserSession: NSObject, ObservableObject {
         applyProxy(relayPort: relayPort)
     }
 
-    /// 터널이 생기거나 없어졌을 때 모델이 부른다: 중계의 판정 범위와 하위 요청 규칙을 새 범위로.
-    func refreshScope() {
-        scopeBox.current = scope()
-        Task { await applyContentRules() }
-    }
-
-    /// 모든 요청을 앱 안 중계(127.0.0.1:<중계 포트>)로. 예외 없음 — 루프백·이름도 중계가 직접 처리한다.
+    /// 모든 요청을 앱 안 중계(127.0.0.1:<중계 포트>)로. 루프백만 WebKit 이 프록시를 건너뛰므로 별칭으로 바꿔 연다 (BrowserPolicy.proxied).
     private func applyProxy(relayPort: Int) {
         guard let port = NWEndpoint.Port(rawValue: UInt16(clamping: relayPort)) else { return }
         webView.configuration.websiteDataStore.proxyConfigurations = [ProxyConfiguration(socksv5Proxy: .hostPort(host: "127.0.0.1", port: port))]
-    }
-
-    /// 중계 큐에서 읽고 메인에서 쓰는 범위 스냅샷
-    final class ScopeBox: @unchecked Sendable {
-        private let lock = NSLock()
-        private var value: BrowserScope
-        init(_ value: BrowserScope) { self.value = value }
-        var current: BrowserScope {
-            get { lock.withLock { value } }
-            set { lock.withLock { value = newValue } }
-        }
-    }
-
-    private func applyContentRules() async {
-        let json = BrowserPolicy.contentRulesJSON(scope: scope())
-        do {
-            let list = try await WKContentRuleListStore.default().compileContentRuleList(forIdentifier: ruleListIdentifier, encodedContentRuleList: json)
-            webView.configuration.userContentController.removeAllContentRuleLists()
-            if let list { webView.configuration.userContentController.add(list) }
-        } catch {
-            onStatus("브라우저 차단 규칙을 만들지 못했습니다: \(error.localizedDescription)")
-        }
     }
 }
 
@@ -161,12 +122,16 @@ final class BrowserSession: NSObject, ObservableObject {
 extension BrowserSession: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
         guard let url = navigationAction.request.url else { return (.cancel, preferences) }
-        guard BrowserPolicy.isAllowed(url, scope: scope()) else {
-            if navigationAction.targetFrame?.isMainFrame ?? true { blocked = url.absoluteString }
+        guard BrowserPolicy.isOpenable(url) else { return (.cancel, preferences) }   // file: 등 이 Mac 의 것
+        // 루프백으로 가는 이동(링크·리다이렉트)은 별칭으로 바꿔 다시 연다 — 그대로 두면 WebKit 이 이 Mac 으로 붙는다
+        let target = BrowserPolicy.proxied(url)
+        if target != url, navigationAction.targetFrame?.isMainFrame ?? true {
+            var request = navigationAction.request
+            request.url = target
+            webView.load(request)
             return (.cancel, preferences)
         }
         if navigationAction.shouldPerformDownload { return (.download, preferences) }
-        if navigationAction.targetFrame?.isMainFrame ?? true { blocked = nil }
         return (.allow, preferences)
     }
 
@@ -200,7 +165,7 @@ extension BrowserSession: WKNavigationDelegate {
         case NSURLErrorNetworkConnectionLost: (title, detail) = ("연결이 끊어졌습니다", "페이지를 불러오는 중 연결이 끊어졌습니다.")
         default: (title, detail) = ("페이지를 열 수 없습니다", nsError.localizedDescription)
         }
-        let target = failed?.absoluteString ?? ""
+        let target = failed.map(BrowserPolicy.displayed)?.absoluteString ?? ""
         let html = """
         <!doctype html><meta charset="utf-8"><title>\(escape(title))</title>
         <style>body{font:14px -apple-system,system-ui;color:#333;background:#fafafa;margin:0;display:flex;height:100vh;align-items:center;justify-content:center}
@@ -209,7 +174,7 @@ extension BrowserSession: WKNavigationDelegate {
         <div class="box"><h1>\(escape(title))</h1><p>\(escape(detail))</p><code>\(escape(target))</code></div>
         """
         webView.loadHTMLString(html, baseURL: failed)
-        url = failed
+        url = failed.map(BrowserPolicy.displayed)
     }
 
     private func escape(_ s: String) -> String {
@@ -247,12 +212,12 @@ extension BrowserSession: WKDownloadDelegate {
 // MARK: - 창·대화상자·파일 선택
 
 extension BrowserSession: WKUIDelegate {
-    /// target=_blank 는 새 창 대신 같은 탭에서 연다 (정책은 그대로 적용된다)
+    /// target=_blank 는 새 창 대신 같은 탭에서 연다
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        if let url = navigationAction.request.url, BrowserPolicy.isAllowed(url, scope: scope()) {
-            webView.load(navigationAction.request)
-        } else if let url = navigationAction.request.url {
-            blocked = url.absoluteString
+        if let url = navigationAction.request.url, BrowserPolicy.isOpenable(url) {
+            var request = navigationAction.request
+            request.url = BrowserPolicy.proxied(url)
+            webView.load(request)
         }
         return nil
     }

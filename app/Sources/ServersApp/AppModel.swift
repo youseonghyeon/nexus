@@ -286,7 +286,6 @@ final class AppModel {
             let loaded = try ServerConfigParser.load(path: configPath).applyingAccounts(activeAccounts)
             // 접속 정보가 바뀐 서버의 원격 정보 캐시는 버린다 (같은 키로 다른 서버를 가리킬 수 있다). 액션 줄(tunnel_ports 등)만 바뀐 건 두고.
             // 무엇을 버릴지는 ServersCore ConfigReloadChanges — 여기는 적용만
-            var connectionChanged = false
             if let old = config {
                 let changes = ConfigReloadChanges.between(old: old, loaded: loaded)
                 for before in changes.connectionChanged {
@@ -303,7 +302,6 @@ final class AppModel {
                         session.process.stop()
                     }
                 }
-                connectionChanged = !changes.connectionChanged.isEmpty
                 // 고른 계정이 목록에서 빠져 기본 계정으로 돌아왔다 — 원격 정보만 새 계정으로
                 for key in changes.accountChanged {
                     remoteInfo[key] = nil
@@ -325,7 +323,6 @@ final class AppModel {
             }
             config = loaded.applyingIdentities(identities)
             configError = nil
-            if connectionChanged { refreshBrowserScopes() }
             loadLanSettingsIfNeeded()
             let removed = tabs.filter { tab in tab.server.map { loaded.server($0.key) == nil } ?? false }
             for tab in removed { closeTab(tab.id) }
