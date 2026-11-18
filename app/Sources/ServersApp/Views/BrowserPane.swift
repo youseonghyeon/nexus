@@ -1,4 +1,4 @@
-// 브라우저 탭 화면: 주소창(◀ ▶ ↻ ⌂ · URL · ☆ 즐겨찾기, 아래에 진행 줄) + WKWebView. 통신은 BrowserSession/BrowserPolicy — 그 서버에서 켠 브라우저처럼.
+// 브라우저 탭 화면: 주소창(◀ ▶ ↻ ⌂ · URL · ☆ 즐겨찾기, 아래에 진행 줄) + 로그인 저장 띠(물을 때만) + WKWebView. 통신은 BrowserSession/BrowserPolicy — 그 서버에서 켠 브라우저처럼.
 
 import ServersCore
 import SwiftUI
@@ -51,6 +51,20 @@ struct BrowserPane: View {
                 .frame(height: 2)
                 .opacity(browser.isLoading && browser.notice == nil ? 1 : 0)
                 .allowsHitTesting(false)
+            }
+            // 로그인 저장 띠: 로그인이 된 것 같을 때(비밀번호 칸이 사라짐) 묻는다 — 정할 때까지 남는다
+            if let offer = browser.loginOffer {
+                HStack(spacing: 8) {
+                    Image(systemName: "key").foregroundStyle(.secondary)
+                    Text(offer.isUpdate ? "저장한 비밀번호를 바꿀까요?" : "이 로그인을 저장할까요?").font(.callout)
+                    Text([offer.note.username, BookmarkStore.shortAddress(offer.note.site)].filter { !$0.isEmpty }.joined(separator: " · "))
+                        .font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 8)
+                    Button("안 함") { browser.declineLoginOffer() }.buttonStyle(CompactButtonStyle())
+                    Button(offer.isUpdate ? "바꾸기" : "저장") { browser.acceptLoginOffer() }.buttonStyle(CompactButtonStyle())
+                }
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(Palette.card)
             }
             Divider()
             ZStack {

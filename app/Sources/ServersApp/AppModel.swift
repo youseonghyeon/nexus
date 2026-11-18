@@ -130,6 +130,12 @@ final class AppModel {
     var snippetsShown = false
     /// 빈칸 {{이름}} 에 마지막으로 넣은 값 (이름별, 앱이 켜져 있는 동안만) — 다음에 채워 둔다
     @ObservationIgnored private(set) var snippetValues: [String: String] = [:]
+    /// 메모·로그인 (notes.bin — 서버마다 따로, NoteVault). 못 읽었으면(키체인 실패·못 푸는 파일) notesError 가 차고 읽기·쓰기를 막는다.
+    /// 바꾸는 것은 AppModel+Notes 의 메서드로
+    var notes = NoteState()
+    var notesError: ConfigError?
+    /// 메모·로그인 팝오버 (탭 막대의 열쇠 버튼)
+    var notesShown = false
     var transfers: [TransferSession] = []
     var uploadPrompt: UploadPromptRequest?
     /// 계정별 마지막 업로드 폴더 (앱이 켜져 있는 동안, 키는 accountID). 업로드 창을 다시 열면 이걸로 채운다.
@@ -266,6 +272,7 @@ final class AppModel {
         }
         restoreRecentTunnels()
         do { snippets = try SnippetStore.load() } catch { snippetsError = error as? ConfigError }
+        loadNotes()
         // `--select <키>` 로 시작 화면을 고정할 수 있다 (스크린샷·검증용). wifi/ethernet/tailscale/lan 은 NETWORK 행.
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--select"), args.indices.contains(i + 1) {

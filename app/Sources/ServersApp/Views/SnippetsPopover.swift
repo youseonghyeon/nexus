@@ -215,7 +215,7 @@ private struct SnippetRow: View {
 
 /// 줄 끝 작은 버튼: 24pt 정사각형 누름 영역, 마우스를 올리면 그 칸만 줄보다 한 단계 진한 면 — 어디를 누르는지 보이게.
 /// 감춰져 있어도(줄에 마우스가 없을 때) 누름 영역은 남긴다 — 팝오버가 열릴 때 이미 그 자리에 있던 커서로 눌러도 입력이 아니라 이 동작이 되게.
-private struct RowIconButton: View {
+struct RowIconButton: View {
     let systemName: String
     let help: String
     let visible: Bool

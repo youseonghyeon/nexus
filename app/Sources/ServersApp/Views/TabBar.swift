@@ -51,8 +51,9 @@ struct TabBar: View {
                 .background(WindowDragArea())   // 창 윗줄이라 탭 뒤 빈 곳은 끌면 창 이동
             }
             .onScrollGeometryChange(for: CGFloat.self, of: { $0.containerSize.width }) { _, width in viewport = width }
-            // 오른쪽 끝 고정 (탭이 많아도 스크롤에 밀리지 않게): 서버 종류별 · 이 Mac 로컬 셸 명령 모음
+            // 오른쪽 끝 고정 (탭이 많아도 스크롤에 밀리지 않게): 그 서버의 메모·로그인 · 서버 종류별 · 이 Mac 로컬 셸 명령 모음
             if let server = model.selectedServer {
+                NotesButton(serverKey: server.key)
                 SnippetsButton(type: SnippetKind(server.type))
             } else if model.selectedKey == AppModel.localKey {
                 SnippetsButton(type: .mac)

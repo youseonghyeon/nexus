@@ -10,7 +10,7 @@
 - 공개 저장소다 (2026-11-17, Homebrew cask + 앱 안 업데이트 Sparkle — 화면은 사이드바 띠 `UpdateBanner`, 상태는 ServersCore `AppUpdate`).
   실제 환경의 값(공인 IP · 회사·장비 고유 이름 · 실제 MAC · 계정 · tailnet 이름)을 코드·주석·테스트·픽스처에 넣지 않는다 — 문서용 대역(192.0.2.0/24 · 198.51.100.0/24 · 203.0.113.0/24)과 가상의 이름으로.
   새 목록(`ConfigLocation.template`)에는 서버를 넣지 않는다. 저장소의 `servers.conf` 는 형식을 보여 주는 예시다(앱은 읽지 않는다).
-- 앱 상태는 `~/Library/Application Support/Servers/` (servers.conf · passwords.bin · identities.json · recent.json · hosts.json · lan.json · snippets.json · bookmarks.json).
+- 앱 상태는 `~/Library/Application Support/Servers/` (servers.conf · passwords.bin · identities.json · recent.json · hosts.json · lan.json · snippets.json · bookmarks.json · notes.bin).
 
 ## 검증 — 실제 서버에 접속하지 않는다
 

@@ -2,6 +2,7 @@
 //   프록시: 데이터 스토어의 proxyConfigurations 를 127.0.0.1:<중계 포트> 로. 이름 풀이는 서버가 한다. 막는 주소는 없다.
 //   루프백(127.0.0.1·localhost): WebKit 이 프록시에 안 보내므로 별칭 이름으로 바꿔 열고 주소창엔 원래 주소를 보인다 (BrowserPolicy 머리 주석).
 //   쿠키·로그인: 서버별 영구 데이터 스토어 (재실행해도 유지). 다운로드는 ~/Downloads. 파일 선택·alert/confirm/prompt 도 받는다.
+//   로그인 저장·채우기: 페이지와 분리된 영역에서 폼을 읽고 채운다 (ServersCore LoginForms · 저장은 NoteVault — 아래 MARK: 로그인).
 
 import AppKit
 import Network
@@ -31,6 +32,23 @@ final class BrowserSession: NSObject, ObservableObject {
         let remove: @MainActor (String) -> Void
     }
     private let bookmarks: BookmarkHooks
+    /// 메모·로그인(서버별 — 모델이 들고 있다)으로 가는 길: 잡은 로그인을 물을지(주소·ID·비밀번호) · 저장
+    struct LoginHooks {
+        let captured: @MainActor (URL, String, String) -> NoteVault.Capture
+        let save: @MainActor (SecretNote) -> Void
+    }
+    private let logins: LoginHooks
+    /// 주소창 아래 띠로 묻는 중인 로그인 (새로 저장 · 저장한 것의 비밀번호 바꾸기)
+    struct LoginOffer: Equatable {
+        let note: SecretNote
+        let isUpdate: Bool
+    }
+    @Published private(set) var loginOffer: LoginOffer?
+    /// 페이지에서 잡아 둔 로그인 — 로그인이 된 것 같을 때(비밀번호 칸이 사라짐) 묻는다
+    private var loginCandidate: (address: URL, username: String, password: String, at: Date)?
+    /// 이 탭에서 [안 함] 한 것 (주소 + ID) — 탭을 닫을 때까지 다시 묻지 않는다
+    private var declinedLogins: Set<String> = []
+    private let loginWorld = WKContentWorld.world(name: LoginForms.world)
     /// 지금 시작 페이지를 보고 있는가 (포트 목록이 오면 다시 그린다 · 주소창은 비운다)
     private(set) var showingStart = false { didSet { updateCanGoBack() } }
     /// 시작 페이지를 한 번이라도 띄웠는가 (프록시 연결 중에는 뒤로 갈 곳이 없다)
@@ -63,7 +81,7 @@ final class BrowserSession: NSObject, ObservableObject {
 
     init(server: Server, socksPort: Int, startPage: @escaping @MainActor () -> String, startPorts: @escaping @MainActor () -> String,
          onStartShown: @escaping @MainActor () -> Void, onStartReload: @escaping @MainActor () -> Void, bookmarks: BookmarkHooks,
-         onStatus: @escaping @MainActor (String) -> Void) {
+         logins: LoginHooks, onStatus: @escaping @MainActor (String) -> Void) {
         self.server = server
         self.socksPort = socksPort
         self.startPage = startPage
@@ -71,6 +89,7 @@ final class BrowserSession: NSObject, ObservableObject {
         self.onStartShown = onStartShown
         self.onStartReload = onStartReload
         self.bookmarks = bookmarks
+        self.logins = logins
         self.onStatus = onStatus
         relay = SocksRelay(upstreamPort: socksPort) { host, port in BrowserPolicy.route(host: host, port: port) }
         let configuration = WKWebViewConfiguration()
@@ -85,6 +104,9 @@ final class BrowserSession: NSObject, ObservableObject {
         webView.uiDelegate = self
         // 시작 페이지의 즐겨찾기 ✕ 가 보내는 것 (약한 참조로 — 컨트롤러가 처리기를 붙들어 탭이 닫혀도 남는 것을 막는다)
         configuration.userContentController.add(MessageRelay(self), name: "nexus")
+        // 로그인 폼 읽기: 페이지의 스크립트가 못 보는 영역에서, 맨 위 프레임에만 (통로도 그 영역에서만 열린다)
+        configuration.userContentController.add(MessageRelay(self), contentWorld: loginWorld, name: LoginForms.handler)
+        configuration.userContentController.addUserScript(WKUserScript(source: LoginForms.captureScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: loginWorld))
         Task {
             do {
                 let port = try await relay.start()
@@ -213,8 +235,80 @@ final class BrowserSession: NSObject, ObservableObject {
         return null;
         """
 
+    // MARK: 로그인 (메모·로그인 — NoteVault)
+
+    /// 지금 보는 페이지의 로그인 주소 (시작 페이지·연결 중이면 nil)
+    var site: String? { url.flatMap { NoteVault.site(of: $0.absoluteString) } }
+
+    /// 페이지가 보낸 것: 잡은 ID·비밀번호는 들고만 있고, 비밀번호 칸이 사라졌다고 하면 묻는다
+    private func receivedLogin(_ message: WKScriptMessage) {
+        guard message.frameInfo.isMainFrame, !showingStart, let url, site != nil, let parsed = LoginForms.parse(message.body) else { return }
+        switch parsed {
+        case let .candidate(username, password): loginCandidate = (url, username, password, Date())
+        case .gone: settleLogin(passwordFieldVisible: false)
+        }
+    }
+
+    /// 잡아 둔 것을 끝낸다: 로그인이 된 것 같으면 모델에 물어 띠를 띄우고, 아니면(칸이 다시 떴다·오래됐다) 버린다
+    private func settleLogin(passwordFieldVisible: Bool) {
+        guard let candidate = loginCandidate else { return }
+        loginCandidate = nil
+        guard NoteVault.confirms(capturedAt: candidate.at, now: Date(), passwordFieldVisible: passwordFieldVisible) else { return }
+        switch logins.captured(candidate.address, candidate.username, candidate.password) {
+        case .ignore: break
+        case let .add(note): offer(note, isUpdate: false)
+        case let .update(note): offer(note, isUpdate: true)
+        }
+    }
+
+    private func offer(_ note: SecretNote, isUpdate: Bool) {
+        guard !declinedLogins.contains(note.site + "\n" + note.username) else { return }
+        loginOffer = LoginOffer(note: note, isUpdate: isUpdate)
+    }
+
+    /// 페이지가 통째로 넘어간 뒤: 새 페이지에 비밀번호 칸이 없으면 로그인이 된 것으로 본다 (확인을 못 하면 버린다)
+    private func settleLoginAfterNavigation() {
+        guard loginCandidate != nil else { return }
+        guard !showingStart else { loginCandidate = nil; return }
+        Task {
+            let visible = try? await webView.callAsyncJavaScript(LoginForms.visibleScript, arguments: [:], in: nil, contentWorld: loginWorld) as? Bool
+            settleLogin(passwordFieldVisible: visible ?? true)
+        }
+    }
+
+    /// 띠의 [저장]·[바꾸기]
+    func acceptLoginOffer() {
+        guard let offer = loginOffer else { return }
+        loginOffer = nil
+        logins.save(offer.note)
+    }
+
+    /// 띠의 [안 함]
+    func declineLoginOffer() {
+        guard let offer = loginOffer else { return }
+        declinedLogins.insert(offer.note.site + "\n" + offer.note.username)
+        loginOffer = nil
+    }
+
+    /// 팝오버에서 로그인을 눌렀다: 지금 페이지가 그 주소일 때만 채운다 (다른 사이트에 비밀번호를 넣지 않는다)
+    func fill(_ note: SecretNote) {
+        guard NoteVault.fits(note, site: site) else { return }
+        let address = url
+        Task {
+            guard url == address else { return }
+            let result = try? await webView.callAsyncJavaScript(LoginForms.fillScript, arguments: ["username": note.username, "password": note.password],
+                                                              in: nil, contentWorld: loginWorld) as? String
+            switch result.flatMap(LoginForms.Filled.init(rawValue:)) ?? .none {
+            case .filled: break
+            case .user: onStatus("ID 만 넣었습니다 — 비밀번호 칸이 나오면 다시 누르세요")
+            case .none: onStatus("채울 로그인 칸을 찾지 못했습니다")
+            }
+        }
+    }
+
     /// 시작 페이지가 보낸 것만 받는다 — 이 탭이 여는 다른 웹 페이지도 같은 이름으로 보낼 수 있다
     fileprivate func received(_ message: WKScriptMessage) {
+        if message.name == LoginForms.handler { return receivedLogin(message) }
         guard showingStart, message.frameInfo.isMainFrame, webView.url?.absoluteString == "about:blank",
               let body = message.body as? [String: Any], let address = body["remove"] as? String else { return }
         bookmarks.remove(address)
@@ -278,6 +372,7 @@ extension BrowserSession: WKNavigationDelegate {
     /// 시작 페이지가 다 그려진 뒤 포트 부분을 한 번 더 맞춘다 — 그리는 사이에 온 포트 목록·웹 확인 결과를 놓치지 않게
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         refreshStartPorts()
+        settleLoginAfterNavigation()
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

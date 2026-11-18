@@ -30,11 +30,13 @@ extension AppModel {
     }
 
     /// 설정의 [키 새로 만들기]: 새 키를 키체인에 두고 저장한 비밀번호를 모두 지운다 (다음 접속 때 다시 묻는다).
+    /// 같은 키로 잠근 메모·로그인(notes.bin)도 지운다 — 새 키로는 못 푼다.
     func rotatePasswordKey() {
         do {
             vaultKey = try PasswordVault.rotateKey(store: vaultKeyStore)
             passwords = [:]
-            statusMessage = "새 키를 만들고 저장한 비밀번호를 지웠습니다."
+            clearNotes()
+            statusMessage = "새 키를 만들고 저장한 비밀번호와 메모·로그인을 지웠습니다."
         } catch {
             statusMessage = "키를 새로 만들지 못했습니다: \(error.localizedDescription)"
         }

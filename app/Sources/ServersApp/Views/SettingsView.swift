@@ -69,14 +69,14 @@ struct SettingsView: View {
             } header: {
                 SectionHeader("비밀번호")
             } footer: {
-                Text("비밀번호는 이 Mac 의 키체인에 둔 키로 암호화합니다. 키를 새로 만들면 저장한 비밀번호가 모두 지워지고, 다음 접속 때 다시 묻습니다.")
+                Text("비밀번호와 메모·로그인은 이 Mac 의 키체인에 둔 키로 암호화합니다. 키를 새로 만들면 저장한 비밀번호와 메모·로그인이 모두 지워지고, 비밀번호는 다음 접속 때 다시 묻습니다.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .alert("비밀번호 키를 새로 만들까요?", isPresented: $confirmRotate) {
                 Button("새로 만들기", role: .destructive) { model.rotatePasswordKey() }
                 Button("취소", role: .cancel) {}
             } message: {
-                Text("저장한 비밀번호 \(model.passwords.count)개가 모두 지워집니다.")
+                Text("저장한 비밀번호 \(model.passwords.count)개와 메모·로그인 \(model.noteCount)개가 모두 지워집니다.")
             }
             // 경로가 둘 이상인 서버만 (하나면 고를 게 없다)
             let wakeServers = model.config?.servers.filter { $0.wolMac != nil && $0.wolRoutes.count > 1 } ?? []
