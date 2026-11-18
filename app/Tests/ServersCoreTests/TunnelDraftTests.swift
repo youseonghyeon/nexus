@@ -84,4 +84,31 @@ final class TunnelDraftTests: XCTestCase {
         }
         XCTAssertEqual(TunnelDraft.invalidNameMessage, "이름은 영문·숫자·하이픈(-)·점(.)만 쓸 수 있습니다 (예: api.acme)", "화면 문구 그대로")
     }
+
+    // MARK: HTTPS 전용 도메인 경고
+
+    func testForcedSuffix() {
+        XCTAssertEqual(HTTPSOnlyDomains.forcedSuffix(of: "acme.office"), "office")
+        XCTAssertEqual(HTTPSOnlyDomains.forcedSuffix(of: " API.Acme.DEV. "), "dev", "대소문자·끝 점·공백 무시")
+        XCTAssertEqual(HTTPSOnlyDomains.forcedSuffix(of: "dev"), "dev", "마디 하나짜리 이름도")
+        for free in ["acme-office", "office.acme", "acme.lan", "acme.internal", "localhost", "acme.com", "devbox", "", "."] {
+            XCTAssertNil(HTTPSOnlyDomains.forcedSuffix(of: free), free)
+        }
+        XCTAssertEqual(HTTPSOnlyDomains.topLevel.count, 52)
+        XCTAssertTrue(HTTPSOnlyDomains.topLevel.allSatisfy { $0 == $0.lowercased() && !$0.contains(".") && !$0.isEmpty })
+    }
+
+    /// 서버 이름으로 여는 포트 터널에만 — 막지는 않는다
+    func testBrowserWarningOnlyForNamedPortTunnelAndNeverBlocks() {
+        let named = TunnelDraft(remote: "9090", named: true)
+        XCTAssertEqual(named.browserWarning(defaultName: "acme.office"), ".office 로 끝나는 이름은 브라우저가 HTTPS 로만 엽니다 — 웹 화면이면 localhost 로 여세요.")
+        XCTAssertTrue(named.canOpen(nameProblem: named.nameProblem(defaultName: "acme.office") { _ in nil }), "경고가 있어도 열 수 있다")
+        XCTAssertNil(named.browserWarning(defaultName: "acme-office"))
+        XCTAssertNil(TunnelDraft(remote: "9090", named: false).browserWarning(defaultName: "acme.office"), "localhost 로 열면 상관없다")
+        XCTAssertNil(TunnelDraft(named: true, fixedRemotePort: 5432).browserWarning(defaultName: "acme.office"), "DB 터널은 웹이 아니다")
+        // 이름 칸에 친 값이 기본 이름보다 먼저
+        XCTAssertNil(TunnelDraft(remote: "9090", name: "grafana.lan", named: true).browserWarning(defaultName: "acme.office"))
+        XCTAssertNotNil(TunnelDraft(remote: "9090", name: "grafana.app", named: true).browserWarning(defaultName: "acme"))
+        XCTAssertNil(TunnelDraft(remote: "9090", name: "bad name.dev", named: true).browserWarning(defaultName: "acme"), "형식이 틀린 이름은 그쪽 안내만")
+    }
 }

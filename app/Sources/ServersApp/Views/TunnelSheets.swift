@@ -1,10 +1,39 @@
-// 터널 시트: 정보(접속 주소·DB 문자열·다시 연결/끊기) · 포트 입력.
+// 터널 시트: 정보(접속 주소·DB 문자열·다시 연결/끊기) · 포트 입력. 둘 다 창이 곧 터널 그림이다 — 왼쪽 이 Mac → 오른쪽 서버 (TunnelSidePanel).
 
 import AppKit
 import ServersCore
 import SwiftUI
 
-/// 터널 정보: 상태 → 접속 주소(크게, 복사) → 용도별 접속 문자열(DB) → 경로(작게) → 다시 연결/끊기.
+/// 터널의 한쪽 (이 Mac · 서버) — 머리 줄(이름 · 오른쪽 조작부) + 주소 줄 + 안내 한 줄. 입력창과 정보 창이 같이 쓴다.
+private struct TunnelSidePanel<Trailing: View, Address: View>: View {
+    let title: String
+    let hint: String
+    @ViewBuilder var trailing: () -> Trailing
+    @ViewBuilder var address: () -> Address
+
+    /// 화살표를 주소 줄 높이에 맞출 때 쓰는 값: 칸 안 여백 + 머리 줄 + 간격
+    static var addressOffset: CGFloat { 12 + 26 + 8 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(verbatim: title).font(.cardTitle).foregroundStyle(.secondary).lineLimit(1)
+                Spacer(minLength: 0)
+                trailing()
+            }
+            .frame(height: 26)   // 고르개가 있는 쪽과 없는 쪽의 주소 줄 높이를 맞춘다
+            HStack(spacing: 6) { address() }
+            Text(verbatim: hint).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.content, in: RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous).strokeBorder(Palette.hairline))
+    }
+}
+
+/// 터널 정보 (2026-11-18 다시 그림 — 입력창과 같은 터널 그림): 제목 · 상태 → 왼쪽 이 Mac(접속 주소 크게 · 복사) → 오른쪽 서버(원격 대상) →
+/// 용도별 접속 문자열(DB) → 다시 연결/끊기. 예전엔 경로를 글자 두 줄(`경로 a → b → c` / `바인드 … · 경유 …`)로 적어 한눈에 안 들어왔다.
 /// 복사하는 값은 그대로 붙여 쓸 수 있는 것만: 이름 붙인 터널은 그 이름으로 (127.0.0.x 별칭에만 붙으므로 localhost 로는 안 닿는다).
 struct TunnelInfoSheet: View {
     @Environment(AppModel.self) private var model
@@ -12,13 +41,16 @@ struct TunnelInfoSheet: View {
 
     var body: some View {
         let spec = session.spec
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                StatusDot(tone: session.tone)
-                Text(stateText).font(.headline)
-                if session.isActive {
-                    TimelineView(.periodic(from: .now, by: 30)) { context in
-                        Text("· \(Self.elapsed(from: session.startedAt, to: context.date))").foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(verbatim: heading).font(.title3.weight(.semibold))
+                HStack(spacing: 6) {
+                    StatusDot(tone: session.tone)
+                    Text(stateText).font(.callout)
+                    if session.isActive {
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            Text("· \(Self.elapsed(from: session.startedAt, to: context.date))").font(.callout).foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -26,14 +58,25 @@ struct TunnelInfoSheet: View {
                 Text("exit \(code) · \(message)").font(.caption).foregroundStyle(StatusTone.warn.color).lineLimit(3)
             }
 
-            // 가장 자주 쓰는 값: 접속 주소
-            HStack(spacing: 8) {
-                Text(primaryAddress).font(.title3.monospaced()).textSelection(.enabled).lineLimit(1).truncationMode(.middle)
-                Spacer(minLength: 8)
-                CopyButton(value: primaryAddress, model: model)
+            HStack(alignment: .top, spacing: 10) {
+                // 가장 자주 쓰는 값: 접속 주소
+                TunnelSidePanel(title: "이 Mac", hint: "바인드 \(spec.localBind)") {
+                    CopyButton(value: primaryAddress, model: model)
+                } address: {
+                    Text(verbatim: primaryAddress).font(.title3.monospaced()).textSelection(.enabled).lineLimit(1).truncationMode(.middle)
+                        .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+                }
+                Image(systemName: "arrow.right").foregroundStyle(.tertiary).padding(.top, TunnelSidePanel<EmptyView, EmptyView>.addressOffset + 4)
+                TunnelSidePanel(title: remoteTitle, hint: "경유 \(spec.server.target)") { EmptyView() } address: {
+                    Text(verbatim: remoteAddress).font(.body.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                        .lineLimit(1).truncationMode(.middle).frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+                }
             }
-            .padding(.horizontal, 12).padding(.vertical, 10)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+            // 이름이 HTTPS 전용 도메인으로 끝나는 포트 터널: 브라우저에서는 안 열린다 (HTTPSOnlyDomains)
+            if case .port = spec.kind, spec.isNamed, let warning = HTTPSOnlyDomains.browserWarning(host: spec.localHost) {
+                Label { Text(verbatim: warning) } icon: { Image(systemName: "exclamationmark.triangle") }
+                    .font(.caption).foregroundStyle(StatusTone.warn.color)
+            }
 
             if case let .db(_, _, name) = spec.kind {
                 let db = name ?? "<db>"
@@ -49,13 +92,6 @@ struct TunnelInfoSheet: View {
                 }
             }
 
-            // 경로는 참고용: 작게
-            VStack(alignment: .leading, spacing: 2) {
-                Text("경로  \(pathText)").textSelection(.enabled)
-                Text("      \(spec.isNamed ? "바인드 \(spec.localBind) · " : "")경유 \(spec.server.target)").textSelection(.enabled)
-            }
-            .font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-
             HStack {
                 if session.isActive {
                     Button("끊기") { model.stopTunnel(session.id) }.buttonStyle(SecondaryButtonStyle())
@@ -70,7 +106,31 @@ struct TunnelInfoSheet: View {
             }
         }
         .padding(16)
-        .frame(minWidth: 540)
+        .frame(width: 620)   // 입력창과 같은 폭
+    }
+
+    /// 창 제목: 입력창과 같은 말 ("web-01 포트 터널")
+    private var heading: String {
+        switch session.spec.kind {
+        case .port: return "\(session.spec.server.key) 포트 터널"
+        case .db: return "\(session.spec.server.key) DB 터널"
+        case .socks: return "\(session.spec.server.key) 프록시 터널"
+        }
+    }
+
+    /// 오른쪽 칸의 이름: 서버 자신의 포트면 "…에서", 서버를 거쳐 다른 곳이면 "…경유"
+    private var remoteTitle: String {
+        if case .port = session.spec.kind { return "\(session.spec.server.key) 에서" }
+        return "\(session.spec.server.key) 경유"
+    }
+
+    /// 오른쪽 칸의 주소: 원격 대상 (SOCKS 는 정해진 대상이 없다)
+    private var remoteAddress: String {
+        switch session.spec.kind {
+        case let .port(remote, host): return "\(host):\(remote)"
+        case let .db(host, port, _): return "\(host):\(port)"
+        case .socks: return "모든 주소 (SOCKS5)"
+        }
     }
 
     /// 붙여 쓰는 주소: SOCKS 면 프록시 URL, 아니면 호스트:포트 (이름 붙인 터널은 그 이름)
@@ -78,17 +138,6 @@ struct TunnelInfoSheet: View {
         let spec = session.spec
         if case .socks = spec.kind { return "socks5://\(spec.localHost):\(spec.localPort)" }
         return "\(spec.localHost):\(spec.localPort)"
-    }
-
-    /// "jenkins.acme:9090 → nexus → 127.0.0.1:9090". DB 는 경유 서버의 SSH 를 거쳐 DB 호스트로.
-    private var pathText: String {
-        let spec = session.spec
-        let local = "\(spec.localHost):\(spec.localPort)"
-        switch spec.kind {
-        case let .port(remote, host): return "\(local) → \(spec.server.key) → \(host):\(remote)"
-        case let .db(host, port, _): return "\(local) → \(spec.server.key) → \(host):\(port)"
-        case .socks: return "\(local) → \(spec.server.key) 경유"
-        }
     }
 
     private func copyRow(_ label: String, _ value: String) -> some View {
@@ -166,21 +215,8 @@ struct TunnelPromptSheet: View {
     @FocusState private var focus: Field?
 
     /// 터널의 한쪽 (이 Mac · 서버) — 머리 줄(이름 · 오른쪽 조작부) + 주소 줄(호스트 : 포트) + 안내 한 줄
-    private func side<Trailing: View, Address: View>(_ title: String, hint: String, @ViewBuilder trailing: () -> Trailing, @ViewBuilder address: () -> Address) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text(verbatim: title).font(.cardTitle).foregroundStyle(.secondary).lineLimit(1)
-                Spacer(minLength: 0)
-                trailing()
-            }
-            .frame(height: 26)   // 고르개가 있는 쪽과 없는 쪽의 주소 줄 높이를 맞춘다
-            HStack(spacing: 6) { address() }
-            Text(verbatim: hint).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.content, in: RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous).strokeBorder(Palette.hairline))
+    private func side<Trailing: View, Address: View>(_ title: String, hint: String, @ViewBuilder trailing: @escaping () -> Trailing, @ViewBuilder address: @escaping () -> Address) -> some View {
+        TunnelSidePanel(title: title, hint: hint, trailing: trailing, address: address)
     }
 
     private var colon: some View { Text(verbatim: ":").font(.body.monospaced().weight(.semibold)).foregroundStyle(.tertiary) }
@@ -237,6 +273,11 @@ struct TunnelPromptSheet: View {
             }
             if let nameProblem {
                 Label { Text(verbatim: nameProblem) } icon: { Image(systemName: "exclamationmark.triangle") }
+                    .font(.caption).foregroundStyle(StatusTone.warn.color)
+            }
+            // 막지 않는 경고: 이름이 HTTPS 전용 도메인으로 끝난다 (브라우저에서만 안 열린다)
+            if let warning = draft.browserWarning(defaultName: preview.name) {
+                Label { Text(verbatim: warning) } icon: { Image(systemName: "exclamationmark.triangle") }
                     .font(.caption).foregroundStyle(StatusTone.warn.color)
             }
             HStack {

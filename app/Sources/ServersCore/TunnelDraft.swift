@@ -55,6 +55,15 @@ public struct TunnelDraft: Sendable, Equatable {
         return conflict(hostName)
     }
 
+    /// 서버 이름으로 여는 포트 터널의 이름이 브라우저가 HTTPS 로만 여는 도메인으로 끝날 때의 경고 (HTTPSOnlyDomains). 막지는 않는다 —
+    /// 브라우저 밖(DB 클라이언트·curl)에서는 그대로 쓸 수 있다. DB 터널은 웹이 아니라 경고하지 않는다. 이름 형식이 틀렸으면 그쪽 안내가 먼저다.
+    public func browserWarning(defaultName: String) -> String? {
+        guard named, !isDB else { return nil }
+        let hostName = hostName(defaultName: defaultName)
+        guard HostAliasStore.isValidHostName(hostName) else { return nil }
+        return HTTPSOnlyDomains.browserWarning(host: hostName)
+    }
+
     /// [열기]: 두 포트가 있고, 로컬이 특권 포트가 아니고, 이름 문제가 없고, (포트 터널이면) 원격 호스트 형식이 맞을 때
     public func canOpen(nameProblem: String?) -> Bool {
         remotePort != nil && localPort != nil && !localIsPrivileged && nameProblem == nil && (isDB || remoteHost != nil)
