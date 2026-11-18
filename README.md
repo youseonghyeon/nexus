@@ -139,7 +139,7 @@ git clone https://github.com/youseonghyeon/nexus.git
 cd nexus/app
 make run        # 디버그 빌드 → build/Nexus.app 실행
 make test       # 단위 테스트 (모의 명령만 — 실제 서버에 접속하지 않습니다)
-make install    # 릴리스 빌드 → ~/Applications/Nexus.app
+make install    # 릴리스 빌드 → /Applications/Nexus.app
 ```
 
 | 위치 | 역할 |

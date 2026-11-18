@@ -3,7 +3,7 @@
 #   make            디버그 빌드 + .app 번들 (build/Nexus.app)
 #   make run        번들을 실행
 #   make release    릴리스 빌드로 번들
-#   make install    ~/Applications/Nexus.app 에 복사
+#   make install    /Applications/Nexus.app 에 복사 (brew 로 깐 자리 — 실제로 띄우는 앱)
 #   make dist       릴리스 묶음: 공증한 build/Nexus-<버전>.zip + 앱 안 업데이트 피드 build/appcast.xml + Homebrew cask build/nexus.rb
 #                   (올리는 순서는 저장소 RELEASING.md). 처음 한 번:
 #                   공증 자격 증명  xcrun notarytool store-credentials nexus --apple-id <이메일> --team-id <팀 ID>
@@ -81,10 +81,9 @@ release:
 	$(MAKE) bundle CONFIG=release
 
 install: release
-	@rm -rf "$(HOME)/Applications/$(APP).app"
-	@mkdir -p "$(HOME)/Applications"
-	@cp -R "$(OUT)" "$(HOME)/Applications/$(APP).app"
-	@echo "installed: $(HOME)/Applications/$(APP).app"
+	@rm -rf "/Applications/$(APP).app"
+	@cp -R "$(OUT)" "/Applications/$(APP).app"
+	@echo "installed: /Applications/$(APP).app"
 
 # 공증: 제출 → 승인 대기 → 표(staple)를 붙여 다시 묶는다. 받은 쪽은 인터넷 없이도 Gatekeeper 를 통과한다.
 dist: release

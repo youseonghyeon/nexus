@@ -57,6 +57,7 @@
   툴바 항목은 내용 크기만큼만 커진다 — 탭 막대 폭은 본문 폭을 재서 준다(`DetailView`). 넘치면 툴바가 항목을 » 메뉴로 접으니 여백을 넉넉히.
 - swiftbuild 는 바이너리의 SDK 버전을 배포 타깃으로 찍는다 → 타깃을 낮추면 macOS 가 옛 디자인(불투명 제목줄)으로 그린다.
   확인: `vtool -show-build build/Nexus.app/Contents/MacOS/Nexus`.
+- `make install` 은 `/Applications/Nexus.app` 에 넣는다 (brew 로 깐 자리 — 사용자가 띄우는 앱. 2026-11-18: `~/Applications` 에 넣고 "설치했다"고 해, 재시작해도 옛 빌드가 떴다). 보고 전에 떠 있는 앱의 경로가 설치한 자리인지 본다(`ps -axo comm | grep Nexus.app`).
 - `make install` 뒤 반영은 사용자가 앱을 재시작해야 한다. 재시작하면 터미널 세션·터널이 끊기므로 대신 끄지 않는다.
 
 ## 코드 규칙
