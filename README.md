@@ -150,9 +150,8 @@ make install    # 릴리스 빌드 → /Applications/Nexus.app
 | `app/Sources/ServersApp` | SwiftUI 화면과 AppKit 연결 |
 | `app/Sources/ServersAskPass` | SSH·sudo 비밀번호 창 도우미 |
 | `lib/` | 관리자 권한으로 도는 zsh 스크립트 (hosts 이름, 서비스 순서) |
-| `docs/REFERENCE.md` | 화면·동작별 세부 규칙 |
 
-릴리스 절차는 [RELEASING.md](RELEASING.md), 버전별 변경은 [CHANGELOG.md](CHANGELOG.md) 에 있습니다.
+버전별 변경은 [CHANGELOG.md](CHANGELOG.md) 에 있습니다.
 
 ## 고마운 프로젝트
 
