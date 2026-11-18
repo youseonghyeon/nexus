@@ -151,6 +151,33 @@ struct CompactButtonStyle: ButtonStyle {
     }
 }
 
+/// 탭 막대 오른쪽 끝의 아이콘 버튼 (메모·로그인 · 명령 모음): 그림 폭이 달라도 같은 크기의 칸에 가운데로, 같은 굵기로.
+/// 올리면 옅은 면, 열려 있으면(active) 면이 남는다.
+struct TabBarIconButtonStyle: ButtonStyle {
+    var active = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        TabBarIconButtonBody(configuration: configuration, active: active)
+    }
+
+    private struct TabBarIconButtonBody: View {
+        let configuration: Configuration
+        let active: Bool
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(hovering || active ? Color.primary : Color.secondary)
+                .frame(width: 28, height: 24)
+                .background(hovering || active ? Color.primary.opacity(configuration.isPressed ? 0.14 : 0.08) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: Metrics.smallRadius, style: .continuous))
+                .contentShape(Rectangle())
+                .onHover { hovering = $0 }
+        }
+    }
+}
+
 /// 주 버튼 (SSH 등): 파랑 대신 무채색 채움 — 색은 상태·경고에만 쓴다. 다크 모드면 밝은 채움에 어두운 글자, 라이트면 반대.
 struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled

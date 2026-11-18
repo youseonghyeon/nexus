@@ -15,8 +15,8 @@ struct SnippetsButton: View {
     var body: some View {
         @Bindable var model = model   // 팝오버 바인딩($model.snippetsShown)용
         Button { model.toggleSnippets() } label: { Image(systemName: "list.bullet.rectangle") }.accessibilityLabel("명령 모음")
-            .buttonStyle(.borderless)
-            .padding(.horizontal, 8)
+            .buttonStyle(TabBarIconButtonStyle(active: model.snippetsShown))
+            .padding(.leading, 2).padding(.trailing, 8)
             .help("명령 모음 (⌘P)")
             .popover(isPresented: $model.snippetsShown, arrowEdge: .bottom) {
                 SnippetsPopover(type: type, editing: $editing) { model.closeSnippets() }.environment(model)

@@ -1,5 +1,5 @@
 // 메모·로그인 팝오버 (탭 막대 오른쪽, 명령 모음 옆의 열쇠 버튼). 선택한 서버의 것만 보인다 — 암호화해 notes.bin 에 둔다 (ServersCore NoteVault).
-// 로그인: 누르면 보고 있는 브라우저 탭에 채운다(그 페이지의 로그인일 때만 — 맨 위에 올라온다). 그 밖에는 비밀번호 복사. 줄 끝에서 ID·비밀번호 복사·편집.
+// 로그인: 누르면 보고 있는 브라우저 탭에 채운다(그 페이지의 로그인일 때만 — 맨 위에 올라온다). 그 밖에는 비밀번호 복사. 줄 끝에서 ID·PW 복사(글자 붙은 버튼)·편집.
 // 메모: 누르면 펼쳐 본문을 보인다(가린 메모는 펼쳐야 보인다). 줄 끝에서 복사·편집. 추가·편집·삭제도 이 안에서.
 // 키보드: 글자로 거르기 → ↑↓ 로 고르기 → Return.
 
@@ -14,9 +14,9 @@ struct NotesButton: View {
 
     var body: some View {
         @Bindable var model = model   // 팝오버 바인딩($model.notesShown)용
-        Button { model.toggleNotes() } label: { Image(systemName: "key") }.accessibilityLabel("메모 · 로그인")
-            .buttonStyle(.borderless)
-            .padding(.leading, 8)
+        Button { model.toggleNotes() } label: { Image(systemName: "key.horizontal") }.accessibilityLabel("메모 · 로그인")
+            .buttonStyle(TabBarIconButtonStyle(active: model.notesShown))
+            .padding(.leading, 6)
             .help("메모 · 로그인 — \(serverKey)")
             .popover(isPresented: $model.notesShown, arrowEdge: .bottom) {
                 NotesPopover(serverKey: serverKey, editing: $editing) { model.closeNotes() }.environment(model)
@@ -77,7 +77,7 @@ struct NotesPopover: View {
                     .font(.caption).fontWeight(.medium).foregroundStyle(.secondary)
                 Spacer()
                 // 브라우저 탭에서 열었으면 그 페이지의 로그인부터
-                Button { editing = SecretNote(kind: site == nil ? .memo : .login, site: site ?? "") } label: { Image(systemName: "plus") }.accessibilityLabel("추가")
+                Button { editing = SecretNote(kind: site == nil ? .memo : .login, sites: site.map { [$0] } ?? []) } label: { Image(systemName: "plus") }.accessibilityLabel("추가")
                     .buttonStyle(.borderless)
                     .disabled(model.notesError != nil)
                     .help("추가")
@@ -164,9 +164,10 @@ private struct NoteRow: View {
             HStack(spacing: 2) {
                 switch note.kind {
                 case .login:
-                    RowIconButton(systemName: "person", help: "ID 복사", visible: hovering) { copy(note.username, "ID") }
+                    // 그림만으로는 어느 쪽인지 알 수 없었다 (사람·열쇠 — 2026-11-18 사용자 지적): 복사 그림 + 글자
+                    RowCopyButton(title: "ID", help: "ID 복사", visible: hovering) { copy(note.username, "ID") }
                         .disabled(note.username.isEmpty)
-                    RowIconButton(systemName: "key", help: "비밀번호 복사", visible: hovering) { copy(note.password, "비밀번호") }
+                    RowCopyButton(title: "PW", help: "비밀번호 복사", visible: hovering) { copy(note.password, "비밀번호") }
                 case .memo:
                     RowIconButton(systemName: "doc.on.doc", help: "복사", visible: hovering) { copy(note.body, "메모") }
                 }
@@ -185,7 +186,7 @@ private struct NoteRow: View {
         switch note.kind {
         case .login:
             // 이름을 붙였으면 ID 도 아랫줄에
-            Text([note.title.isEmpty ? "" : note.username, BookmarkStore.shortAddress(note.site)].filter { !$0.isEmpty }.joined(separator: " · "))
+            Text([note.title.isEmpty ? "" : note.username, note.siteSummary].filter { !$0.isEmpty }.joined(separator: " · "))
                 .font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
         case .memo:
             if isExpanded {
@@ -202,7 +203,36 @@ private struct NoteRow: View {
     }
 }
 
+/// 줄 끝의 글자 붙은 복사 버튼 ("⧉ ID" · "⧉ PW"). 누름 영역·올린 면은 RowIconButton 과 같게 (높이 24, 감춰져 있어도 누름 영역은 남는다).
+private struct RowCopyButton: View {
+    @Environment(\.isEnabled) private var isEnabled
+    let title: String
+    let help: String
+    let visible: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Image(systemName: "doc.on.doc").font(.system(size: 10))
+                Text(title).font(.system(size: 11, weight: .medium))
+            }
+            .padding(.horizontal, 6)
+            .frame(height: 24)
+            .background(hovering && isEnabled ? Color.primary.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(hovering && isEnabled ? Color.primary : Color.secondary)
+        .opacity(!(visible || hovering) ? 0 : (isEnabled ? 1 : 0.4))
+        .onHover { hovering = $0 }
+        .help(help)
+    }
+}
+
 /// 추가·편집. 새것은 종류(로그인·메모)를 고른다. 저장은 ⌘Return (Return 은 메모 칸의 줄바꿈). 삭제는 편집에서만.
+/// 로그인은 칸마다 왼쪽에 이름표 — 이름 · ID · PW · URL 순서. URL 은 여러 줄(같은 계정으로 들어가는 주소들): ⊕ 로 아래에 줄을 보태고 ⊖ 로 뺀다(한 줄은 남는다).
 private struct NoteEditor: View {
     @Environment(AppModel.self) private var model
     @Binding var draft: SecretNote
@@ -212,7 +242,12 @@ private struct NoteEditor: View {
     @State private var showPassword = false
     @FocusState private var focused: Field?
 
-    private enum Field { case title, site, username }
+    private enum Field: Hashable { case title, username, site(Int) }
+    /// 이름표 열의 폭 ("이름"·"URL" 이 들어간다)
+    private static let labelWidth: CGFloat = 30
+
+    /// URL 줄들 — 하나도 없으면 빈 줄 하나를 보인다
+    private var sites: [String] { draft.sites.isEmpty ? [""] : draft.sites }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -242,8 +277,8 @@ private struct NoteEditor: View {
                     .help("저장 (⌘Return)")
             }
         }
-        // 목록에서 바뀌어 들어오는 순간에 주면 무시된다 — 화면이 붙은 다음 차례에
-        .onAppear { DispatchQueue.main.async { focused = draft.kind == .memo ? .title : (draft.site.isEmpty ? .site : .username) } }
+        // 목록에서 바뀌어 들어오는 순간에 주면 무시된다 — 화면이 붙은 다음 차례에. 주소가 채워져 있으면(브라우저에서 연 새 로그인) ID 부터
+        .onAppear { DispatchQueue.main.async { focused = draft.kind == .memo ? .title : (sites[0].isEmpty ? .site(0) : .username) } }
     }
 
     private func field(_ placeholder: String, text: Binding<String>, _ field: Field, monospaced: Bool = false) -> some View {
@@ -255,28 +290,58 @@ private struct NoteEditor: View {
             .focused($focused, equals: field)
     }
 
+    /// 이름표 + 칸 한 줄
+    private func row<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 8) {
+            Text(label).font(.fieldLabel).foregroundStyle(.secondary).frame(width: Self.labelWidth, alignment: .leading)
+            content()
+        }
+    }
+
+    private func setSite(_ index: Int, _ value: String) {
+        var next = sites
+        next[index] = value
+        draft.sites = next
+    }
+
     @ViewBuilder
     private var login: some View {
-        field("주소 (localhost:3000)", text: $draft.site, .site, monospaced: true)
-        field("ID", text: $draft.username, .username, monospaced: true)
-        HStack(spacing: 4) {
-            Group {
-                if showPassword {
-                    TextField("비밀번호", text: $draft.password).textFieldStyle(.plain).font(.system(.callout, design: .monospaced))
-                } else {
-                    RomanSecureField("비밀번호", text: $draft.password, plain: true)
+        row("이름") { field("비우면 ID", text: $draft.title, .title) }
+        row("ID") { field("ID", text: $draft.username, .username, monospaced: true) }
+        row("PW") {
+            HStack(spacing: 4) {
+                Group {
+                    if showPassword {
+                        TextField("비밀번호", text: $draft.password).textFieldStyle(.plain).font(.system(.callout, design: .monospaced))
+                    } else {
+                        RomanSecureField("비밀번호", text: $draft.password, plain: true)
+                    }
+                }
+                .frame(height: 18)
+                Button { showPassword.toggle() } label: { Image(systemName: showPassword ? "eye.slash" : "eye") }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(showPassword ? "비밀번호 가리기" : "비밀번호 보기")
+            }
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .fieldSurface()
+        }
+        ForEach(Array(sites.enumerated()), id: \.offset) { index, site in
+            row(index == 0 ? "URL" : "") {
+                field("localhost:3000", text: Binding(get: { site }, set: { setSite(index, $0) }), .site(index), monospaced: true)
+                if sites.count > 1 {
+                    Button { draft.sites = sites.enumerated().filter { $0.offset != index }.map(\.element) } label: { Image(systemName: "minus.circle") }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("이 주소 빼기").help("이 주소 빼기")
                 }
             }
-            .frame(height: 18)
-            Button { showPassword.toggle() } label: { Image(systemName: showPassword ? "eye.slash" : "eye") }
-                .buttonStyle(.borderless)
-                .accessibilityLabel(showPassword ? "비밀번호 가리기" : "비밀번호 보기")
         }
-        .padding(.horizontal, 8).padding(.vertical, 5)
-        .fieldSurface()
-        field("이름 (비우면 ID)", text: $draft.title, .title)
-        Text("주소가 같은 페이지에서만 채웁니다 (http 와 https, 포트가 다르면 다른 곳).")
-            .font(.caption).foregroundStyle(.secondary)
+        row("") {
+            Button { draft.sites = sites + [""]; DispatchQueue.main.async { focused = .site(sites.count - 1) } } label: { Image(systemName: "plus.circle") }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("주소 추가").help("주소 추가 — 같은 계정으로 들어가는 다른 주소")
+            Text("적어 둔 주소에서만 채웁니다 — 스킴·포트까지 같아야 합니다.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     @ViewBuilder

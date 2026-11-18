@@ -18,18 +18,26 @@ public struct SecretNote: Codable, Sendable, Equatable, Identifiable {
     public var body: String
     /// 메모: 목록에서 본문을 가린다 (펼쳐야 보인다)
     public var concealed: Bool
-    /// 로그인: 주소창에 보이는 주소의 출처 (`http://localhost:3000` — NoteVault.site)
-    public var site: String
+    /// 로그인: 이 계정을 쓰는 주소들 — 주소창에 보이는 주소의 출처 (`http://localhost:3000` — NoteVault.site). 하나 이상.
+    /// 같은 계정으로 들어가는 주소가 여럿일 수 있다 (localhost·127.0.0.1·서버 IP)
+    public var sites: [String]
     public var username: String
     public var password: String
 
     public init(id: UUID = UUID(), kind: Kind, title: String = "", body: String = "", concealed: Bool = false,
-                site: String = "", username: String = "", password: String = "") {
+                sites: [String] = [], username: String = "", password: String = "") {
         self.id = id; self.kind = kind; self.title = title; self.body = body; self.concealed = concealed
-        self.site = site; self.username = username; self.password = password
+        self.sites = sites; self.username = username; self.password = password
     }
 
-    private enum CodingKeys: String, CodingKey { case id, kind, title, body, concealed, site, username, password }
+    private enum CodingKeys: String, CodingKey { case id, kind, title, body, concealed, sites, site, username, password }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id); try c.encode(kind, forKey: .kind); try c.encode(title, forKey: .title)
+        try c.encode(body, forKey: .body); try c.encode(concealed, forKey: .concealed)
+        try c.encode(sites, forKey: .sites); try c.encode(username, forKey: .username); try c.encode(password, forKey: .password)
+    }
 
     /// 빠진 칸은 빈 값으로 읽는다 (칸이 늘어도 옛 파일이 읽히게)
     public init(from decoder: Decoder) throws {
@@ -39,7 +47,9 @@ public struct SecretNote: Codable, Sendable, Equatable, Identifiable {
         title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
         body = try c.decodeIfPresent(String.self, forKey: .body) ?? ""
         concealed = try c.decodeIfPresent(Bool.self, forKey: .concealed) ?? false
-        site = try c.decodeIfPresent(String.self, forKey: .site) ?? ""
+        // 주소가 하나이던 때의 파일 (site) 도 읽는다
+        let single = try c.decodeIfPresent(String.self, forKey: .site) ?? ""
+        sites = try c.decodeIfPresent([String].self, forKey: .sites) ?? (single.isEmpty ? [] : [single])
         username = try c.decodeIfPresent(String.self, forKey: .username) ?? ""
         password = try c.decodeIfPresent(String.self, forKey: .password) ?? ""
     }
@@ -49,8 +59,14 @@ public struct SecretNote: Codable, Sendable, Equatable, Identifiable {
         if !title.isEmpty { return title }
         switch kind {
         case .memo: return concealed ? "메모" : String(body.split(whereSeparator: \.isNewline).first ?? "")
-        case .login: return username.isEmpty ? BookmarkStore.shortAddress(site) : username
+        case .login: return username.isEmpty ? siteSummary : username
         }
+    }
+
+    /// 목록 아랫줄의 주소: 첫 주소를 짧게, 더 있으면 "외 N"
+    public var siteSummary: String {
+        guard let first = sites.first else { return "" }
+        return BookmarkStore.shortAddress(first) + (sites.count > 1 ? " 외 \(sites.count - 1)" : "")
     }
 }
 
@@ -119,9 +135,10 @@ public enum NoteVault {
         return notes.filter { fits($0, site: site) } + notes.filter { !fits($0, site: site) }
     }
 
-    /// 이 페이지에 채울 수 있는 로그인인가 (주소가 같을 때만 — 다른 사이트에는 채우지 않는다)
+    /// 이 페이지에 채울 수 있는 로그인인가 (적어 둔 주소 중 하나와 같을 때만 — 다른 사이트에는 채우지 않는다)
     public static func fits(_ note: SecretNote, site: String?) -> Bool {
-        note.kind == .login && site != nil && note.site == site
+        guard note.kind == .login, let site else { return false }
+        return note.sites.contains(site)
     }
 
     /// 검색: 제목·주소·ID, 가리지 않은 메모는 본문도 (대소문자 무시). 비밀번호·가린 본문은 찾지 않는다. 빈 검색어는 전부.
@@ -131,12 +148,13 @@ public enum NoteVault {
         var fields = [note.title]
         switch note.kind {
         case .memo: if !note.concealed { fields.append(note.body) }
-        case .login: fields += [note.site, note.username]
+        case .login: fields += note.sites + [note.username]
         }
         return fields.contains { $0.localizedCaseInsensitiveContains(q) }
     }
 
-    /// 입력칸 값 → 저장할 값. 종류에 안 쓰는 칸은 비운다. 메모는 제목·본문이 다 비면, 로그인은 주소가 틀렸거나 ID·비밀번호가 다 비면 nil.
+    /// 입력칸 값 → 저장할 값. 종류에 안 쓰는 칸은 비운다. 메모는 제목·본문이 다 비면 nil.
+    /// 로그인의 주소: 빈 줄은 버리고 같은 것은 하나로. 틀린 주소가 있거나 하나도 없거나 ID·비밀번호가 다 비면 nil.
     /// 비밀번호는 다듬지 않는다 (앞뒤 공백도 비밀번호일 수 있다).
     public static func normalized(_ note: SecretNote) -> SecretNote? {
         var out = note
@@ -144,11 +162,16 @@ public enum NoteVault {
         switch note.kind {
         case .memo:
             out.body = note.body.trimmingCharacters(in: .whitespacesAndNewlines)
-            out.site = ""; out.username = ""; out.password = ""
+            out.sites = []; out.username = ""; out.password = ""
             return out.title.isEmpty && out.body.isEmpty ? nil : out
         case .login:
-            guard let site = site(of: note.site) else { return nil }
-            out.site = site
+            var sites: [String] = []
+            for raw in note.sites where !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                guard let site = site(of: raw) else { return nil }
+                if !sites.contains(site) { sites.append(site) }
+            }
+            guard !sites.isEmpty else { return nil }
+            out.sites = sites
             out.username = note.username.trimmingCharacters(in: .whitespacesAndNewlines)
             out.body = ""; out.concealed = false
             return out.username.isEmpty && out.password.isEmpty ? nil : out
@@ -199,12 +222,12 @@ public enum NoteVault {
     public static func capture(address: String, username: String, password: String, serverKey: String, in state: NoteState) -> Capture {
         let user = username.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let site = site(of: address), !password.isEmpty, password.count <= fieldLimit, user.count <= fieldLimit else { return .ignore }
-        if var known = notes(for: serverKey, in: state).first(where: { $0.kind == .login && $0.site == site && $0.username == user }) {
+        if var known = notes(for: serverKey, in: state).first(where: { fits($0, site: site) && $0.username == user }) {
             guard known.password != password else { return .ignore }
             known.password = password
             return .update(known)
         }
-        return .add(SecretNote(kind: .login, site: site, username: user, password: password))
+        return .add(SecretNote(kind: .login, sites: [site], username: user, password: password))
     }
 
     /// 잡아 둔 로그인을 물어도 되는가: 잡은 지 얼마 안 됐고(window 초), 지금 페이지에 비밀번호 칸이 안 보인다 —

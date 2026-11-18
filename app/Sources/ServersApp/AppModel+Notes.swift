@@ -73,6 +73,11 @@ extension AppModel {
         return NoteVault.capture(address: address.absoluteString, username: username, password: password, serverKey: server.key, in: notes)
     }
 
+    /// 그 주소에 저장해 둔 로그인 (브라우저 탭의 채우기 띠 — 막힌 상태면 notes 가 비어 있다)
+    func savedLogins(site: String, on server: Server) -> [SecretNote] {
+        NoteVault.notes(for: server.key, in: notes).filter { NoteVault.fits($0, site: site) }
+    }
+
     /// 보이는 브라우저 탭에 채운다 (그 페이지의 로그인일 때만 — BrowserSession.fill 이 주소를 다시 본다)
     func fillLogin(_ note: SecretNote) {
         visibleBrowser?.fill(note)

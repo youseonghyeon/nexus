@@ -10,7 +10,7 @@ final class NoteVaultTests: XCTestCase {
     }
     private var key: VaultKey { PasswordVault.resolveKey(store: MemoryKeyStore()) }
 
-    private let login = SecretNote(kind: .login, site: "http://localhost:3000", username: "admin", password: "s3cret 한글")
+    private let login = SecretNote(kind: .login, sites: ["http://localhost:3000"], username: "admin", password: "s3cret 한글")
     private let memo = SecretNote(kind: .memo, title: "배포", body: "1. 빌드\n2. 올리기")
 
     // MARK: 저장
@@ -85,19 +85,19 @@ final class NoteVaultTests: XCTestCase {
     // MARK: 목록
 
     func testNormalized() {
-        let cleaned = NoteVault.normalized(SecretNote(kind: .login, title: " 관리자 ", body: "남은 글", concealed: true, site: "LOCALHOST:3000/login", username: " admin ", password: " pw "))
-        XCTAssertEqual(cleaned?.site, "http://localhost:3000")
+        let cleaned = NoteVault.normalized(SecretNote(kind: .login, title: " 관리자 ", body: "남은 글", concealed: true, sites: ["LOCALHOST:3000/login"], username: " admin ", password: " pw "))
+        XCTAssertEqual(cleaned?.sites, ["http://localhost:3000"])
         XCTAssertEqual(cleaned?.username, "admin")
         XCTAssertEqual(cleaned?.password, " pw ", "비밀번호는 다듬지 않는다")
         XCTAssertEqual(cleaned?.title, "관리자")
         XCTAssertEqual(cleaned?.body, ""); XCTAssertEqual(cleaned?.concealed, false)
-        XCTAssertNil(NoteVault.normalized(SecretNote(kind: .login, site: "about:blank", username: "a", password: "b")))
-        XCTAssertNil(NoteVault.normalized(SecretNote(kind: .login, site: "localhost", username: " ", password: "")))
-        XCTAssertNotNil(NoteVault.normalized(SecretNote(kind: .login, site: "localhost", password: "pw")), "ID 없는 로그인")
+        XCTAssertNil(NoteVault.normalized(SecretNote(kind: .login, sites: ["about:blank"], username: "a", password: "b")))
+        XCTAssertNil(NoteVault.normalized(SecretNote(kind: .login, sites: ["localhost"], username: " ", password: "")))
+        XCTAssertNotNil(NoteVault.normalized(SecretNote(kind: .login, sites: ["localhost"], password: "pw")), "ID 없는 로그인")
 
-        let note = NoteVault.normalized(SecretNote(kind: .memo, title: " t ", body: "\n a\nb \n", site: "x", username: "u", password: "p"))
+        let note = NoteVault.normalized(SecretNote(kind: .memo, title: " t ", body: "\n a\nb \n", sites: ["x"], username: "u", password: "p"))
         XCTAssertEqual(note?.body, "a\nb"); XCTAssertEqual(note?.title, "t")
-        XCTAssertEqual([note?.site, note?.username, note?.password], ["", "", ""])
+        XCTAssertEqual(note?.sites, []); XCTAssertEqual([note?.username, note?.password], ["", ""])
         XCTAssertNil(NoteVault.normalized(SecretNote(kind: .memo, title: " ", body: "\n")))
         XCTAssertNotNil(NoteVault.normalized(SecretNote(kind: .memo, title: "제목만")))
     }
@@ -107,8 +107,8 @@ final class NoteVaultTests: XCTestCase {
         XCTAssertEqual(SecretNote(kind: .memo, body: "첫 줄\r\n둘째").displayTitle, "첫 줄")
         XCTAssertEqual(SecretNote(kind: .memo, body: "비밀", concealed: true).displayTitle, "메모", "가린 본문은 제목으로 새지 않는다")
         XCTAssertEqual(login.displayTitle, "admin")
-        XCTAssertEqual(SecretNote(kind: .login, site: "http://localhost:3000", password: "p").displayTitle, "localhost:3000")
-        XCTAssertEqual(SecretNote(kind: .login, title: "Grafana", site: "http://localhost:3000", username: "admin").displayTitle, "Grafana")
+        XCTAssertEqual(SecretNote(kind: .login, sites: ["http://localhost:3000"], password: "p").displayTitle, "localhost:3000")
+        XCTAssertEqual(SecretNote(kind: .login, title: "Grafana", sites: ["http://localhost:3000"], username: "admin").displayTitle, "Grafana")
     }
 
     func testUpsertRemoveAndServerMoves() {
@@ -133,7 +133,7 @@ final class NoteVaultTests: XCTestCase {
     }
 
     func testOrderedAndFits() {
-        let other = SecretNote(kind: .login, site: "http://localhost:9090", username: "root", password: "x")
+        let other = SecretNote(kind: .login, sites: ["http://localhost:9090"], username: "root", password: "x")
         let notes = [memo, other, login]
         XCTAssertEqual(NoteVault.ordered(notes, site: "http://localhost:3000"), [login, memo, other], "보는 페이지의 로그인이 맨 위")
         XCTAssertEqual(NoteVault.ordered(notes, site: nil), notes)
@@ -141,7 +141,7 @@ final class NoteVaultTests: XCTestCase {
         XCTAssertFalse(NoteVault.fits(login, site: "https://localhost:3000"), "스킴이 다르면 채우지 않는다")
         XCTAssertFalse(NoteVault.fits(login, site: "http://localhost:3001"))
         XCTAssertFalse(NoteVault.fits(login, site: nil))
-        XCTAssertFalse(NoteVault.fits(SecretNote(kind: .memo, site: "http://localhost:3000"), site: "http://localhost:3000"))
+        XCTAssertFalse(NoteVault.fits(SecretNote(kind: .memo, sites: ["http://localhost:3000"]), site: "http://localhost:3000"))
     }
 
     func testMatchesNeverSearchesSecrets() {
@@ -166,7 +166,7 @@ final class NoteVaultTests: XCTestCase {
         guard case let .update(changed) = capture("http://localhost:3000/login", " admin ", "new") else { return XCTFail("같은 주소·같은 ID 는 바꾸기") }
         XCTAssertEqual(changed.id, login.id); XCTAssertEqual(changed.password, "new")
         guard case let .add(fresh) = capture("http://localhost:3000/login", "viewer", "pw") else { return XCTFail("다른 ID 는 새로") }
-        XCTAssertEqual([fresh.site, fresh.username, fresh.password], ["http://localhost:3000", "viewer", "pw"])
+        XCTAssertEqual(fresh.sites + [fresh.username, fresh.password], ["http://localhost:3000", "viewer", "pw"])
         XCTAssertEqual(fresh.kind, .login)
         if case .add = capture("http://localhost:3001/", "admin", "s3cret 한글") {} else { XCTFail("다른 포트는 다른 곳") }
         if case .add = capture("http://localhost:3000/", "admin", "s3cret 한글", on: "db") {} else { XCTFail("다른 서버는 따로") }
@@ -174,6 +174,40 @@ final class NoteVaultTests: XCTestCase {
         XCTAssertEqual(capture("about:blank", "admin", "pw"), .ignore, "웹 주소가 아니다")
         XCTAssertEqual(capture("http://localhost:3000/", "admin", String(repeating: "x", count: 1001)), .ignore, "너무 긴 값")
         XCTAssertEqual(capture("http://localhost:3000/", String(repeating: "x", count: 1001), "pw"), .ignore)
+    }
+
+    // MARK: 주소 여러 개
+
+    func testSeveralSites() {
+        let both = SecretNote(kind: .login, sites: ["http://localhost:3000", "http://127.0.0.1:3000"], username: "admin", password: "pw")
+        XCTAssertTrue(NoteVault.fits(both, site: "http://127.0.0.1:3000"))
+        XCTAssertTrue(NoteVault.fits(both, site: "http://localhost:3000"))
+        XCTAssertFalse(NoteVault.fits(both, site: "http://192.0.2.10:3000"))
+        XCTAssertTrue(NoteVault.matches(both, "127.0"))
+        XCTAssertEqual(both.siteSummary, "localhost:3000 외 1")
+        XCTAssertEqual(SecretNote(kind: .login, sites: ["https://a.example"]).siteSummary, "https://a.example")
+
+        // 편집기의 줄들: 빈 줄은 버리고 같은 주소는 하나로, 틀린 줄이 있으면 저장하지 않는다
+        let edited = NoteVault.normalized(SecretNote(kind: .login, sites: ["localhost:3000", " ", "http://LOCALHOST:3000/login", "127.0.0.1:3000"], username: "a", password: "b"))
+        XCTAssertEqual(edited?.sites, ["http://localhost:3000", "http://127.0.0.1:3000"])
+        XCTAssertNil(NoteVault.normalized(SecretNote(kind: .login, sites: ["localhost:3000", "about:blank"], username: "a", password: "b")))
+        XCTAssertNil(NoteVault.normalized(SecretNote(kind: .login, sites: ["", " "], username: "a", password: "b")), "주소가 하나도 없다")
+
+        // 잡은 로그인: 적어 둔 주소 어느 쪽에서든 같은 계정으로 본다
+        let state = NoteState(servers: ["web": [both]])
+        XCTAssertEqual(NoteVault.capture(address: "http://127.0.0.1:3000/login", username: "admin", password: "pw", serverKey: "web", in: state), .ignore)
+        guard case let .update(changed) = NoteVault.capture(address: "http://127.0.0.1:3000/", username: "admin", password: "new", serverKey: "web", in: state) else { return XCTFail("바꾸기") }
+        XCTAssertEqual(changed.sites, both.sites, "주소 목록은 그대로")
+    }
+
+    /// 주소가 하나이던 때 저장한 것 (site) 도 읽고, 다시 쓰면 sites 로
+    func testReadsSingleSiteFile() throws {
+        let json = #"{"id":"00000000-0000-0000-0000-000000000001","kind":"login","site":"http://localhost:3000","username":"admin","password":"pw"}"#
+        let note = try JSONDecoder().decode(SecretNote.self, from: Data(json.utf8))
+        XCTAssertEqual(note.sites, ["http://localhost:3000"])
+        let again = try JSONDecoder().decode(SecretNote.self, from: JSONEncoder().encode(note))
+        XCTAssertEqual(again, note)
+        XCTAssertNil(String(data: try JSONEncoder().encode(note), encoding: .utf8)?.range(of: #""site""#))
     }
 
     func testConfirms() {

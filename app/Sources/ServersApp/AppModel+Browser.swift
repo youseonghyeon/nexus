@@ -120,7 +120,8 @@ extension AppModel {
                                         captured: { [weak self] address, username, password in
                                             self?.capturedLogin(address: address, username: username, password: password, on: server) ?? .ignore
                                         },
-                                        save: { [weak self] in self?.saveNote($0, for: server.key) }),
+                                        save: { [weak self] in self?.saveNote($0, for: server.key) },
+                                        saved: { [weak self] site in self?.savedLogins(site: site, on: server) ?? [] }),
                                      onStatus: { [weak self] in self?.statusMessage = $0 })
         // 시작 페이지에 보일 열린 포트 — 아직 읽은 적 없으면 조용히 읽는다 (인증이 필요하면 안내만, ↻ 가 창을 띄운다)
         if info(server, .ports).fetchedAt == nil { fetchInfo(server, .ports, allowPrompt: false) }

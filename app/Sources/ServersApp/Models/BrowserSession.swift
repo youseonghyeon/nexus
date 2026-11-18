@@ -32,21 +32,34 @@ final class BrowserSession: NSObject, ObservableObject {
         let remove: @MainActor (String) -> Void
     }
     private let bookmarks: BookmarkHooks
-    /// 메모·로그인(서버별 — 모델이 들고 있다)으로 가는 길: 잡은 로그인을 물을지(주소·ID·비밀번호) · 저장
+    /// 메모·로그인(서버별 — 모델이 들고 있다)으로 가는 길: 잡은 로그인을 물을지(주소·ID·비밀번호) · 저장 · 그 주소에 저장해 둔 로그인
     struct LoginHooks {
         let captured: @MainActor (URL, String, String) -> NoteVault.Capture
         let save: @MainActor (SecretNote) -> Void
+        let saved: @MainActor (String) -> [SecretNote]
     }
     private let logins: LoginHooks
-    /// 주소창 아래 띠로 묻는 중인 로그인 (새로 저장 · 저장한 것의 비밀번호 바꾸기)
+    /// 웹 화면 오른쪽 위 카드로 묻는 중인 로그인 (새로 저장 · 저장한 것의 비밀번호 바꾸기). site 는 잡은 페이지의 주소
     struct LoginOffer: Equatable {
         let note: SecretNote
         let isUpdate: Bool
+        let site: String
     }
     @Published private(set) var loginOffer: LoginOffer?
+    /// 로그인 칸에 포커스가 있고 이 주소에 저장해 둔 로그인이 있다 — 그 칸 아래에 목록을 띄운다 (BrowserOverlays). field 는 웹 화면 안의 칸 자리
+    struct FillPrompt: Equatable {
+        let field: LoginForms.Rect
+        let logins: [SecretNote]
+    }
+    @Published private(set) var fillPrompt: FillPrompt?
+    /// 목록 위에 마우스가 있다 — 그동안 온 blur 는 미룬다 (목록을 누르는 사이 칸이 포커스를 잃어도 누르기 전에 사라지지 않게)
+    private var fillPromptHovered = false
+    private var fillBlurPending = false
+    /// 채운 직후: 채우면서 준 포커스로 목록이 다시 뜨지 않게 잠깐 막는다
+    private var fillQuietUntil = Date.distantPast
     /// 페이지에서 잡아 둔 로그인 — 로그인이 된 것 같을 때(비밀번호 칸이 사라짐) 묻는다
     private var loginCandidate: (address: URL, username: String, password: String, at: Date)?
-    /// 이 탭에서 [안 함] 한 것 (주소 + ID) — 탭을 닫을 때까지 다시 묻지 않는다
+    /// 이 탭에서 [나중에] 한 것 (잡은 주소 + ID) — 탭을 닫을 때까지 다시 묻지 않는다
     private var declinedLogins: Set<String> = []
     private let loginWorld = WKContentWorld.world(name: LoginForms.world)
     /// 지금 시작 페이지를 보고 있는가 (포트 목록이 오면 다시 그린다 · 주소창은 비운다)
@@ -176,6 +189,7 @@ final class BrowserSession: NSObject, ObservableObject {
     func showStart() {
         showingStart = true
         url = nil
+        fillPrompt = nil
         webView.loadHTMLString(startPage(), baseURL: nil)
         onStartShown()
     }
@@ -242,11 +256,27 @@ final class BrowserSession: NSObject, ObservableObject {
 
     /// 페이지가 보낸 것: 잡은 ID·비밀번호는 들고만 있고, 비밀번호 칸이 사라졌다고 하면 묻는다
     private func receivedLogin(_ message: WKScriptMessage) {
-        guard message.frameInfo.isMainFrame, !showingStart, let url, site != nil, let parsed = LoginForms.parse(message.body) else { return }
+        guard message.frameInfo.isMainFrame, let parsed = LoginForms.parse(message.body) else { return }
+        // 칸이 안 보인다·떠났다는 알림은 어느 페이지에서든 목록을 내린다 (시작 페이지·오류 페이지로 넘어갔을 때도)
+        if parsed == .field(false) { fillPrompt = nil }
+        if parsed == .blur { if fillPromptHovered { fillBlurPending = true } else { fillPrompt = nil } }
+        guard !showingStart, let url, let site else { return }
         switch parsed {
         case let .candidate(username, password): loginCandidate = (url, username, password, Date())
-        case .gone: settleLogin(passwordFieldVisible: false)
+        case .gone, .field(false): settleLogin(passwordFieldVisible: false)
+        case let .focus(field):
+            guard Date() >= fillQuietUntil else { return }
+            let saved = logins.saved(site)
+            fillBlurPending = false
+            fillPrompt = saved.isEmpty ? nil : FillPrompt(field: field, logins: saved)
+        case .field(true), .blur: break
         }
+    }
+
+    /// 목록 화면이 알린다: 마우스가 목록 위에 있다·떠났다
+    func setFillPromptHovered(_ hovered: Bool) {
+        fillPromptHovered = hovered
+        if !hovered, fillBlurPending { fillBlurPending = false; fillPrompt = nil }
     }
 
     /// 잡아 둔 것을 끝낸다: 로그인이 된 것 같으면 모델에 물어 띠를 띄우고, 아니면(칸이 다시 떴다·오래됐다) 버린다
@@ -256,14 +286,15 @@ final class BrowserSession: NSObject, ObservableObject {
         guard NoteVault.confirms(capturedAt: candidate.at, now: Date(), passwordFieldVisible: passwordFieldVisible) else { return }
         switch logins.captured(candidate.address, candidate.username, candidate.password) {
         case .ignore: break
-        case let .add(note): offer(note, isUpdate: false)
-        case let .update(note): offer(note, isUpdate: true)
+        case let .add(note): offer(note, isUpdate: false, at: candidate.address)
+        case let .update(note): offer(note, isUpdate: true, at: candidate.address)
         }
     }
 
-    private func offer(_ note: SecretNote, isUpdate: Bool) {
-        guard !declinedLogins.contains(note.site + "\n" + note.username) else { return }
-        loginOffer = LoginOffer(note: note, isUpdate: isUpdate)
+    private func offer(_ note: SecretNote, isUpdate: Bool, at address: URL) {
+        let site = NoteVault.site(of: address.absoluteString) ?? ""
+        guard !declinedLogins.contains(site + "\n" + note.username) else { return }
+        loginOffer = LoginOffer(note: note, isUpdate: isUpdate, site: site)
     }
 
     /// 페이지가 통째로 넘어간 뒤: 새 페이지에 비밀번호 칸이 없으면 로그인이 된 것으로 본다 (확인을 못 하면 버린다)
@@ -276,23 +307,26 @@ final class BrowserSession: NSObject, ObservableObject {
         }
     }
 
-    /// 띠의 [저장]·[바꾸기]
+    /// 카드의 [저장]·[바꾸기]
     func acceptLoginOffer() {
         guard let offer = loginOffer else { return }
         loginOffer = nil
         logins.save(offer.note)
     }
 
-    /// 띠의 [안 함]
+    /// 카드의 [나중에]
     func declineLoginOffer() {
         guard let offer = loginOffer else { return }
-        declinedLogins.insert(offer.note.site + "\n" + offer.note.username)
+        declinedLogins.insert(offer.site + "\n" + offer.note.username)
         loginOffer = nil
     }
 
-    /// 팝오버에서 로그인을 눌렀다: 지금 페이지가 그 주소일 때만 채운다 (다른 사이트에 비밀번호를 넣지 않는다)
+    /// 팝오버·칸 아래 목록에서 로그인을 눌렀다: 지금 페이지가 그 주소일 때만 채운다 (다른 사이트에 비밀번호를 넣지 않는다)
     func fill(_ note: SecretNote) {
         guard NoteVault.fits(note, site: site) else { return }
+        fillPrompt = nil
+        fillPromptHovered = false; fillBlurPending = false
+        fillQuietUntil = Date().addingTimeInterval(1)
         let address = url
         Task {
             guard url == address else { return }
@@ -373,6 +407,12 @@ extension BrowserSession: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         refreshStartPorts()
         settleLoginAfterNavigation()
+    }
+
+    /// 새 문서로 넘어갔다 — 옛 페이지의 칸 아래 목록은 내린다 (옛 문서는 blur 를 못 보낸다)
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        fillPrompt = nil
+        fillPromptHovered = false; fillBlurPending = false
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

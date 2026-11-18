@@ -7,9 +7,17 @@ import XCTest
 
 @MainActor
 private final class Sink: NSObject, WKScriptMessageHandler {
+    /// 잡은 것·사라짐 (field 알림은 fields 에, 포커스 알림은 prompts 에 따로)
     var messages: [LoginForms.Message] = []
+    var fields: [Bool] = []
+    var prompts: [LoginForms.Message] = []
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        if let parsed = LoginForms.parse(message.body) { messages.append(parsed) }
+        guard let parsed = LoginForms.parse(message.body) else { return }
+        switch parsed {
+        case let .field(shown): fields.append(shown)
+        case .focus, .blur: prompts.append(parsed)
+        default: messages.append(parsed)
+        }
     }
 }
 
@@ -114,6 +122,88 @@ final class LoginFormsTests: XCTestCase {
         XCTAssertFalse(sink.messages.isEmpty)
     }
 
+    // MARK: 비밀번호 칸 알림
+
+    func testFieldReportedOnLoadAndWhenItChanges() async throws {
+        let (view, sink) = try await page("<div id=app></div>")
+        try await wait("처음 알림") { sink.fields == [false] }
+        // 주소는 그대로인데 화면만 로그인으로 갈린다 (SPA)
+        _ = try await inPage(view, "app.innerHTML = '<input id=u type=text><input id=p type=password>'")
+        try await wait("칸이 생김") { sink.fields == [false, true] }
+        // 값만 치는 동안에는 다시 알리지 않는다
+        _ = try await inPage(view, "p.value = 'x'; p.setAttribute('class', 'dirty')")
+        try await Task.sleep(for: .milliseconds(500))
+        XCTAssertEqual(sink.fields, [false, true])
+        // 부모를 감춰도 사라진 것
+        _ = try await inPage(view, "app.style.display = 'none'")
+        try await wait("칸이 사라짐") { sink.fields == [false, true, false] }
+        let (login, loginSink) = try await page(form)
+        try await wait("로그인 페이지") { loginSink.fields == [true] }
+        _ = login
+    }
+
+    // MARK: 로그인 칸 포커스 (칸 아래 목록)
+
+    func testFocusOnLoginFieldsReportsRectAndBlurHides() async throws {
+        let html = "<input id=s type=search style='position:absolute;left:10px;top:10px'><form onsubmit='event.preventDefault()'>"
+            + "<input id=u type=text style='position:absolute;left:100px;top:200px;width:300px;height:30px;box-sizing:border-box;margin:0'>"
+            + "<input id=p type=password style='position:absolute;left:100px;top:250px;width:300px;height:30px;box-sizing:border-box;margin:0'></form>"
+        let (view, sink) = try await page(html)
+        _ = try await inPage(view, "u.focus()")
+        try await wait("ID 칸") { sink.prompts.count == 1 }
+        XCTAssertEqual(sink.prompts.last, .focus(LoginForms.Rect(x: 100, y: 200, width: 300, height: 30)))
+        // 비밀번호 칸으로 옮기면 그 칸의 자리 — 사이에 blur 가 끼지 않는다
+        _ = try await inPage(view, "p.focus()")
+        try await wait("PW 칸") { sink.prompts.count == 2 }
+        XCTAssertEqual(sink.prompts.last, .focus(LoginForms.Rect(x: 100, y: 250, width: 300, height: 30)))
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertEqual(sink.prompts.count, 2, "칸 사이를 옮길 때는 내리지 않는다")
+        // 글자를 치면 내린다 — 같은 칸을 다시 누르면 뜬다
+        _ = try await inPage(view, "p.value = 'x'; p.dispatchEvent(new Event('input', { bubbles: true }))")
+        try await wait("입력") { sink.prompts.last == .blur }
+        _ = try await inPage(view, "p.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))")
+        try await wait("다시 누름") { sink.prompts.count == 4 }
+        // 로그인 칸이 아닌 곳으로 가면 내린다. 이미 내려가 있으면 또 보내지 않는다
+        _ = try await inPage(view, "s.focus()")
+        try await wait("다른 칸") { sink.prompts.last == .blur }
+        let count = sink.prompts.count
+        _ = try await inPage(view, "s.blur(); window.dispatchEvent(new Event('scroll'))")
+        try await Task.sleep(for: .milliseconds(250))
+        XCTAssertEqual(sink.prompts.count, count)
+        XCTAssertTrue(sink.messages.isEmpty, "포커스만으로는 잡지 않는다")
+    }
+
+    func testFocusHidesOnScrollAndFiresForAutofocusAndUserOnlyStep() async throws {
+        let (view, sink) = try await page("<input id=u type=text><input id=p type=password autofocus><div style='height:3000px'></div>")
+        try await wait("자동 포커스") { sink.prompts.count == 1 }
+        if case .focus = sink.prompts[0] {} else { XCTFail("열 때 이미 포커스가 있으면 알린다") }
+        _ = try await inPage(view, "window.scrollTo(0, 200)")
+        try await wait("스크롤") { sink.prompts.last == .blur }
+        // 비밀번호 칸이 없는 화면: 이름으로 보아 ID 칸만
+        let (first, firstSink) = try await page("<input id=q type=text name=search><input id=u type=email name=loginfmt>")
+        _ = try await inPage(first, "q.focus()")
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertTrue(firstSink.prompts.isEmpty, "검색 칸에는 안 뜬다")
+        _ = try await inPage(first, "u.focus()")
+        try await wait("ID 먼저 화면") { firstSink.prompts.count == 1 }
+    }
+
+    func testDropdownFrame() {
+        let field = LoginForms.Rect(x: 100, y: 200, width: 300, height: 30)
+        func frame(_ field: LoginForms.Rect, _ width: Double = 800, _ height: Double = 600, content: Double = 88) -> LoginForms.Rect {
+            LoginForms.dropdownFrame(field: field, container: (width, height), contentHeight: content)
+        }
+        XCTAssertEqual(frame(field), LoginForms.Rect(x: 100, y: 234, width: 300, height: 88), "칸 바로 아래, 칸 폭")
+        XCTAssertEqual(frame(LoginForms.Rect(x: 100, y: 200, width: 120, height: 30)).width, 240, "좁은 칸은 최소 폭")
+        XCTAssertEqual(frame(LoginForms.Rect(x: 700, y: 200, width: 120, height: 30)).x, 552, "오른쪽으로 넘치면 안으로 (800 - 8 - 240)")
+        XCTAssertEqual(frame(LoginForms.Rect(x: -50, y: 200, width: 300, height: 30)).x, 8)
+        XCTAssertEqual(frame(LoginForms.Rect(x: 100, y: 540, width: 300, height: 30)).y, 448, "아래에 자리가 없으면 칸 위 (540 - 4 - 88)")
+        XCTAssertEqual(frame(LoginForms.Rect(x: 100, y: 40, width: 300, height: 30), 800, 120).y, 74, "위에도 없으면 아래에 둔다 — 칸은 가리지 않는다")
+        let narrow = frame(field, 200)
+        XCTAssertEqual([narrow.x, narrow.width], [8, 184], "화면이 좁으면 화면 폭 안으로")
+        XCTAssertEqual(frame(field, 0).width, 0, "크기를 아직 못 쟀을 때 음수가 되지 않는다")
+    }
+
     func testPageCannotSeeScriptOrHandler() async throws {
         let (view, _) = try await page(form)
         let seen = try await inPage(view, "return [typeof window.__nexusLoginWatch, typeof (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.\(LoginForms.handler))].join()")
@@ -165,6 +255,13 @@ final class LoginFormsTests: XCTestCase {
         XCTAssertEqual(LoginForms.parse(["username": "a", "password": "b"]), .candidate(username: "a", password: "b"))
         XCTAssertEqual(LoginForms.parse(["password": "b"]), .candidate(username: "", password: "b"))
         XCTAssertEqual(LoginForms.parse(["gone": true]), .gone)
+        XCTAssertEqual(LoginForms.parse(["field": true]), .field(true))
+        XCTAssertEqual(LoginForms.parse(["field": false]), .field(false))
+        XCTAssertEqual(LoginForms.parse(["blur": true]), .blur)
+        XCTAssertEqual(LoginForms.parse(["focus": ["x": 1, "y": 2.5, "width": 3, "height": 4]]), .focus(LoginForms.Rect(x: 1, y: 2.5, width: 3, height: 4)))
+        XCTAssertNil(LoginForms.parse(["focus": ["x": 1, "y": 2, "width": 0, "height": 4]]), "크기 없는 칸")
+        XCTAssertNil(LoginForms.parse(["focus": ["x": 1, "y": "2", "width": 3, "height": 4]]))
+        XCTAssertNil(LoginForms.parse(["focus": ["x": Double.nan, "y": 2, "width": 3, "height": 4]]))
         XCTAssertNil(LoginForms.parse(["username": "a", "password": ""]))
         XCTAssertNil(LoginForms.parse(["username": "a", "password": 3]))
         XCTAssertNil(LoginForms.parse("글자"))

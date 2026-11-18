@@ -1,4 +1,4 @@
-// 브라우저 탭 화면: 주소창(◀ ▶ ↻ ⌂ · URL · ☆ 즐겨찾기, 아래에 진행 줄) + 로그인 저장 띠(물을 때만) + WKWebView. 통신은 BrowserSession/BrowserPolicy — 그 서버에서 켠 브라우저처럼.
+// 브라우저 탭 화면: 주소창(◀ ▶ ↻ ⌂ · URL · ☆ 즐겨찾기, 아래에 진행 줄) + WKWebView (그 위에 비밀번호 저장 카드·저장한 로그인 목록 — BrowserOverlays). 통신은 BrowserSession/BrowserPolicy — 그 서버에서 켠 브라우저처럼.
 
 import ServersCore
 import SwiftUI
@@ -8,6 +8,8 @@ struct BrowserPane: View {
     @ObservedObject var browser: BrowserSession
     @State private var address = ""
     @FocusState private var addressFocused: Bool
+    /// 웹 화면 크기 (칸 아래 목록이 화면 밖으로 나가지 않게 — LoginForms.dropdownFrame)
+    @State private var webSize: CGSize = .zero
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,20 +54,6 @@ struct BrowserPane: View {
                 .opacity(browser.isLoading && browser.notice == nil ? 1 : 0)
                 .allowsHitTesting(false)
             }
-            // 로그인 저장 띠: 로그인이 된 것 같을 때(비밀번호 칸이 사라짐) 묻는다 — 정할 때까지 남는다
-            if let offer = browser.loginOffer {
-                HStack(spacing: 8) {
-                    Image(systemName: "key").foregroundStyle(.secondary)
-                    Text(offer.isUpdate ? "저장한 비밀번호를 바꿀까요?" : "이 로그인을 저장할까요?").font(.callout)
-                    Text([offer.note.username, BookmarkStore.shortAddress(offer.note.site)].filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                    Spacer(minLength: 8)
-                    Button("안 함") { browser.declineLoginOffer() }.buttonStyle(CompactButtonStyle())
-                    Button(offer.isUpdate ? "바꾸기" : "저장") { browser.acceptLoginOffer() }.buttonStyle(CompactButtonStyle())
-                }
-                .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(Palette.card)
-            }
             Divider()
             ZStack {
                 WebViewRepresentable(webView: browser.webView)
@@ -76,6 +64,25 @@ struct BrowserPane: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(nsColor: .textBackgroundColor))
+                }
+            }
+            .onGeometryChange(for: CGSize.self, of: { $0.size }) { webSize = $0 }
+            // 웹 화면 위에 덧그리는 것 (BrowserOverlays) — 있을 때만 얹는다 (없을 때는 웹 화면 위에 아무 뷰도 없다)
+            // 비밀번호 저장 카드: 로그인이 된 것 같을 때(비밀번호 칸이 사라짐) 오른쪽 위에. 정할 때까지 남는다
+            .overlay(alignment: .topTrailing) {
+                if let offer = browser.loginOffer {
+                    LoginSaveCard(offer: offer, accept: { browser.acceptLoginOffer() }, decline: { browser.declineLoginOffer() })
+                        .padding(12)
+                }
+            }
+            // 저장한 로그인 목록: 로그인 칸에 포커스가 있을 때 그 칸 바로 아래에
+            .overlay(alignment: .topLeading) {
+                if let prompt = browser.fillPrompt {
+                    let frame = LoginForms.dropdownFrame(field: prompt.field, container: (Double(webSize.width), Double(webSize.height)),
+                                                         contentHeight: Double(LoginFillList.height(rows: prompt.logins.count)))
+                    LoginFillList(logins: prompt.logins, fill: { browser.fill($0) }, hover: { browser.setFillPromptHovered($0) })
+                        .frame(width: frame.width)
+                        .offset(x: frame.x, y: frame.y)
                 }
             }
         }
