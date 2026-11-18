@@ -6,15 +6,17 @@
 import ServersCore
 import SwiftUI
 
-/// 웹 화면 위에 뜨는 면: 카드 면 + 가는 선 + 그림자 (다크에서도 — 페이지 위에 떠 보여야 한다)
-private struct FloatingSurface: ViewModifier {
+/// 내용 위에 뜨는 면: 카드 면 + 가는 선 + 그림자 (다크에서도 — 아래 내용 위에 떠 보여야 한다). 웹 화면 위의 목록·카드, 탭 막대 패널이 쓴다
+struct FloatingSurface: ViewModifier {
+    var radius: CGFloat = Metrics.panelRadius
+
     func body(content: Content) -> some View {
         content
             .background {
-                RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous).fill(Palette.card)
+                RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Palette.card)
                     .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
             }
-            .overlay(RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous).strokeBorder(Palette.hairline))
+            .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(Palette.hairline))
     }
 }
 

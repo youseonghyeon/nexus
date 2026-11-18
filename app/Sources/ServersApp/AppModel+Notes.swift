@@ -30,7 +30,11 @@ extension AppModel {
     func toggleNotes() {
         guard selectedServer != nil, !tabsForSelected.isEmpty else { notesShown = false; return }
         notesShown.toggle()
+        if notesShown { closeSnippets() }   // 같은 자리의 패널 — 하나만
     }
+
+    /// 탭 막대 패널(명령 모음 · 메모·로그인)이 열려 있다 — 그동안 Return 은 패널의 것 (서버 화면의 SSH 기본 버튼으로 새지 않게)
+    var tabPanelOpen: Bool { snippetsShown || notesShown }
 
     func closeNotes() {
         if notesShown { notesShown = false }

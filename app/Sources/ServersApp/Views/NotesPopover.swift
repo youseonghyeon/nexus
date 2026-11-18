@@ -1,4 +1,5 @@
-// 메모·로그인 팝오버 (탭 막대 오른쪽, 명령 모음 옆의 열쇠 버튼). 선택한 서버의 것만 보인다 — 암호화해 notes.bin 에 둔다 (ServersCore NoteVault).
+// 메모·로그인 (탭 막대 오른쪽, 명령 모음 옆의 열쇠 버튼). 앱이 그리는 패널에 들어간다 (TabBarPanels).
+// 선택한 서버의 것만 보인다 — 암호화해 notes.bin 에 둔다 (ServersCore NoteVault).
 // 로그인: 누르면 보고 있는 브라우저 탭에 채운다(그 페이지의 로그인일 때만 — 맨 위에 올라온다). 그 밖에는 비밀번호 복사. 줄 끝에서 ID·PW 복사(글자 붙은 버튼)·편집.
 // 메모: 누르면 펼쳐 본문을 보인다(가린 메모는 펼쳐야 보인다). 줄 끝에서 복사·편집. 추가·편집·삭제도 이 안에서.
 // 키보드: 글자로 거르기 → ↑↓ 로 고르기 → Return.
@@ -9,20 +10,13 @@ import SwiftUI
 struct NotesButton: View {
     @Environment(AppModel.self) private var model
     let serverKey: String
-    /// 편집 중인 초안. 팝오버 밖에 두어 바깥을 눌러 팝오버가 닫혀도 다시 열면 이어서 쓴다.
-    @State private var editing: SecretNote?
 
     var body: some View {
-        @Bindable var model = model   // 팝오버 바인딩($model.notesShown)용
         Button { model.toggleNotes() } label: { Image(systemName: "key.horizontal") }.accessibilityLabel("메모 · 로그인")
             .buttonStyle(TabBarIconButtonStyle(active: model.notesShown))
             .padding(.leading, 6)
             .help("메모 · 로그인 — \(serverKey)")
-            .popover(isPresented: $model.notesShown, arrowEdge: .bottom) {
-                NotesPopover(serverKey: serverKey, editing: $editing) { model.closeNotes() }.environment(model)
-            }
             .onDisappear { model.closeNotes() }   // 마지막 탭을 닫거나 서버를 바꿔 버튼이 사라지면, 다음에 탭을 열 때 저절로 뜨지 않게
-            .onChange(of: serverKey) { _, _ in editing = nil; model.closeNotes() }   // 다른 서버로 옮겼으면 옛 초안은 버린다 (그 서버에 저장되지 않게)
     }
 }
 
@@ -121,7 +115,7 @@ struct NotesPopover: View {
                 }
             }
         }
-        .onAppear { searchFocused = true }
+        .onAppear { DispatchQueue.main.async { searchFocused = true } }   // 패널이 붙은 다음 차례에
     }
 
     private func move(_ step: Int) {

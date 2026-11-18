@@ -40,6 +40,8 @@ struct DetailView: View {
                 .sharedBackgroundVisibility(.hidden)
             }
         }
+        // 탭 막대 버튼의 패널 (명령 모음 · 메모·로그인): 본문 오른쪽 위에 앱이 그린다
+        .overlay { TabBarPanels() }
         .scrollEdgeEffectHidden(true, for: .top)   // 툴바 밑 색 다른 띠·선(기본 가장자리 효과)을 없앤다 — 안쪽 모든 스크롤 뷰(대시보드·탭줄)에 적용
         // 대신 툴바 높이만큼 본문색 가림판: 평소엔 안 보이고, 스크롤한 내용이 투명한 툴바 밑으로 비쳐 탭 글자와 겹치지 않게 (2026-10-14).
         // 클릭은 통과 — 툴바 빈 곳 끌기(창 이동)를 막지 않는다.

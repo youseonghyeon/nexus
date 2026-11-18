@@ -126,7 +126,7 @@ final class AppModel {
     /// 명령 모음 (snippets.json). 못 읽었으면 snippetsError 가 차고 추가·편집을 막는다 — 저장하면 그 파일을 덮는다 (아래 MARK: 명령 모음)
     private(set) var snippets = SnippetState()
     private(set) var snippetsError: ConfigError?
-    /// 명령 모음 팝오버 (탭 막대 버튼 · ⌘P)
+    /// 명령 모음 패널 (탭 막대 버튼 · ⌘P — TabBarPanels)
     var snippetsShown = false
     /// 빈칸 {{이름}} 에 마지막으로 넣은 값 (이름별, 앱이 켜져 있는 동안만) — 다음에 채워 둔다
     @ObservationIgnored private(set) var snippetValues: [String: String] = [:]
@@ -134,7 +134,7 @@ final class AppModel {
     /// 바꾸는 것은 AppModel+Notes 의 메서드로
     var notes = NoteState()
     var notesError: ConfigError?
-    /// 메모·로그인 팝오버 (탭 막대의 열쇠 버튼)
+    /// 메모·로그인 패널 (탭 막대의 열쇠 버튼 — TabBarPanels)
     var notesShown = false
     var transfers: [TransferSession] = []
     var uploadPrompt: UploadPromptRequest?
@@ -618,6 +618,7 @@ final class AppModel {
     func toggleSnippets() {
         guard selectedServer != nil || selectedKey == AppModel.localKey, !tabsForSelected.isEmpty else { snippetsShown = false; return }
         snippetsShown.toggle()
+        if snippetsShown { closeNotes() }   // 같은 자리의 패널 — 하나만
     }
 
     func closeSnippets() {

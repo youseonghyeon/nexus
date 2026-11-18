@@ -414,7 +414,7 @@ struct ConnectActions: View {
             }
             Button { model.openSSH(server) } label: { Label(server.extraUsers.isEmpty ? "SSH" : "SSH · \(server.user)", systemImage: "terminal") }
                 .buttonStyle(PrimaryButtonStyle())
-                .keyboardShortcut(model.sidebarSearchFocused ? nil : .defaultAction)
+                .keyboardShortcut(model.sidebarSearchFocused || model.tabPanelOpen ? nil : .defaultAction)
                 .disabled(!reachable)
             Button { model.openBrowser(server) } label: { Label("Browser", systemImage: "globe") }
                 .disabled(!reachable)

@@ -1,4 +1,5 @@
-// 명령 모음 팝오버 (탭 막대 오른쪽 끝 · ⌘P). 선택한 서버 종류(windows·linux)·이 Mac 로컬 셸(mac)의 명령을 보여 주고, 누르면 보고 있는 터미널에 입력한다.
+// 명령 모음 (탭 막대 오른쪽 끝 버튼 · ⌘P). 시스템 팝오버가 아니라 앱이 그리는 패널에 들어간다 (TabBarPanels — 버튼 아래, 오른쪽 맞춤).
+// 선택한 서버 종류(windows·linux)·이 Mac 로컬 셸(mac)의 명령을 보여 주고, 누르면 보고 있는 터미널에 입력한다.
 // "바로 실행" 명령만 Enter 까지 보낸다. 터미널이 안 보이면(Dashboard·브라우저 탭) 누르면 복사. 추가·편집·삭제도 이 안에서.
 // 키보드만으로: ⌘P → 글자로 거르기 → ↑↓ 로 고르기 → Return. 빈칸 {{이름}} 이 있으면 값을 물은 뒤 입력한다.
 // 민감한 명령(재부팅·삭제 등)은 터미널에 넣기 전에 서버 이름(이 Mac 은 "mac")을 쳐서 확인한다 — 엉뚱한 서버에서 실행하는 실수를 막으려고. 복사는 그대로.
@@ -8,23 +9,13 @@ import SwiftUI
 
 struct SnippetsButton: View {
     @Environment(AppModel.self) private var model
-    let type: SnippetKind
-    /// 편집 중인 초안. 팝오버 밖에 두어 바깥을 눌러 팝오버가 닫혀도 다시 열면 이어서 쓴다.
-    @State private var editing: CommandSnippet?
 
     var body: some View {
-        @Bindable var model = model   // 팝오버 바인딩($model.snippetsShown)용
         Button { model.toggleSnippets() } label: { Image(systemName: "list.bullet.rectangle") }.accessibilityLabel("명령 모음")
             .buttonStyle(TabBarIconButtonStyle(active: model.snippetsShown))
             .padding(.leading, 2).padding(.trailing, 8)
             .help("명령 모음 (⌘P)")
-            .popover(isPresented: $model.snippetsShown, arrowEdge: .bottom) {
-                SnippetsPopover(type: type, editing: $editing) { model.closeSnippets() }.environment(model)
-            }
             .onDisappear { model.closeSnippets() }   // 마지막 탭을 닫거나 서버를 바꿔 버튼이 사라지면, 다음에 탭을 열 때 저절로 뜨지 않게
-            .onChange(of: model.snippetsShown) { _, shown in
-                if shown, editing.map({ $0.type != type }) ?? false { editing = nil }   // 다른 종류 서버로 옮겼으면 옛 초안은 버린다
-            }
     }
 }
 
@@ -157,7 +148,7 @@ struct SnippetsPopover: View {
                 }
             }
         }
-        .onAppear { searchFocused = true }
+        .onAppear { DispatchQueue.main.async { searchFocused = true } }   // 패널이 붙은 다음 차례에 (같은 창의 터미널에서 포커스를 가져온다)
     }
 
     private func move(_ step: Int) {
