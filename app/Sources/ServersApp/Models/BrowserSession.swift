@@ -182,7 +182,15 @@ final class BrowserSession: NSObject, ObservableObject {
         var candidate = text.trimmingCharacters(in: .whitespaces)
         if !candidate.contains("://") { candidate = "http://" + candidate }
         guard let url = URL(string: candidate), BrowserPolicy.isOpenable(url) else { return }
-        webView.load(URLRequest(url: BrowserPolicy.proxied(url)))
+        open(URLRequest(url: BrowserPolicy.proxied(url)))
+    }
+
+    /// 이 탭이 직접 여는 길 (주소창 · 루프백을 별칭으로 바꿔 다시 열기 · 새 창 링크). 웹 주소면 여기서 시작 페이지를 떠난 것으로 한다 —
+    /// load 는 그 자리에서 webView.url 을 바꾸는데(주소 관찰이 바로 돈다) 이동 정책 물음은 그 뒤에 온다. 그때까지 시작 페이지로 남아 있으면
+    /// 주소창을 비우고, 같은 주소로 확정될 때는 관찰이 다시 오지 않아 빈 채로 남았다 (2026-11-18 — 시작 페이지에서 즐겨찾기·포트 타일로 연 루프백 주소).
+    private func open(_ request: URLRequest) {
+        if let url = request.url, BrowserPolicy.isWeb(url) { showingStart = false }
+        webView.load(request)
     }
 
     /// 시작 페이지(서버·열린 포트)를 지금 값으로 그린다
@@ -382,7 +390,7 @@ extension BrowserSession: WKNavigationDelegate {
         if target != url, navigationAction.targetFrame?.isMainFrame ?? true {
             var request = navigationAction.request
             request.url = target
-            webView.load(request)
+            open(request)
             return (.cancel, preferences)
         }
         if navigationAction.shouldPerformDownload { return (.download, preferences) }
@@ -490,7 +498,7 @@ extension BrowserSession: WKUIDelegate {
         if let url = navigationAction.request.url, BrowserPolicy.isOpenable(url) {
             var request = navigationAction.request
             request.url = BrowserPolicy.proxied(url)
-            webView.load(request)
+            open(request)
         }
         return nil
     }
