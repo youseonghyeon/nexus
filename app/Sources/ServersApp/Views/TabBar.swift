@@ -137,6 +137,23 @@ struct DashboardTabButton: View {
 }
 
 /// 탭 버튼(터미널·브라우저). 두 번 클릭(또는 우클릭 → 이름 변경)으로 이름을 바꾼다. 비우고 확정하면 자동 제목으로 돌아간다.
+/// 브라우저 탭의 머리: 보고 있는 페이지의 아이콘(원래 색 그대로), 없으면 지구본. 자리는 같은 크기 — 아이콘이 오고 갈 때 탭 폭이 변하지 않게.
+private struct BrowserTabIcon: View {
+    @ObservedObject var browser: BrowserSession
+
+    var body: some View {
+        Group {
+            if let icon = browser.icon {
+                Image(nsImage: icon).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+            } else {
+                Image(systemName: "globe").font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 14, height: 14)
+    }
+}
+
 struct TabButton: View {
     @Environment(AppModel.self) private var model
     @ObservedObject var tab: TerminalTab
@@ -150,8 +167,8 @@ struct TabButton: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            if case .browser = tab.content {
-                Image(systemName: "globe").font(.caption2).foregroundStyle(.secondary)
+            if let browser = tab.browser {
+                BrowserTabIcon(browser: browser)
             } else {
                 Circle()
                     .fill(tab.isAlive ? StatusTone.good.color : Color.secondary)

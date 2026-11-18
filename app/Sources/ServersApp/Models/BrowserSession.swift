@@ -86,6 +86,10 @@ final class BrowserSession: NSObject, ObservableObject {
     @Published private(set) var progress = 0.0
     /// 보고 있는 주소가 이 서버의 즐겨찾기에 있는가 (주소창의 별)
     @Published private(set) var bookmarked = false
+    /// 보고 있는 페이지의 아이콘 (탭 머리 — 없으면 지구본). 주소(호스트·포트)가 바뀔 때만 다시 받는다
+    @Published private(set) var icon: NSImage?
+    /// 아이콘을 받아 본 주소 (못 받았어도 — 같은 곳에서 페이지마다 다시 묻지 않게)
+    private var iconSite: String?
     /// SOCKS 터널이 열리기 전(또는 못 열었을 때)의 안내. 페이지가 뜨면 nil.
     @Published private(set) var notice: String? = "프록시 터널 연결 중…"
 
@@ -198,6 +202,7 @@ final class BrowserSession: NSObject, ObservableObject {
         showingStart = true
         url = nil
         fillPrompt = nil
+        icon = nil; iconSite = nil
         webView.loadHTMLString(startPage(), baseURL: nil)
         onStartShown()
     }
@@ -233,6 +238,18 @@ final class BrowserSession: NSObject, ObservableObject {
             let icon = try? await webView.callAsyncJavaScript(Self.iconScript, arguments: ["limit": BookmarkStore.iconLimit], in: nil, contentWorld: .defaultClient) as? String
             guard self.url == url else { return }   // 받는 사이 다른 페이지로 갔으면 넣지 않는다
             bookmarks.toggle(url, title, icon)
+        }
+    }
+
+    /// 페이지가 다 열렸다: 탭 머리의 아이콘을 맞춘다. 같은 주소(호스트·포트) 안에서 옮겨 다닐 때는 그대로 두고, 다른 곳이면 그 페이지 안에서 받는다
+    /// (즐겨찾기와 같은 스크립트 — 같은 쿠키·같은 길). 못 받으면 지구본.
+    private func refreshIcon() {
+        guard !showingStart, let site, site != iconSite else { return }
+        iconSite = site
+        Task {
+            let found = try? await webView.callAsyncJavaScript(Self.iconScript, arguments: ["limit": BookmarkStore.iconLimit], in: nil, contentWorld: .defaultClient) as? String
+            guard iconSite == site else { return }   // 받는 사이 다른 곳으로 갔다
+            icon = BookmarkStore.iconData(found).flatMap(NSImage.init(data:))
         }
     }
 
@@ -415,6 +432,7 @@ extension BrowserSession: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         refreshStartPorts()
         settleLoginAfterNavigation()
+        refreshIcon()
     }
 
     /// 새 문서로 넘어갔다 — 옛 페이지의 칸 아래 목록은 내린다 (옛 문서는 blur 를 못 보낸다)

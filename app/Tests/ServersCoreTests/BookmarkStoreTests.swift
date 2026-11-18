@@ -105,4 +105,14 @@ final class BookmarkStoreTests: XCTestCase {
         XCTAssertLessThan(page.range(of: "id=\"marks\"")!.lowerBound, page.range(of: "id=\"ports\"")!.lowerBound)
         XCTAssertTrue(page.contains("messageHandlers.nexus"))
     }
+
+    func testIconData() {
+        XCTAssertEqual(BookmarkStore.iconData("data:image/png;base64,AQID"), Data([1, 2, 3]))
+        XCTAssertEqual(BookmarkStore.iconData("DATA:image/PNG;BASE64,AQID"), Data([1, 2, 3]), "머리 글자는 대소문자 무시")
+        XCTAssertEqual(BookmarkStore.iconData("data:image/svg+xml,%3Csvg%2F%3E").map { String(decoding: $0, as: UTF8.self) }, "<svg/>")
+        for bad in [nil, "", "data:text/html;base64,AQID", "data:image/png;base64,", "data:image/png;base64,!!!", "data:image/png", "https://a.example/favicon.ico",
+                    "data:image/png;base64," + String(repeating: "A", count: BookmarkStore.iconLimit)] {
+            XCTAssertNil(BookmarkStore.iconData(bad), bad ?? "nil")
+        }
+    }
 }

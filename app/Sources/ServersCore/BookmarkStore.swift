@@ -79,6 +79,15 @@ public enum BookmarkStore {
         return icon
     }
 
+    /// data: 주소의 그림 바이트 (탭의 페이지 아이콘 — 앱이 그릴 때). 그림이 아니거나 너무 크거나 못 풀면 nil.
+    /// base64 가 아닌 것(`data:image/svg+xml,<svg…>`)은 퍼센트 인코딩을 풀어 쓴다.
+    public static func iconData(_ icon: String?) -> Data? {
+        guard let icon = cleanIcon(icon), let comma = icon.firstIndex(of: ",") else { return nil }
+        let header = icon[..<comma].lowercased(), body = String(icon[icon.index(after: comma)...])
+        let data = header.hasSuffix(";base64") ? Data(base64Encoded: body, options: .ignoreUnknownCharacters) : body.removingPercentEncoding.map { Data($0.utf8) }
+        return data.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
     /// 타일 아랫줄의 짧은 주소: "http://localhost:3000/d/x/" → "localhost:3000/d/x", https 는 스킴을 남긴다
     public static func shortAddress(_ url: String) -> String {
         var text = url
