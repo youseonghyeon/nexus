@@ -74,7 +74,7 @@ public enum RemoteInfo {
     /// 스크립트가 보낸 원시 값 → 화면 값과 경고. nil 이면 줄을 숨긴다.
     ///   MODEL   "제조사|제품|가상화|c(컨테이너)" → "Dell OptiPlex 7090" · "KVM 가상 머신 · Standard PC" · "LXC 컨테이너"
     ///   REBOOT  yes/no → "필요"(경고) · "필요 없음"
-    ///   UPDATES "전체;보안" (apt-check) → "12개 · 보안 3"(보안이 있으면 경고) · "3개 · 보류 3"(목록에는 있지만 지금은 안 올라가는 수) · "최신"
+    ///   UPDATES "전체;보안" (apt-check) → "12개 (보안 3)"(보안이 있으면 경고) · "3개 · 보류 3"(목록에는 있지만 지금은 안 올라가는 수) · "최신"
     ///   UPTIME  초 → "25일 3시간" (예전 글 꼴이면 그대로)
     ///   CPU     "… (8 threads)" → "… (8스레드)"
     static func formatSpec(_ key: String, _ value: String, deferredUpdates: Int = 0) -> (value: String, warning: Bool)? {
@@ -101,8 +101,10 @@ public enum RemoteInfo {
             let counts = value.split(separator: ";").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
             guard counts.count == 2 else { return nil }   // apt-check 가 오류를 냈으면 숨긴다
             if counts[0] == 0 { return ("최신", false) }
-            let notes = [counts[1] > 0 ? "보안 \(counts[1])" : nil, deferredUpdates > 0 ? "보류 \(deferredUpdates)" : nil].compactMap { $0 }
-            return ((["\(counts[0])개"] + notes).joined(separator: " · "), counts[1] > 0)   // 괄호 없이 가운뎃점으로 — "3개 (보류 2)" 는 딱딱했다 (2026-11-17)
+            // 보안은 전체 수 바로 뒤 괄호에 — 가운뎃점으로 나란히 두면("5개 · 보안 1 · 보류 2") 다 더한 8개처럼 읽혔다 (2026-11-18 사용자 지적).
+            // 보류는 괄호 없이 가운뎃점으로 ("3개 (보류 2)" 는 딱딱했다 — 2026-11-17)
+            let total = "\(counts[0])개" + (counts[1] > 0 ? " (보안 \(counts[1]))" : "")
+            return (deferredUpdates > 0 ? "\(total) · 보류 \(deferredUpdates)" : total, counts[1] > 0)
         case "UPTIME":
             guard let seconds = Double(value) else { return (value, false) }
             return (ServicesFormat.duration(seconds), false)
