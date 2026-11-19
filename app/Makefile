@@ -57,6 +57,8 @@ bundle: build
 	@cp ../lib/lan.zsh ../lib/hosts.zsh "$(CONTENTS)/Resources/lib/"
 	@# IEEE 배정 목록 — 진단 [이웃 보기]의 제조사 (DeviceIdentity)
 	@cp Resources/oui/oui.tsv "$(CONTENTS)/Resources/oui.tsv"
+	@# 브라우저 시작 페이지의 다크 모드 배경 (Resources/startpage/render-background.py 로 Blender 에서 그린 것 — AppModel.startPageBackground)
+	@cp Resources/startpage/background-dark.jpg "$(CONTENTS)/Resources/startpage-background.jpg"
 	@# GhosttyTerminal 리소스 번들(terminfo·셸 통합). Bundle.module 은 Bundle.main.resourceURL 부터 찾는다.
 	@cp -R "$(BUILD)/GhosttyKit_GhosttyTerminal.bundle" "$(CONTENTS)/Resources/"
 	@# Sparkle(앱 안 업데이트): 프레임워크를 번들에 넣고 실행 파일이 거기서 찾게 한다. 빌드 폴더를 가리키는 rpath 는 뺀다(다른 Mac 엔 없는 경로).

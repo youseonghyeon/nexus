@@ -24,13 +24,14 @@ extension AppModel {
                                           probes: browserProbes[current.key] ?? [:], probed: browserProbed.contains(current.key))
     }
 
-    /// 시작 페이지 전체: 대표 카드(본창과 같은 상태 판정) + 주소칸 + 포트 부분
+    /// 시작 페이지 전체: 대표 카드(본창과 같은 상태 판정) + 주소칸 + 포트 부분 (다크 모드는 번들 배경 그림 위에)
     func browserStartPage(for server: Server) -> String {
         let current = currentServer(server)
         let state = status.remote(current.key)
         let hero = BrowserStartPage.Hero(key: current.key, target: current.target, role: current.role, tags: ServerTags.parse(current.env),
                                          status: StatusText.conclusion(state, lanName: networkName(.lan)), level: StatusText.remoteLevel(state))
-        return BrowserStartPage.html(hero: hero, bookmarksHTML: browserStartMarks(for: server), portsHTML: browserStartPorts(for: server))
+        return BrowserStartPage.html(hero: hero, bookmarksHTML: browserStartMarks(for: server), portsHTML: browserStartPorts(for: server),
+                                    background: Self.startPageBackground)
     }
 
     // MARK: 즐겨찾기 (서버마다 따로 — BookmarkStore)

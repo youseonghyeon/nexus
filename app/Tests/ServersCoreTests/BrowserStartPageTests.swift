@@ -137,4 +137,44 @@ final class BrowserStartPageTests: XCTestCase {
         XCTAssertTrue(probing.contains("<h2>확인 중…</h2>"))
         XCTAssertFalse(probing.contains("<h2>웹</h2>") || probing.contains("class=\"s\""))
     }
+
+    /// 대표 카드 아래 띠의 수: 포트 부분이 들고 오고(페이지 스크립트가 #band 로 옮긴다), 다 읽기 전에는 "—"
+    func testBandCounts() {
+        let list = [item(22), item(80), item(3000), item(9090)]
+        let probes = [80: WebProbeResult(scheme: "http", title: nil, status: 301), 3000: WebProbeResult(scheme: "http", title: "Grafana"),
+                      9090: WebProbeResult(scheme: "http", title: "CI")]
+        let loaded = BrowserStartPage.portsHTML(state: .loaded(list), probes: probes, probed: true)
+        XCTAssertTrue(loaded.hasPrefix("<div class=\"band\"><div class=\"m\"><div class=\"l\">웹</div><div class=\"v\">2</div></div>"
+            + "<div class=\"m\"><div class=\"l\">제목 없는 응답</div><div class=\"v\">1</div></div><div class=\"m\"><div class=\"l\">그 밖</div><div class=\"v\">1</div></div></div>"))
+        XCTAssertTrue(BrowserStartPage.portsHTML(state: .loading, probes: [:], probed: false).contains("<div class=\"l\">확인 중</div><div class=\"v\">—</div>"))
+        XCTAssertTrue(BrowserStartPage.portsHTML(state: .failed, probes: [:], probed: true).contains("<div class=\"v\">—</div>"), "못 읽었으면 0 이 아니라 모름")
+        XCTAssertTrue(BrowserStartPage.portsHTML(state: .loaded([]), probes: [:], probed: true).contains("<div class=\"l\">웹</div><div class=\"v\">0</div>"), "빈 목록은 0")
+        let page = BrowserStartPage.html(hero: hero, portsHTML: loaded)
+        XCTAssertTrue(page.contains("<div id=\"band\"></div></div>"), "띠 자리는 대표 카드 안 맨 아래")
+        XCTAssertTrue(page.contains("new MutationObserver(sync)"), "포트 부분을 갈아 끼울 때마다 띠도 따라 바뀐다")
+    }
+
+    /// 섹션은 카드로 묶고, 칩과 그 밖이 둘 다 있을 때만 나란히
+    func testSectionCardsAndPair() {
+        let probes = [80: WebProbeResult(scheme: "http", title: nil, status: 301)]
+        let both = BrowserStartPage.portsHTML(state: .loaded([item(22), item(80)]), probes: probes, probed: true)
+        XCTAssertTrue(both.contains("<div class=\"pair\"><section class=\"card sec\"><h2>제목 없는 응답</h2>"))
+        XCTAssertTrue(both.contains("<div class=\"o hd\"><span class=\"n\">Port</span><span>Service</span><span class=\"a\">Address</span></div>"), "그 밖은 머리 줄 있는 표")
+        let onlyOther = BrowserStartPage.portsHTML(state: .loaded([item(22)]), probes: [:], probed: true)
+        XCTAssertFalse(onlyOther.contains("class=\"pair\""), "하나뿐이면 폭 전체")
+        XCTAssertTrue(onlyOther.contains("<section class=\"card sec\"><h2>그 밖</h2>"))
+    }
+
+    /// 배경 그림: data: 이미지만, 다크 모드에서만. 없거나 이상한 값이면 무채색 바탕 그대로
+    func testBackgroundOnlyDataImageInDarkMode() {
+        let plain = BrowserStartPage.html(hero: hero, portsHTML: "")
+        XCTAssertFalse(plain.contains("body.wall") || plain.contains("class=\"wall\""))
+        let wall = BrowserStartPage.html(hero: hero, portsHTML: "", background: "data:image/jpeg;base64,AAAA")
+        XCTAssertTrue(wall.contains("<body class=\"wall\">"))
+        XCTAssertTrue(wall.contains("@media(prefers-color-scheme:dark){\n  body.wall{background:#07080C url(data:image/jpeg;base64,AAAA)"), "라이트 모드엔 깔지 않는다")
+        for bad in ["https://example.com/a.jpg", "data:image/jpeg;base64,AA) ; body{x:y", "data:text/html,<b>", "data:image/png;base64,A'B"] {
+            let page = BrowserStartPage.html(hero: hero, portsHTML: "", background: bad)
+            XCTAssertFalse(page.contains("body.wall"), "받지 않는 값: \(bad)")
+        }
+    }
 }

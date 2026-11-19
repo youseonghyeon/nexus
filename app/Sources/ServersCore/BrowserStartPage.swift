@@ -1,4 +1,5 @@
-// 앱 안 브라우저 탭의 시작 페이지 (2026-11-17 시안 D → 같은 날 타일을 다듬음): 대표 카드(서버·태그·상태) + 주소칸 + 즐겨찾기 타일(BookmarkStore) + 웹 타일 + 제목 없는 응답 칩 + 그 밖 포트 목록.
+// 앱 안 브라우저 탭의 시작 페이지 (2026-11-17 시안 D → 2026-11-19 시안 A): 대표 카드(서버·태그·상태 · 주소칸 · 아래 띠에 웹/제목 없는 응답/그 밖 수)
+// + 카드로 묶은 즐겨찾기 타일(BookmarkStore) · 웹 타일 · 제목 없는 응답 칩 | 그 밖 표. 다크 모드에서 배경 그림을 주면 그 위에 반투명 카드 (background).
 // 서버에 띄우는 것이 아니라 앱이 그려 탭에 넣는다. 타일을 누르면 그 탭에서 서버 쪽 주소(localhost:<포트>)로 연다 — 탭은 그 서버에서 켠 브라우저처럼 동작한다 (BrowserPolicy).
 // 포트 목록은 서버 화면 Ports 탭과 같은 값(PortItem). "웹" 타일은 화면이 있는 것 — 제목이 있는 응답(WebProbe).
 // HTTP 로 답했지만 제목이 없는 포트(API·리다이렉트·오류)는 칩 한 줄, 답이 없는 포트는 "그 밖".
@@ -116,27 +117,37 @@ public enum BrowserStartPage {
         func marks(https: Bool, badge: (text: String, warn: Bool)?) -> String {
             (https ? "<span class=\"k\">https</span>" : "") + (badge.map { "<span class=\"s\($0.warn ? " warn" : "")\">\($0.text)</span>" } ?? "")
         }
-        var out = ""
+        // 대표 카드 아래 띠의 수 — 포트 부분과 함께 오고, 페이지 스크립트가 띠 자리(#band)로 옮긴다
+        let counted: Bool
+        if case .loaded = state { counted = true } else { counted = false }
+        func metric(_ label: String, _ count: Int) -> String {
+            "<div class=\"m\"><div class=\"l\">\(label)</div><div class=\"v\">\(counted ? String(count) : "—")</div></div>"
+        }
+        var out = "<div class=\"band\">" + metric("웹", web.count) + metric(probed ? "제목 없는 응답" : "확인 중", bare.count) + metric("그 밖", other.count) + "</div>"
         if !web.isEmpty {
-            out += "<h2>웹</h2><div class=\"grid\">" + web.map { tile in
+            out += "<section class=\"card sec\"><h2>웹</h2><div class=\"grid\">" + web.map { tile in
                 let icon = tile.icon.map { "<img class=\"i\" src=\"\(escape($0))\" alt=\"\">" } ?? placeholderIcon
                 let extra = tile.address.isEmpty ? "" : "<span class=\"e\">\(escape(tile.address))</span>"
                 return "<a class=\"tile\" href=\"\(escape(tile.url))\">\(icon)<div class=\"x\"><div class=\"t\">\(escape(tile.title))</div>"
                     + "<div class=\"b\"><span class=\"n\">\(tile.port)</span>\(extra)\(marks(https: tile.isHTTPS, badge: tile.badge))</div></div></a>"
-            }.joined() + "</div>"
+            }.joined() + "</div></section>"
         }
+        var lower: [String] = []
         if !bare.isEmpty {
             // 다 묻기 전에는 아직 어느 쪽인지 모른다 — 답이 오면 타일·칩·그 밖으로 갈린다
-            out += "<h2>\(probed ? "제목 없는 응답" : "확인 중…")</h2><div class=\"chips\">" + bare.map { chip in
+            lower.append("<section class=\"card sec\"><h2>\(probed ? "제목 없는 응답" : "확인 중…")</h2><div class=\"chips\">" + bare.map { chip in
                 "<a class=\"chip\" href=\"\(escape(chip.url))\"><span class=\"n\">\(chip.port)</span>"
                     + (chip.label.isEmpty ? "" : "<em>\(escape(chip.label))</em>") + marks(https: chip.isHTTPS, badge: chip.badge) + "</a>"
-            }.joined() + "</div>"
+            }.joined() + "</div></section>")
         }
         if !other.isEmpty {
-            out += "<h2>그 밖</h2><div class=\"others\">" + other.map { row in
-                "<div class=\"o\"><span class=\"n\">\(row.port)</span><span>\(escape(row.label))</span><span class=\"a\">\(escape(row.addresses))</span></div>"
-            }.joined() + "</div>"
+            lower.append("<section class=\"card sec\"><h2>그 밖</h2><div class=\"others\"><div class=\"o hd\"><span class=\"n\">Port</span><span>Service</span><span class=\"a\">Address</span></div>"
+                + other.map { row in
+                    "<div class=\"o\"><span class=\"n\">\(row.port)</span><span>\(escape(row.label))</span><span class=\"a\">\(escape(row.addresses))</span></div>"
+                }.joined() + "</div></section>")
         }
+        // 칩과 그 밖이 둘 다 있으면 나란히 (좁은 폭에서는 위아래)
+        out += lower.count == 2 ? "<div class=\"pair\">" + lower.joined() + "</div>" : lower.joined()
         switch state {
         case .loading: out += "<p class=\"note\">열린 포트를 읽는 중…</p>"
         case .failed: out += "<p class=\"note\">열린 포트를 읽지 못했습니다. ↻ 로 다시 읽습니다.</p>"
@@ -162,7 +173,9 @@ public enum BrowserStartPage {
     static let placeholderIcon = "<svg class=\"i ph\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.1\"><circle cx=\"8\" cy=\"8\" r=\"4.6\"/>"
         + "<path d=\"M3.4 8h9.2M8 3.4c-1.8 1.4-1.8 7.8 0 9.2M8 3.4c1.8 1.4 1.8 7.8 0 9.2\"/></svg>"
 
-    public static func html(hero: Hero, bookmarksHTML: String = "", portsHTML: String) -> String {
+    /// background: 다크 모드에서 깔 배경 그림 (data: 주소 — 시작 페이지는 baseURL 없이 그려 파일 주소를 못 읽는다). nil 이면 무채색 바탕.
+    /// 라이트 모드는 늘 무채색 바탕 (배경 그림은 어두운 것 하나뿐이다).
+    public static func html(hero: Hero, bookmarksHTML: String = "", portsHTML: String, background: String? = nil) -> String {
         let tags = hero.tags.map { tag -> String in
             let tone: String
             switch ServerTags.tone(tag) { case .production: tone = " prod"; case .staging: tone = " stg"; case .plain: tone = "" }
@@ -171,17 +184,30 @@ public enum BrowserStartPage {
         let level: String
         switch hero.level { case .good: level = "good"; case .warn: level = "warn"; case .bad: level = "bad"; case .muted: level = "muted" }
         let subtitle = ([escape(hero.target)] + (hero.role.map { [escape($0)] } ?? [])).joined(separator: " · ")
+        // 배경 그림은 data: 주소만 받는다 — url( ) 안에서 끊기거나 다른 주소를 부르지 못하게
+        let wall = background.flatMap { $0.hasPrefix("data:image/") && !$0.contains(where: { "()'\"\\ \n".contains($0) }) ? $0 : nil }
+        let wallCSS = wall.map { """
+            @media(prefers-color-scheme:dark){
+              body.wall{background:#07080C url(\($0)) center/cover fixed no-repeat}
+              body.wall .card,body.wall #marks:not(:empty){background:rgba(18,19,23,.55);-webkit-backdrop-filter:blur(30px) saturate(1.5);border-color:rgba(255,255,255,.14)}
+              body.wall .tile,body.wall .chip,body.wall .box{background:rgba(255,255,255,.07)}
+              body.wall .i.ph{background:rgba(255,255,255,.08)}
+              body.wall h2{color:rgba(255,255,255,.78)}
+            }
+            """ } ?? ""
         return """
         <!doctype html><html lang="ko"><meta charset="utf-8"><title>\(escape(hero.key))</title>
         <style>
-        :root{--bg:#F4F4F2;--card:#FFFFFF;--well:#ECECEA;--line:rgba(0,0,0,.09);--text:#1d1d1f;--dim:rgba(0,0,0,.5);--faint:rgba(0,0,0,.34);--hover:rgba(0,0,0,.035);
+        :root{--bg:#F4F4F2;--card:#FFFFFF;--raised:#F7F7F5;--well:#ECECEA;--line:rgba(0,0,0,.09);--text:#1d1d1f;--dim:rgba(0,0,0,.5);--faint:rgba(0,0,0,.34);
           --good:#1F9D57;--warn:#B8730A;--bad:#D63F36;--stg:#2F6FD0}
-        @media(prefers-color-scheme:dark){:root{--bg:#141517;--card:#1B1C1F;--well:#27282C;--line:rgba(255,255,255,.08);--text:#ECECEE;--dim:rgba(255,255,255,.5);--faint:rgba(255,255,255,.32);--hover:rgba(255,255,255,.045);
+        @media(prefers-color-scheme:dark){:root{--bg:#141517;--card:#1B1C1F;--raised:#222327;--well:#27282C;--line:rgba(255,255,255,.08);--text:#ECECEE;--dim:rgba(255,255,255,.5);--faint:rgba(255,255,255,.32);
           --good:#3FD68A;--warn:#F2BE4A;--bad:#FF6B60;--stg:#5B9BF0}}
         *{box-sizing:border-box}
-        body{margin:0;background:var(--bg);color:var(--text);font:13px -apple-system,system-ui;-webkit-font-smoothing:antialiased}
-        main{max-width:860px;margin:0 auto;padding:36px 24px 48px}
-        .hero{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;display:flex;align-items:flex-start;margin-bottom:12px}
+        body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:13px -apple-system,system-ui;-webkit-font-smoothing:antialiased}
+        main{max-width:860px;margin:0 auto;padding:32px 24px 48px}
+        .card,#marks:not(:empty){background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:12px}
+        .hero{overflow:hidden}
+        .top{display:flex;align-items:flex-start;padding:20px 22px 16px}
         .hero h1{font-size:26px;font-weight:700;letter-spacing:-.4px;margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
         .sub{font:12px ui-monospace,Menlo,monospace;color:var(--dim);margin-top:6px}
         .right{margin-left:auto;padding-left:16px;white-space:nowrap}
@@ -190,19 +216,25 @@ public enum BrowserStartPage {
         .pill{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12px;padding:4px 10px;border-radius:999px;background:var(--well);color:var(--dim)}
         .pill i{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
         .pill.good{color:var(--good)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}
-        form{margin:0 0 22px}
-        .box{display:flex;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0 16px;color:var(--faint)}
-        .box input{flex:1;border:0;outline:0;background:transparent;color:var(--text);font:14px ui-monospace,Menlo,monospace;padding:12px 0}
+        form{margin:0;padding:0 22px 18px}
+        .box{display:flex;gap:10px;align-items:center;background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:0 14px;color:var(--faint)}
+        .box input{flex:1;border:0;outline:0;background:transparent;color:var(--text);font:14px ui-monospace,Menlo,monospace;padding:11px 0}
         .box input::placeholder{color:var(--faint)}
-        h2{font-size:11px;font-weight:600;color:var(--dim);margin:0 0 8px 4px}
-        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:22px}
-        .tile{position:relative;display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;color:inherit;text-decoration:none;min-width:0}
-        .tile:hover,.chip:hover{background:color-mix(in srgb,var(--card),var(--text) 4%)}
+        #band:empty{display:none}
+        #band{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line)}
+        .m{padding:12px 22px;border-left:1px solid var(--line);min-width:0}.m:first-child{border-left:0}
+        .m .l{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.m .v{font-size:20px;font-weight:700;margin-top:3px;letter-spacing:-.3px}
+        #ports>.band{display:none}
+        .sec,#marks:not(:empty){padding:14px 16px 16px}
+        h2{font-size:11px;font-weight:700;color:var(--dim);margin:0 0 12px}
+        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+        .tile{position:relative;display:flex;align-items:center;gap:12px;background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:inherit;text-decoration:none;min-width:0}
+        .tile:hover,.chip:hover{background:color-mix(in srgb,var(--raised),var(--text) 5%)}
         .i{width:24px;height:24px;border-radius:5px;flex:none;object-fit:contain}
         .i.ph{background:var(--well);color:var(--faint);padding:4px}
         .x{min-width:0;flex:1}
         .tile .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .tile .b{display:flex;gap:6px;align-items:center;margin-top:5px;color:var(--dim);min-width:0}
+        .tile .b{display:flex;gap:6px;align-items:center;margin-top:4px;color:var(--dim);min-width:0}
         .n{font:600 12px ui-monospace,Menlo,monospace}
         .tile .e{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
         .tile .e::before{content:"· ";color:var(--faint)}
@@ -212,19 +244,25 @@ public enum BrowserStartPage {
         .tile .u{font:11.5px ui-monospace,Menlo,monospace;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
         .rm{position:absolute;top:7px;right:7px;width:20px;height:20px;border:0;border-radius:6px;background:var(--well);color:var(--dim);font-size:10px;line-height:20px;padding:0;cursor:pointer;opacity:0}
         .tile:hover .rm{opacity:1}.rm:hover{color:var(--text)}
-        .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}
-        .chip{display:flex;gap:8px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:inherit;text-decoration:none}
+        .chips{display:flex;flex-wrap:wrap;gap:6px}
+        .chip{display:flex;gap:7px;align-items:center;background:var(--raised);border:1px solid var(--line);border-radius:6px;padding:5px 9px;color:inherit;text-decoration:none}
         .chip em{font-style:normal;font-size:12px;color:var(--dim)}
-        .others{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 16px;margin-bottom:22px}
-        .o{display:flex;gap:14px;padding:9px 0;border-top:1px solid var(--line);color:var(--dim)}.o:first-child{border-top:0}
-        .o .n{font-size:13px;min-width:48px}.o .a{margin-left:auto}
+        .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}.pair .card{margin-bottom:0}
+        @media(max-width:700px){.pair{grid-template-columns:1fr}}
+        .o{display:flex;gap:14px;padding:9px 0;border-top:1px solid var(--line);color:var(--dim)}
+        .o.hd{border-top:0;padding-top:0;font-size:11px;font-weight:600;color:var(--faint)}.o.hd .n{font:inherit;color:inherit}
+        .o.hd+.o{border-top:1px solid var(--line)}
+        .o .n{min-width:48px;color:var(--text)}.o .a{margin-left:auto;text-align:right}
         .note{color:var(--dim);margin:0 4px}
+        \(wallCSS)
         </style>
+        <body\(wall == nil ? "" : " class=\"wall\"")>
         <main>
-        <div class="hero"><div><h1>\(escape(hero.key)) \(tags)</h1><div class="sub">\(subtitle)</div></div>
+        <div class="card hero"><div class="top"><div><h1>\(escape(hero.key)) \(tags)</h1><div class="sub">\(subtitle)</div></div>
         <div class="right"><span class="pill \(level)"><i></i>\(escape(hero.status))</span></div></div>
         <form onsubmit="return go()"><label class="box"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
         <input id="q" placeholder="주소 또는 포트 번호" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus></label></form>
+        <div id="band"></div></div>
         <div id="marks">\(bookmarksHTML)</div>
         <div id="ports">\(portsHTML)</div>
         </main>
@@ -234,7 +272,11 @@ public enum BrowserStartPage {
           location.href=v;return false}
         document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.rm');if(!b)return;e.preventDefault();e.stopPropagation();
           try{window.webkit.messageHandlers.nexus.postMessage({remove:b.dataset.u})}catch(_){}} ,true);
-        </script></html>
+        // 포트 부분이 들고 온 수(.band)를 대표 카드 아래 띠로 — 포트 부분은 앱이 통째로 갈아 끼운다
+        (function(){var p=document.getElementById('ports'),d=document.getElementById('band');
+          function sync(){var s=p.querySelector(':scope>.band');if(s)d.innerHTML=s.innerHTML}
+          sync();new MutationObserver(sync).observe(p,{childList:true})})();
+        </script></body></html>
         """
     }
 

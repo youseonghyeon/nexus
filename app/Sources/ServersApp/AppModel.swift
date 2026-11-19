@@ -91,6 +91,9 @@ final class AppModel {
     var diagnostics: [String: DiagnosticState] = [:]
     /// IEEE 배정 목록 (번들 oui.tsv, 처음 [Scan] 때 한 번 읽는다)
     static let ouiTable: OUITable? = OUITable.load(path: (Bundle.main.resourcePath ?? "") + "/oui.tsv")
+    /// 브라우저 시작 페이지의 다크 모드 배경 (번들 startpage-background.jpg → data: 주소, 처음 그릴 때 한 번). 없으면 무채색 바탕.
+    static let startPageBackground: String? = (try? Data(contentsOf: URL(fileURLWithPath: (Bundle.main.resourcePath ?? "") + "/startpage-background.jpg")))
+        .map { "data:image/jpeg;base64," + $0.base64EncodedString() }
     /// Wi-Fi 상세 (sudo wdutil info — [상세 보기] 를 눌러 인증할 때 한 번). 화면을 떠나거나 Wi-Fi 가 끊기면 지운다.
     var wifiDetail: WiFiDetail?
     var wifiDetailLoading = false
