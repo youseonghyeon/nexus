@@ -1,0 +1,12 @@
+Server:		0.250.250.200
+Address:	0.250.250.200:53
+
+Non-authoritative answer:
+Name:	localhost
+Address: ::1
+
+Non-authoritative answer:
+Name:	localhost
+Address: 127.0.0.1
+
+@RC 0

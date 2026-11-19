@@ -1,0 +1,2 @@
+ping: bad address 'no-such-host.invalid'
+@RC 1

@@ -149,7 +149,7 @@ final class AppModel {
     var infoTab: [String: RemoteCommands.Query] = [:]
     /// 변화 기록 (history.json — 서버마다 마지막으로 본 값과 달라진 사건, ServerHistory). 바꾸는 것은 AppModel+History 의 메서드로
     var history = ServerHistory.load()
-    /// 서버 시점 진단(원격 정보의 Diagnose 탭)의 마지막 결과: 서버 키 → 도구 → 한 번의 비교 (AppModel+Diagnostics · ServerDiagnose)
+    /// 서버 시점 진단(원격 정보의 Diagnose 탭)의 마지막 결과: 서버 키 → 도구 → 한 번의 실행 (AppModel+Diagnostics · ServerDiagnose)
     var serverDiagnoses: [String: [ServerDiagnose.Tool: ServerDiagnose.Run]] = [:]
     /// 서버별 "실시간" 탭 수집기 (그 탭을 처음 열 때 만든다 — AppModel+Live)
     @ObservationIgnored var liveMonitors: [String: ServerLiveMonitor] = [:]

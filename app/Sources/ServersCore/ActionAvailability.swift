@@ -81,7 +81,7 @@ public enum RemoteInfoTabs {
 }
 
 /// 원격 정보 카드 Diagnose 탭의 [Run] (ServerDiagnose): 입력이 꼴에 맞고, 서버가 응답 중이고, 그 도구가 돌고 있지 않을 때.
-/// 서버가 응답하지 않으면 서버 쪽을 잴 수 없어 비교가 안 된다 — 이 Mac 쪽만 재는 것은 망 화면의 진단 카드가 한다.
+/// 서버에서 재는 것이라 서버가 응답하지 않으면 잴 수 없다 — 이 Mac 에서 재는 것은 망 화면의 진단 카드가 한다.
 public enum ServerDiagnoseRun {
     public static func canRun(_ tool: ServerDiagnose.Tool, input: String, reachable: Bool, running: Bool) -> Bool {
         reachable && !running && ServerDiagnose.request(tool, input: input) != nil

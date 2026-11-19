@@ -207,7 +207,7 @@ public enum RemoteCommands {
         /// live: 한 번 가져오는 조회가 아니라 그 탭을 보는 동안 계속 읽는다 (LinuxLive · 앱의 ServerLiveMonitor)
         /// network 는 linux·OpenWrt·Windows, firewall · clients · wireguard 는 OpenWrt 만 (OpenWrt)
         /// schedule: systemd 타이머 · cron (linux 만)
-        /// diagnose: 조회가 아니다 — 대상을 넣어 이 Mac 과 그 서버에서 나란히 잰다 (linux 만, ServerDiagnose)
+        /// diagnose: 조회가 아니다 — 대상을 넣어 그 서버에서 잰다 (linux · openwrt, ServerDiagnose)
         case spec, network, firewall, clients, wireguard, services, ports, schedule, diagnose, live
         public var title: String { self == .wireguard ? "WireGuard" : rawValue.capitalized }
         /// 한 번 가져와 보여 주는 탭인가 (새로고침·확인 시각·자동 조회가 있다). Live 는 계속 읽고, Diagnose 는 누를 때만 돈다
@@ -216,7 +216,7 @@ public enum RemoteCommands {
 
     /// 그 종류의 서버에 이 탭이 있는가
     public static func supports(_ query: Query, type: ServerType) -> Bool {
-        query == .diagnose ? type == .linux : self.query(query, for: type) != nil
+        query == .diagnose ? (type == .linux || type == .openwrt) : self.query(query, for: type) != nil
     }
 
     /// 서버 종류별 조회 명령. stdin 이 있으면 command(`bash -s` · `sh -s`)에 넘긴다. 지원하지 않으면 nil.

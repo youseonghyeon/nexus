@@ -163,11 +163,29 @@ public struct DemoRunner: CommandRunner {
               !Self.offKeys.contains(server.key) else { return CommandResult(exitCode: 255, stderr: "ssh: connect to host: Operation timed out") }
         let command = arguments[arguments.count - 1]
         if command == "true" || command == "exit" { return ok("") }
+        // Diagnose 탭 (ServerDiagnose.script) — 도구마다 가상의 결과 하나
+        if command == "sh -s", server.type == .linux, let stdin, let reply = Self.diagnoseReply(stdin) { return ok(reply) }
         for query in RemoteCommands.Query.allCases {
             guard let q = RemoteCommands.query(query, for: server.type), q.command == command, q.stdin == stdin else { continue }
             return Self.reply(query, server: server).map(ok) ?? CommandResult(exitCode: 1)
         }
         return CommandResult(exitCode: 1)
+    }
+
+    /// 서버 시점 진단 스크립트의 가짜 출력 (문서용 대역). 스크립트가 아니면 nil
+    static func diagnoseReply(_ script: String) -> String? {
+        guard script.contains("@RC") else { return nil }
+        if script.contains("ping -c") {
+            return "5 packets transmitted, 5 received, 0% packet loss, time 804ms\nrtt min/avg/max/mdev = 0.412/0.538/0.701/0.097 ms\n@RC 0\n"
+        }
+        if script.contains("/dev/tcp/") { return "@RC 0\n@MS 3\n" }
+        if script.contains("curl ") {
+            return "exit=0\ncode=200\nscheme=HTTPS\nip=192.0.2.40\nport=443\ndns=0.004\nconnect=0.011\ntls=0.038\nfirst=0.121\ntotal=0.134\nredirect=\nerror=\n@RC 0\n"
+        }
+        if script.contains("getent ahosts") {
+            return "192.0.2.40      STREAM db.example.internal\n192.0.2.40      DGRAM  \n192.0.2.40      RAW    \n2001:db8::40    STREAM \n@RC 0\n@MS 2\n"
+        }
+        return nil
     }
 
     static func reply(_ query: RemoteCommands.Query, server: Server) -> String? {

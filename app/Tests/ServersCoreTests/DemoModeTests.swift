@@ -48,6 +48,20 @@ final class DemoModeTests: XCTestCase {
         XCTAssertEqual(other.exitCode, 127)
     }
 
+    /// Diagnose 탭: 도구마다 스크립트를 넘기면 풀리는 가짜 결과가 온다 (프로세스를 띄우지 않는다)
+    func testDiagnoseRepliesParse() async throws {
+        let runner = DemoRunner()
+        let server = try XCTUnwrap(try ServerConfigParser.parse(DemoMode.conf).server("web"))
+        for (tool, input, headline) in [(ServerDiagnose.Tool.ping, "192.0.2.40", "0.5 ms · Jitter 0.1 ms"), (.tcp, "192.0.2.40:5432", "열림 · 3 ms"),
+                                         (.http, "https://db.example.internal/health", "200 성공"), (.dns, "db.example.internal", "192.0.2.40")] {
+            let request = try XCTUnwrap(ServerDiagnose.request(tool, input: input))
+            let result = await runner.run("ssh", [server.target, "sh -s"], stdin: ServerDiagnose.script(request) + "\n", timeout: 5)
+            let outcome = ServerDiagnose.parseServer(request, output: result.stdout, ok: result.ok)
+            XCTAssertEqual(outcome.state, .ok, "\(tool)")
+            XCTAssertEqual(outcome.headline, headline, "\(tool)")
+        }
+    }
+
     func testWiredSnapshotShowsEthernetAndIntranet() async {
         let snapshot = await WiredSnapshot.fetch(runner: DemoRunner())
         XCTAssertEqual(snapshot.adapters(excluding: [DemoMode.lanService]).map(\.service), ["Ethernet"])

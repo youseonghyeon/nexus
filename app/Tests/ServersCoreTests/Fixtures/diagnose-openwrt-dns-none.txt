@@ -1,0 +1,8 @@
+Server:		0.250.250.200
+Address:	0.250.250.200:53
+
+** server can't find no-such-host.invalid: NXDOMAIN
+
+** server can't find no-such-host.invalid: NXDOMAIN
+
+@RC 1

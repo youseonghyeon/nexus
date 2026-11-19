@@ -1,7 +1,6 @@
-// 서버 시점 진단 (2026-11-18, 원격 정보 카드의 Diagnose 탭 — linux 만): 같은 대상을 이 Mac 과 그 서버에서 한 번씩 재서 나란히 보인다.
-// "내 쪽에선 되는데 서버에선 안 됨"(방화벽·경로·DNS)을 한 화면에서 가르려는 것. 도구는 ping · TCP · HTTP · DNS.
-//   이 Mac: 기본 경로로 (장치에 묶지 않는다 — 터미널에서 직접 친 것과 같다). ping · curl · dscacheutil · TCP 연결 한 번.
-//   서버: ssh 로 `sh -s` 에 스크립트를 넘긴다. ping · curl · getent ahosts · bash 의 /dev/tcp. 아무것도 설치하지 않고, 없는 도구는 "없음"으로 알린다.
+// 서버 시점 진단 (2026-11-18, 원격 정보 카드의 Diagnose 탭 — linux · openwrt): 대상을 넣으면 그 서버에서 재서 보인다 — 서버에 들어가 직접 쳐 보던 것을 대신한다.
+// 도구는 ping · TCP · HTTP · DNS. 처음엔 이 Mac 에서도 같이 재서 나란히 보였는데 서버 쪽만 있으면 된다고 해 뺐다 (2026-11-18 사용자 결정 — 이 Mac 쪽은 망 화면의 진단 카드).
+//   ssh 로 `sh -s` 에 스크립트를 넘긴다. ping · curl · getent ahosts · bash 의 /dev/tcp. 아무것도 설치하지 않고, 없는 도구는 "없음"으로 알린다.
 // 서버는 보내기만 한다 (설정을 바꾸지 않는다). 대상은 입력창 검사(PingTest·TCPPortTest·HTTPTest·DNSLookup)를 거친 뒤 작은따옴표로 싸서 넣는다.
 // 서버 스크립트의 실제 출력: Tests/…/Fixtures/diagnose-*.txt (2026-11-18, 로컬 docker ubuntu:24.04 — 서버 아님).
 
@@ -11,13 +10,13 @@ public enum ServerDiagnose {
     public enum Tool: String, CaseIterable, Sendable {
         case ping, tcp, http, dns
         public var title: String { self == .ping ? "ping" : rawValue.uppercased() }
-        /// 입력칸의 자리 글
+        /// 입력칸의 자리 글 (망 화면의 진단 카드와 같은 말)
         public var placeholder: String {
             switch self {
-            case .ping: return "주소 · 이름"
-            case .tcp: return "IP:포트"
-            case .http: return "URL"
-            case .dns: return "이름"
+            case .ping: return "IP 또는 이름"
+            case .tcp: return "IPv4:포트 (예: 192.0.2.10:22)"
+            case .http: return "URL (http:// 생략 가능)"
+            case .dns: return "이름 (예: www.example.com)"
             }
         }
     }
@@ -47,59 +46,39 @@ public enum ServerDiagnose {
     public struct Outcome: Sendable, Equatable {
         public enum State: Sendable, Equatable {
             case ok, failed
-            /// 재지 못했다 (도구 없음 · 접속 실패) — 비교하지 않는다
+            /// 재지 못했다 (도구 없음 · 접속 실패) — 서버에서 안 되는 것과는 다르다
             case unavailable
         }
         public var state: State
-        /// 한 줄 결론: "12.3 ms" · "열림 · 3 ms" · "200 성공 · 308 ms" · "192.0.2.10"
+        /// 결과 줄: "12.3 ms · Jitter 0.4 ms" · "열림 · 3 ms" · "200 성공" · "192.0.2.10" (dns 는 IPv4 만 — IPv6 는 아랫줄)
         public var headline: String
-        /// 덧붙는 줄 (연결된 주소 · 단계별 시간 · curl 문장)
+        /// [복사] 텍스트에 덧붙는 줄 ("연결: 192.0.2.10:443" — 화면은 망 화면의 진단 카드와 같은 줄로 따로 그린다: check · ms · addresses6)
         public var lines: [String] = []
-        /// dns: 풀린 주소들 · http: 연결된 주소 하나 (양쪽 비교에 쓴다)
+        /// dns: 풀린 주소들 · http: 연결된 주소 하나
         public var addresses: [String] = []
         /// http: 상태 코드
         public var status: Int?
+        /// http: curl 이 준 값 그대로 — 화면이 진단 카드와 같은 줄(결과 · 상세 · 이동 · 연결 · 시간 막대)로 그린다
+        public var check: HTTPCheck?
+        /// dns: 걸린 시간 (결과 줄 옆 작은 글씨)
+        public var ms: Int?
 
-        public init(state: State, headline: String, lines: [String] = [], addresses: [String] = [], status: Int? = nil) {
+        /// dns: IPv6 주소 (진단 카드처럼 IPv6 줄로 따로)
+        public var addresses6: [String] { addresses.filter { $0.contains(":") } }
+
+        public init(state: State, headline: String, lines: [String] = [], addresses: [String] = [], status: Int? = nil,
+                    check: HTTPCheck? = nil, ms: Int? = nil) {
             self.state = state; self.headline = headline; self.lines = lines; self.addresses = addresses; self.status = status
-        }
-    }
-
-    /// 양쪽을 놓고 본 한 줄
-    public struct Verdict: Sendable, Equatable {
-        public enum Kind: Sendable, Equatable { case same, differs, macOnly, serverOnly, neither, unknown }
-        public let kind: Kind
-        public let text: String
-        /// 눈여겨볼 결과인가 (한쪽만 되거나 답이 다르다)
-        public var notable: Bool { kind == .differs || kind == .macOnly || kind == .serverOnly }
-    }
-
-    public static func verdict(_ tool: Tool, mac: Outcome, server: Outcome, serverKey: String) -> Verdict {
-        if mac.state == .unavailable || server.state == .unavailable {
-            return Verdict(kind: .unknown, text: "한쪽을 재지 못해 비교하지 않았습니다")
-        }
-        switch (mac.state == .ok, server.state == .ok) {
-        case (true, false): return Verdict(kind: .macOnly, text: "이 Mac 에서는 되고 \(serverKey) 에서는 안 됩니다")
-        case (false, true): return Verdict(kind: .serverOnly, text: "\(serverKey) 에서는 되고 이 Mac 에서는 안 됩니다")
-        case (false, false): return Verdict(kind: .neither, text: "양쪽 다 안 됩니다")
-        case (true, true):
-            if tool == .dns, Set(mac.addresses) != Set(server.addresses) {
-                return Verdict(kind: .differs, text: "양쪽이 다른 주소로 풉니다")
-            }
-            if tool == .http, let a = mac.status, let b = server.status, a != b {
-                return Verdict(kind: .differs, text: "상태 코드가 다릅니다 (이 Mac \(a) · \(serverKey) \(b))")
-            }
-            if tool == .http, let a = mac.addresses.first, let b = server.addresses.first, a != b {
-                return Verdict(kind: .differs, text: "양쪽 다 되지만 붙은 주소가 다릅니다")
-            }
-            return Verdict(kind: .same, text: "양쪽 다 됩니다")
+            self.check = check; self.ms = ms
         }
     }
 
     // MARK: 서버에서
 
     /// `sh -s` 에 넘길 스크립트. 줄 끝의 @RC(종료 코드)·@MS(걸린 ms)·@MISSING(없는 도구)로 결과를 가른다.
-    public static func script(_ request: Request) -> String {
+    /// openwrt 는 BusyBox 라 따로 (openwrtScript) — bash · timeout · getent 가 없고 ping 은 소수 간격을 모른다.
+    public static func script(_ request: Request, type: ServerType = .linux) -> String {
+        if type == .openwrt, let script = openwrtScript(request) { return script }
         let target = shellQuote(request.target)
         switch request.tool {
         case .ping:
@@ -140,8 +119,53 @@ public enum ServerDiagnose {
         }
     }
 
+    /// OpenWrt(BusyBox) 용 — http 는 linux 와 같은 스크립트라 nil (curl 은 기본으로 없다: 있으면 재고 없으면 없다고 알린다).
+    /// 실제 출력: Fixtures/diagnose-openwrt-*.txt (2026-11-18, 로컬 docker openwrt/rootfs:x86-64-23.05.5 — BusyBox 1.36.1).
+    static func openwrtScript(_ request: Request) -> String? {
+        let target = shellQuote(request.target)
+        switch request.tool {
+        case .ping:
+            // BusyBox ping 은 -i 0.2 를 못 읽는다 ("invalid number") — 1초 간격 그대로
+            return """
+                command -v ping >/dev/null 2>&1 || { echo "@MISSING ping"; exit 0; }
+                LC_ALL=C ping -c \(PingTest.count) -W 1 \(target) 2>&1
+                echo "@RC $?"
+                """
+        case .tcp:
+            // nc 는 "nc 주소 포트" 뿐이고 timeout 도 없다 — 뒤에서 돌리고 \(Int(TCPPortTest.timeout))초 기다린다. 끝났으면 0 열림 · 그 밖 거부.
+            // 안 끝났으면 막힘(124) — 붙었는데 상대가 끊지 않는 것은 netstat 의 ESTABLISHED 로 가려 열림. sleep 이 소수를 모르면 1초씩.
+            // 걸린 시간은 재지 않는다 (date 에 나노초가 없고, 기다리는 간격이 섞인다)
+            let seconds = Int(TCPPortTest.timeout)
+            return """
+                command -v nc >/dev/null 2>&1 || { echo "@MISSING nc"; exit 0; }
+                nc \(request.host) \(request.port) </dev/null >/dev/null 2>&1 &
+                p=$!
+                if sleep 0.1 2>/dev/null; then step=0.1; max=\(seconds * 10); else step=1; max=\(seconds); fi
+                i=0
+                while kill -0 $p 2>/dev/null && [ $i -lt $max ]; do sleep $step; i=$((i + 1)); done
+                if kill -0 $p 2>/dev/null; then
+                  rc=124
+                  netstat -tn 2>/dev/null | grep -q "[ :]\(request.host):\(request.port) .*ESTABLISHED" && rc=0
+                  kill $p 2>/dev/null
+                else
+                  wait $p; rc=$?
+                fi
+                echo "@RC $rc"
+                """
+        case .http:
+            return nil
+        case .dns:
+            // 공유기의 리졸버(dnsmasq)에 묻는다. 없는 이름은 Name 줄이 없다
+            return """
+                command -v nslookup >/dev/null 2>&1 || { echo "@MISSING nslookup"; exit 0; }
+                nslookup \(target) 2>&1
+                echo "@RC $?"
+                """
+        }
+    }
+
     /// 서버 스크립트의 출력 → 결과. ssh 가 실패했으면(ok=false) failure 문구로 "재지 못함".
-    public static func parseServer(_ request: Request, output: String, ok: Bool, failure: String? = nil) -> Outcome {
+    public static func parseServer(_ request: Request, output: String, ok: Bool, failure: String? = nil, type: ServerType = .linux) -> Outcome {
         var body: [String] = [], rc: Int?, ms: Int?, missing: String?
         for raw in output.split(whereSeparator: \.isNewline) {
             let line = String(raw)
@@ -167,8 +191,23 @@ public enum ServerDiagnose {
             guard let check = HTTPTest.parse(patched) else { return Outcome(state: .unavailable, headline: "curl 출력을 읽지 못했습니다") }
             return http(check)
         case .dns:
-            return dns(addresses: getentAddresses(text), ms: ms)
+            return dns(addresses: type == .openwrt ? nslookupAddresses(text) : getentAddresses(text), ms: ms)
         }
+    }
+
+    /// BusyBox nslookup 출력 → 풀린 주소. 앞머리의 "Server · Address"(물어본 리졸버)는 버리고 Name 줄 뒤의 Address 만.
+    /// 새 꼴 "Address: 192.0.2.10" · 옛 꼴 "Address 1: 192.0.2.10 이름" 둘 다
+    static func nslookupAddresses(_ text: String) -> [String] {
+        var seen: [String] = [], named = false
+        for raw in text.split(whereSeparator: \.isNewline) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("Name:") { named = true; continue }
+            guard named, line.hasPrefix("Address"), let colon = line.range(of: ": ") else { continue }
+            guard let address = line[colon.upperBound...].split(separator: " ").first.map(String.init),
+                  address.contains(".") || address.contains(":"), !seen.contains(address) else { continue }
+            seen.append(address)
+        }
+        return seen
     }
 
     /// getent ahosts 출력 ("192.0.2.10   STREAM name" · DGRAM · RAW 가 주소마다 한 줄씩) → 겹치지 않는 주소, 나온 순서
@@ -182,109 +221,60 @@ public enum ServerDiagnose {
         return seen
     }
 
-    // MARK: 이 Mac 에서
+    // MARK: 출력 풀이
 
-    /// 이 Mac 에서 같은 대상을 잰다 (기본 경로). tcp 는 연결 한 번 — 테스트는 tcpConnect 를 바꿔 넣는다.
-    public static func runLocal(_ request: Request, runner: any CommandRunner,
-                                tcpConnect: @Sendable (String, Int) async -> Bool = { host, port in
-                                    await TCPProbe.connect(host: host, port: port, timeout: TCPPortTest.timeout, device: nil)
-                                }) async -> Outcome {
-        switch request.tool {
-        case .ping:
-            let result = await runner.run("ping", ["-c", "\(PingTest.count)", "-i", "0.2", "-W", "1000", request.target], timeout: 15)
-            return ping(result.stdout + result.stderr)
-        case .tcp:
-            let started = Date()
-            let open = await tcpConnect(request.host, request.port)
-            let ms = Int(Date().timeIntervalSince(started) * 1000)
-            // 이 Mac 의 연결 확인은 열림/아님만 안다 (거부와 막힘을 가르지 않는다 — TCPProbe)
-            return open ? Outcome(state: .ok, headline: "열림 · \(ms) ms") : Outcome(state: .failed, headline: "응답 없음 (닫힘 · 막힘)")
-        case .http:
-            let arguments = ["-sS", "-g", "-o", "/dev/null", "--proto", "=http,https", "--noproxy", "*",
-                             "--connect-timeout", "\(HTTPTest.connectTimeout)", "--max-time", "\(HTTPTest.maxTime)", "-w", HTTPTest.format, request.target]
-            let result = await runner.run("curl", arguments, timeout: TimeInterval(HTTPTest.maxTime + 5))
-            guard let check = HTTPTest.parse(result.stdout) else { return Outcome(state: .unavailable, headline: "curl 을 실행하지 못했습니다") }
-            return http(check)
-        case .dns:
-            // 이 Mac 의 프로그램들이 보는 그대로 (/etc/hosts · 시스템 리졸버) — 서버의 getent 와 같은 층
-            let started = Date()
-            let result = await runner.run("dscacheutil", ["-q", "host", "-a", "name", request.target], timeout: 10)
-            guard result.exitCode != CommandResult.timedOutExitCode else { return Outcome(state: .failed, headline: "응답 없음 (시간 초과)") }
-            return dns(addresses: dscacheutilAddresses(result.stdout), ms: Int(Date().timeIntervalSince(started) * 1000))
-        }
-    }
+    /// 이름이 안 풀렸을 때의 결과 줄 (ping · dns) — 화면이 진단 카드처럼 흐리게 그린다
+    public static let unresolvedText = "이름을 찾지 못했습니다"
 
-    /// dscacheutil -q host 출력의 "ip_address: …" · "ipv6_address: …" 줄 → 겹치지 않는 주소, 나온 순서
-    static func dscacheutilAddresses(_ text: String) -> [String] {
-        var seen: [String] = []
-        for line in text.split(whereSeparator: \.isNewline) {
-            let parts = line.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
-            guard parts.count == 2, parts[0] == "ip_address" || parts[0] == "ipv6_address", !parts[1].isEmpty, !seen.contains(parts[1]) else { continue }
-            seen.append(parts[1])
-        }
-        return seen
-    }
-
-    // MARK: 양쪽이 같이 쓰는 풀이
-
-    /// ping 출력 (macOS · Linux 요약 줄이 같은 꼴 — NetworkProbe.parsePing)
+    /// ping 출력 (Linux 요약 줄도 macOS 와 같은 꼴 — NetworkProbe.parsePing)
     static func ping(_ output: String) -> Outcome {
         let unresolved = PingTest.resolveFailed(output) || output.contains("Name or service not known") || output.contains("failure in name resolution")
-        if unresolved { return Outcome(state: .failed, headline: "이름을 찾지 못했습니다") }
+            || output.contains("ping: bad address")   // BusyBox
+        if unresolved { return Outcome(state: .failed, headline: unresolvedText) }
         let summary = NetworkProbe.parsePing(output)
         return Outcome(state: summary.averageMs == nil ? .failed : .ok, headline: summary.text)
     }
 
+    /// 결과 줄·덧붙는 줄은 진단 카드의 [복사] 텍스트와 같은 말·같은 순서 (HTTPTestResult.reportText)
     static func http(_ check: HTTPCheck) -> Outcome {
         var lines: [String] = []
-        if let endpoint = check.endpoint { lines.append("연결 \(endpoint)") }
-        if let redirect = check.redirect { lines.append("이동 \(redirect)") }
-        if let stages = check.stages, stages.dnsMs != nil || stages.connectMs != nil { lines.append(stages.text) }
-        if let failure = check.failureText {
-            if let error = check.error { lines.insert(error, at: 0) }
-            return Outcome(state: .failed, headline: failure, lines: lines)
-        }
-        guard let status = check.status else { return Outcome(state: .failed, headline: "응답 없음", lines: lines) }
+        if check.failureText != nil || check.bodyNote != nil, let error = check.error { lines.append("상세: \(error)") }
+        if let redirect = check.redirect { lines.append("이동: \(redirect)") }
+        if let endpoint = check.endpoint { lines.append("연결: \(endpoint)") }
+        if let stages = check.stages, stages.dnsMs != nil { lines.append("시간: \(stages.text)") }
+        if let failure = check.failureText { return Outcome(state: .failed, headline: failure, lines: lines, check: check) }
+        guard let status = check.status else { return Outcome(state: .failed, headline: "응답 없음", lines: lines, check: check) }
         var headline = "\(status)" + (HTTPTest.statusKind(status).map { " \($0)" } ?? "")
-        if let stages = check.stages { headline += " · \(stages.totalText)" }
-        if let note = check.bodyNote { lines.insert(note, at: 0) }
-        // 응답을 받았으면 된 것이다 (4xx·5xx 도 — 서버가 답했다. 코드가 다르면 verdict 가 알린다)
-        return Outcome(state: .ok, headline: headline, lines: lines, addresses: check.remoteIP.map { [$0] } ?? [], status: status)
+        if let note = check.bodyNote { headline += " · \(note)" }
+        // 응답을 받았으면 된 것이다 (4xx·5xx 도 — 상대가 답했다. 코드는 결과 줄에 있다)
+        return Outcome(state: .ok, headline: headline, lines: lines, addresses: check.remoteIP.map { [$0] } ?? [], status: status, check: check)
     }
 
     static func dns(addresses: [String], ms: Int?) -> Outcome {
-        guard !addresses.isEmpty else { return Outcome(state: .failed, headline: "이름을 찾지 못했습니다") }
-        let shown = addresses.prefix(4).joined(separator: ", ") + (addresses.count > 4 ? " 외 \(addresses.count - 4)" : "")
-        return Outcome(state: .ok, headline: shown, lines: ms.map { ["\($0) ms"] } ?? [], addresses: addresses)
+        guard !addresses.isEmpty else { return Outcome(state: .failed, headline: unresolvedText) }
+        let v4 = addresses.filter { !$0.contains(":") }, v6 = addresses.filter { $0.contains(":") }
+        let shown = v4.isEmpty ? "IPv4 주소 없음" : v4.prefix(4).joined(separator: ", ") + (v4.count > 4 ? " 외 \(v4.count - 4)" : "")
+        return Outcome(state: .ok, headline: shown, lines: v6.isEmpty ? [] : ["IPv6: \(v6.joined(separator: ", "))"], addresses: addresses, ms: ms)
     }
 
     // MARK: 한 번의 실행
 
-    /// 한 번의 비교 (탭의 결과 한 칸). mac·server 가 nil 이면 그쪽은 재는 중.
+    /// 한 번의 실행 (탭의 결과 한 칸). outcome 이 nil 이면 재는 중.
     public struct Run: Sendable, Equatable {
         public let request: Request
         public let at: Date
-        public var mac: Outcome?
-        public var server: Outcome?
+        public var outcome: Outcome?
 
         public init(request: Request, at: Date = Date()) { self.request = request; self.at = at }
 
-        public var running: Bool { mac == nil || server == nil }
-
-        public func verdict(serverKey: String) -> Verdict? {
-            guard let mac, let server else { return nil }
-            return ServerDiagnose.verdict(request.tool, mac: mac, server: server, serverKey: serverKey)
-        }
+        public var running: Bool { outcome == nil }
 
         /// [복사] 텍스트 — 화면과 같은 내용
         public func reportText(serverKey: String) -> String {
-            var out = ["\(request.tool.title) \(request.target) · \(at.formatted(date: .abbreviated, time: .standard))"]
-            for (name, outcome) in [("이 Mac", mac), (serverKey, server)] {
-                guard let outcome else { out.append("\(name): 재는 중"); continue }
-                out.append("\(name): \(outcome.headline)")
-                out += outcome.lines.map { "  \($0)" }
-            }
-            if let verdict = verdict(serverKey: serverKey) { out.append("결과: \(verdict.text)") }
+            var out = ["\(request.tool.title) \(request.target) · \(serverKey) 에서 · \(at.formatted(date: .abbreviated, time: .standard))"]
+            guard let outcome else { return (out + ["결과: 재는 중"]).joined(separator: "\n") }
+            out.append("결과: \(outcome.headline)" + (outcome.ms.map { " · \($0) ms" } ?? ""))
+            out += outcome.lines
             return out.joined(separator: "\n")
         }
     }

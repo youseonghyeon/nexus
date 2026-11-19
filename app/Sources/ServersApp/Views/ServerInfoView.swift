@@ -33,7 +33,8 @@ struct ServerInfoView: View {
                 }
                 if RemoteCommands.query(.services, for: server.type) != nil {
                     RemoteInfoCard(server: server)
-                    HistoryCard(server: server)
+                    // 달라진 것이 있을 때만 — 빈 카드가 늘 떠 있으면 거슬렸다 (2026-11-18 사용자 지적)
+                    if !model.historyEvents(server).isEmpty { HistoryCard(server: server) }
                 }
                 if model.tunnels.contains(where: { $0.server.key == server.key }) {
                     InfoCard(title: "터널") { TunnelsCard(server: server) }

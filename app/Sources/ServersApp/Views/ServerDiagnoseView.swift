@@ -1,6 +1,6 @@
-// 원격 정보 카드의 Diagnose 탭 (linux): 같은 대상을 이 Mac 과 그 서버에서 한 번씩 재서 나란히 보인다 (ServersCore ServerDiagnose).
-// 도구(ping · TCP · HTTP · DNS)를 고르고 입력칸 한 줄 + [Run] → 왼쪽 "이 Mac" · 오른쪽 "<서버>" 칸에 결론 한 줄과 덧붙는 줄, 아래에 양쪽을 놓고 본 한 줄.
-// 한쪽만 되거나 답이 다르면(다른 주소로 풀림 · 다른 상태 코드) 그 줄이 경고색. 도구를 옮겨도 다른 도구의 결과는 남아 있다.
+// 원격 정보 카드의 Diagnose 탭 (linux · openwrt): 대상을 넣으면 그 서버에서 재서 보인다 (ServersCore ServerDiagnose) — 서버에 들어가 직접 쳐 보던 것을 대신한다.
+// 모양은 망 화면의 진단 카드와 같다: 도구 탭(ping · TCP · HTTP · DNS) → 입력칸 한 줄 + [Run] → 결과 격자. 결과 줄은 진단 카드와 같은 부품(DiagnosticResultRows)으로 그린다. 도구를 옮겨도 다른 도구의 결과는 남아 있다.
+// 이 Mac 에서 재는 것은 망 화면의 진단 카드 (여기서는 뺐다 — 2026-11-18 사용자 결정).
 
 import ServersCore
 import SwiftUI
@@ -16,87 +16,69 @@ struct ServerDiagnoseView: View {
     var body: some View {
         let run = model.serverDiagnose(server, tool)
         let canRun = ServerDiagnoseRun.canRun(tool, input: input.wrappedValue, reachable: model.isReachable(server), running: run?.running ?? false)
+        // 망 화면의 진단 카드(DiagnosticCard)와 같은 꼴: 도구 탭 → 입력칸 한 줄 + [Run] → 결과 격자
         VStack(alignment: .leading, spacing: 10) {
+            PlainSegmented(items: ServerDiagnose.Tool.allCases, selection: $tool, title: \.title)
             HStack(spacing: 8) {
-                PlainSegmented(items: ServerDiagnose.Tool.allCases, selection: $tool, title: \.title)
                 TextField(tool.placeholder, text: input)
                     .textFieldStyle(.plain)
                     .padding(.horizontal, 9).padding(.vertical, 5)
                     .fieldSurface()
-                    .frame(maxWidth: 360)
+                    .frame(maxWidth: 420)
                     .onSubmit { if canRun { start() } }
                     .accessibilityLabel(tool.title)
                 Button("Run", action: start)
                     .buttonStyle(CompactButtonStyle()).disabled(!canRun)
-                    .help("이 Mac 과 \(server.key) 에서 함께 잽니다")
-                Spacer(minLength: 0)
+                    .help("\(server.key) 에서 잽니다")
             }
             if let run {
-                HStack(alignment: .top, spacing: 10) {
-                    side("이 Mac", run.mac)
-                    side(server.key, run.server)
+                // 결과 줄은 진단 카드와 같은 부품으로 (DiagnosticResultRows) — 보낸 곳 자리에 장치 대신 서버 키
+                DiagnosticResultGrid(target: run.request.target, at: run.at, source: server.key,
+                                     report: run.running ? nil : run.reportText(serverKey: server.key),
+                                     reset: { model.clearServerDiagnose(tool, on: server); inputs[tool] = "" }) {
+                    resultRows(run)
                 }
-                .fixedSize(horizontal: false, vertical: true)   // 두 칸의 높이를 긴 쪽에 맞춘다
+            }
+        }
+    }
+
+    /// 도구마다의 결과 줄 — 진단 카드의 같은 도구와 같은 줄. 서버에서 못 얻는 줄(ping 경로 · DNS 의 TTL·네임서버)만 없다
+    @ViewBuilder
+    private func resultRows(_ run: ServerDiagnose.Run) -> some View {
+        let outcome = run.outcome
+        // 재지 못했거나(도구 없음 · 접속 실패) 이름이 안 풀린 것은 흐리게
+        let dim = outcome?.state == .unavailable || outcome?.headline == ServerDiagnose.unresolvedText
+        if run.request.tool == .http, outcome == nil || outcome?.check != nil {
+            HTTPCheckRows(check: outcome?.check)
+        } else {
+            GridRow {
+                Text(run.request.tool == .ping ? "응답" : "결과").font(.fieldLabel).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
-                    if let verdict = run.verdict(serverKey: server.key) {
-                        Label { Text(verbatim: verdict.text) } icon: { Image(systemName: verdict.notable ? "exclamationmark.triangle" : "equal.circle") }
-                            .font(.callout).foregroundStyle(verdict.notable ? StatusTone.warn.color : Color.secondary)
+                    if let outcome {
+                        Text(verbatim: outcome.headline).monospacedDigit().textSelection(.enabled)
+                            .foregroundStyle(dim ? Color.secondary : Color.primary)
+                        if run.request.tool == .ping, !dim { Text("\(PingTest.count)회").font(.caption).foregroundStyle(.tertiary) }
+                        if let ms = outcome.ms { Text("\(ms) ms").font(.caption).foregroundStyle(.tertiary) }
                     } else {
-                        Text("재는 중…").font(.callout).foregroundStyle(.secondary)
+                        ProgressView().controlSize(.small)
+                        switch run.request.tool {
+                        case .ping: Text("보내는 중…").foregroundStyle(.secondary)
+                        case .dns: Text("묻는 중…")
+                        default: Text("확인 중…")
+                        }
                     }
-                    Spacer(minLength: 8)
-                    Text(verbatim: "\(run.request.target) · \(run.at.formatted(date: .omitted, time: .shortened))")
-                        .font(.caption).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.middle)
-                    Button { model.copy(run.reportText(serverKey: server.key)) } label: { Image(systemName: "doc.on.doc") }.accessibilityLabel("결과 복사")
-                        .buttonStyle(.borderless).controlSize(.small).disabled(run.running)
-                        .help("결과를 텍스트로 복사")
-                    Button("초기화") { model.clearServerDiagnose(tool, on: server) }
-                        .buttonStyle(.borderless).controlSize(.small).font(.caption).disabled(run.running)
-                        .help("이 결과를 지웁니다")
                 }
-            } else {
-                Text("대상을 넣고 Run 을 누르면 이 Mac 과 \(server.key) 에서 함께 재서 나란히 보입니다.")
-                    .font(.callout).foregroundStyle(.secondary)
+            }
+            if let v6 = outcome?.addresses6, !v6.isEmpty {
+                GridRow(alignment: .top) {
+                    Text("IPv6").font(.fieldLabel).foregroundStyle(.secondary)
+                    Text(verbatim: v6.joined(separator: ", ")).textSelection(.enabled)
+                }
             }
         }
     }
 
     private func start() {
         model.runServerDiagnose(tool, input: input.wrappedValue, on: server)
-    }
-
-    /// 한쪽의 결과 칸: 이름 · 결론 한 줄(상태 점) · 덧붙는 줄. nil 이면 재는 중
-    private func side(_ title: String, _ outcome: ServerDiagnose.Outcome?) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: title).font(.cardTitle).foregroundStyle(.secondary).lineLimit(1)
-            if let outcome {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    StatusDot(tone: tone(outcome.state))
-                    Text(verbatim: outcome.headline).font(.body.monospacedDigit()).textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                ForEach(Array(outcome.lines.enumerated()), id: \.offset) { _, line in
-                    Text(verbatim: line).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            } else {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text("재는 중…").foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Palette.content, in: RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous).strokeBorder(Palette.hairline))
-    }
-
-    private func tone(_ state: ServerDiagnose.Outcome.State) -> StatusTone {
-        switch state {
-        case .ok: return .good
-        case .failed: return .bad
-        case .unavailable: return .muted
-        }
     }
 }
