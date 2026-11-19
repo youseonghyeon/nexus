@@ -100,7 +100,7 @@ extension AppModel {
     /// 원격 정보 조회. allowPrompt=false 면 조용히만 시도하고(자동 조회용) 인증 필요 시 안내만 남긴다.
     func fetchInfo(_ server: Server, _ query: RemoteCommands.Query, allowPrompt: Bool) {
         // 실시간 탭은 한 번 가져오는 조회가 아니다 — 그 탭이 보이는 동안 ServerLiveMonitor 가 읽는다
-        guard query != .live, let q = RemoteCommands.query(query, for: server.type) else { return }
+        guard query.fetches, let q = RemoteCommands.query(query, for: server.type) else { return }
         if info(server, query).loading { return }
         remoteInfo[server.key, default: [:]][query, default: RemoteInfoResult()].loading = true
         Task {
@@ -175,7 +175,7 @@ extension AppModel {
         guard let server = selectedServer, status.remote(server.key).isReachable, server.autoFetches(hasPassword: hasPassword(server)) else { return }
         let query: RemoteCommands.Query
         // 보고 있는 탭을 — 계정을 바꾸면 그 탭이 비어 있다. Live 는 수집기가 따로 읽는다
-        if let tab = infoTab[server.key], tab != .live, RemoteCommands.query(tab, for: server.type) != nil {
+        if let tab = infoTab[server.key], tab.fetches, RemoteCommands.query(tab, for: server.type) != nil {
             query = tab
         } else {
             query = RemoteCommands.query(.spec, for: server.type) != nil ? .spec : .services

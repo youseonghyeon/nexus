@@ -36,7 +36,7 @@ public enum ParsedRemoteInfo: Sendable, Equatable {
         case .firewall: return .firewall(OpenWrtFirewall.parse(lines))
         case .clients: return .clients(OpenWrtClients.parse(lines))
         case .wireguard: return .wireguard(WireGuardReport.parse(lines))
-        case .live: return .none
+        case .live, .diagnose: return .none
         }
     }
 }

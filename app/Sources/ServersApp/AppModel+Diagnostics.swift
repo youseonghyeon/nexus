@@ -213,4 +213,36 @@ extension AppModel {
             diagnostics[screen]?.running.remove(.http)
         }
     }
+
+    // MARK: 서버 시점 진단 (원격 정보의 Diagnose 탭 — ServerDiagnose)
+
+    func serverDiagnose(_ server: Server, _ tool: ServerDiagnose.Tool) -> ServerDiagnose.Run? {
+        serverDiagnoses[server.key]?[tool]
+    }
+
+    /// 같은 대상을 이 Mac(기본 경로)과 그 서버(ssh)에서 함께 잰다. 먼저 끝난 쪽부터 채운다.
+    /// 서버 쪽은 인증이 필요하면 비밀번호 창을 띄운다 (버튼을 누른 것이라) — 취소·실패는 "재지 못함"으로 남는다.
+    func runServerDiagnose(_ tool: ServerDiagnose.Tool, input: String, on server: Server) {
+        guard ServerDiagnoseRun.canRun(tool, input: input, reachable: isReachable(server), running: serverDiagnose(server, tool)?.running ?? false),
+              let request = ServerDiagnose.request(tool, input: input) else { return }
+        let run = ServerDiagnose.Run(request: request)
+        serverDiagnoses[server.key, default: [:]][tool] = run
+        // 그 사이 다시 돌렸거나 지웠으면 버린다
+        let current: @MainActor () -> Bool = { [weak self] in self?.serverDiagnoses[server.key]?[tool]?.at == run.at }
+        Task {
+            let outcome = await ServerDiagnose.runLocal(request, runner: runner)
+            if current() { serverDiagnoses[server.key]?[tool]?.mac = outcome }
+        }
+        Task {
+            let result = await runRemote(server, command: "sh -s", stdin: ServerDiagnose.script(request) + "\n", timeout: 30)
+            let outcome = ServerDiagnose.parseServer(request, output: result.stdout, ok: result.ok,
+                                                     failure: result.ok ? nil : RemoteFailure.text(result, serverKey: server.key))
+            if current() { serverDiagnoses[server.key]?[tool]?.server = outcome }
+        }
+    }
+
+    func clearServerDiagnose(_ tool: ServerDiagnose.Tool, on server: Server) {
+        guard serverDiagnose(server, tool)?.running != true else { return }
+        serverDiagnoses[server.key]?[tool] = nil
+    }
 }

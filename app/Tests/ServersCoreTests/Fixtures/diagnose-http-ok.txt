@@ -1,0 +1,13 @@
+exit=0
+code=200
+scheme=HTTP
+ip=127.0.0.1
+port=8081
+dns=0.000024
+connect=0.000218
+tls=0.000000
+first=0.000358
+total=0.000400
+redirect=
+error=
+@RC 0

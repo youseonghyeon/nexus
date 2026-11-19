@@ -1,4 +1,4 @@
-// 원격 정보 카드: 서버 종류가 지원하는 탭(RemoteCommands.Query — Spec · Network · Schedule · Firewall · Clients · WireGuard · Services · Ports · Live)과
+// 원격 정보 카드: 서버 종류가 지원하는 탭(RemoteCommands.Query — Spec · Network · Schedule · Firewall · Clients · WireGuard · Services · Ports · Diagnose · Live)과
 // Spec 격자(SpecGrid) · 포트 표(PortsTable). 나머지 탭의 표는 OpenWrtViews · LinuxInfoViews · ServicesView · ServerLiveView.
 
 import ServersCore
@@ -27,8 +27,8 @@ struct RemoteInfoCard: View {
                                       title: \.title)
                 .disabled(!RemoteInfoTabs.canSwitch(reachable: reachable, current: tab, currentFetchedAt: entry.fetchedAt))   // 실시간 탭엔 fetchedAt 이 없다 — 꺼져도 다른 탭으로 옮길 수 있게
             let trailing = HStack(spacing: 8) {
-                // 실시간 탭은 저절로 갱신된다 — 확인 시각·간격은 탭 안 요약 줄에
-                if tab != .live {
+                // 실시간 탭은 저절로 갱신된다 — 확인 시각·간격은 탭 안 요약 줄에. Diagnose 는 가져오는 것이 없다
+                if tab.fetches {
                     if entry.loading {
                         ProgressView().controlSize(.small)
                     } else if let at = entry.fetchedAt {
@@ -51,6 +51,8 @@ struct RemoteInfoCard: View {
             if tab == .live {
                 // 서버를 옮기거나 접속 정보가 바뀌면 화면·수집 루프를 새로 — 안 그러면 루프가 처음 잡은 서버를 계속 읽는다
                 ServerLiveView(server: server, monitor: model.liveMonitor(server)).id(server)
+            } else if tab == .diagnose {
+                ServerDiagnoseView(server: server).id(server.key)   // 입력칸이 다른 서버로 옮겨 가지 않게
             } else {
                 if let error = entry.error {
                     Label(error, systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(StatusTone.warn.color)
@@ -75,7 +77,7 @@ struct RemoteInfoCard: View {
                         if case .openwrtServices(let report) = entry.parsed { OpenWrtServicesView(server: server, lines: entry.lines, report: report).id(server.key) }
                         else if case .services(let report) = entry.parsed { ServicesView(server: server, lines: entry.lines, report: report).id(server.key) }
                     case .ports: if case .ports(let items) = entry.parsed { PortsTable(server: server, items: items) }
-                    case .live: EmptyView()
+                    case .live, .diagnose: EmptyView()
                     }
                 }
             }

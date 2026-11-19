@@ -1,0 +1,14 @@
+curl: (7) Failed to connect to 127.0.0.1 port 9 after 0 ms: Couldn't connect to server
+exit=7
+code=000
+scheme=
+ip=
+port=0
+dns=0.000032
+connect=0.000000
+tls=0.000000
+first=0.000000
+total=0.000240
+redirect=
+error=Failed to connect to 127.0.0.1 port 9 after 0 ms: Couldn't connect to server
+@RC 7

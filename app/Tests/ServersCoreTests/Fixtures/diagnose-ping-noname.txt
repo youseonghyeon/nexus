@@ -1,0 +1,2 @@
+ping: no-such-host.invalid: Name or service not known
+@RC 2

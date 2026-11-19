@@ -18,8 +18,8 @@ final class OpenWrtTests: XCTestCase {
     // MARK: 조회 연결
 
     func testQueriesPerType() {
-        for query in RemoteCommands.Query.allCases where query != .schedule {
-            XCTAssertNotNil(RemoteCommands.query(query, for: .openwrt), "OpenWrt 는 schedule 말고 모든 탭: \(query)")
+        for query in RemoteCommands.Query.allCases where query != .schedule && query != .diagnose {
+            XCTAssertNotNil(RemoteCommands.query(query, for: .openwrt), "OpenWrt 는 schedule · diagnose(linux 만, 조회가 아니다) 말고 모든 탭: \(query)")
         }
         XCTAssertNil(RemoteCommands.query(.schedule, for: .openwrt), "cron·systemd 타이머는 리눅스 탭")
         for type in [ServerType.linux, .windows] {
@@ -33,7 +33,7 @@ final class OpenWrtTests: XCTestCase {
         XCTAssertEqual(RemoteCommands.query(.spec, for: .openwrt)?.command, "sh -s")
         XCTAssertFalse(OpenWrt.specScript.contains("[["), "ash 전용이 아닌 문법은 피한다")
         XCTAssertEqual(RemoteCommands.Query.wireguard.title, "WireGuard")
-        XCTAssertEqual(RemoteCommands.Query.allCases.map(\.title), ["Spec", "Network", "Firewall", "Clients", "WireGuard", "Services", "Ports", "Schedule", "Live"])
+        XCTAssertEqual(RemoteCommands.Query.allCases.map(\.title), ["Spec", "Network", "Firewall", "Clients", "WireGuard", "Services", "Ports", "Schedule", "Diagnose", "Live"])
     }
 
     func testConfigTypeAndSession() throws {

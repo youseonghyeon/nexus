@@ -71,12 +71,20 @@ public enum DiagnosticRun {
 public enum RemoteInfoTabs {
     /// 탭 전환: 서버가 닿지 않아도 지금 탭에 가져온 결과가 있거나 실시간 탭(fetchedAt 이 없다)이면 다른 탭으로 옮길 수 있다
     public static func canSwitch(reachable: Bool, current: RemoteCommands.Query, currentFetchedAt: Date?) -> Bool {
-        reachable || currentFetchedAt != nil || current == .live
+        reachable || currentFetchedAt != nil || !current.fetches
     }
 
     /// 탭을 고르면 조용히 가져오는가: 아직 가져온 적 없는 탭만. 실시간 탭은 한 번 가져오는 조회가 아니다 (ServerLiveMonitor)
     public static func fetchesOnSelect(_ tab: RemoteCommands.Query, fetchedAt: Date?) -> Bool {
-        tab != .live && fetchedAt == nil
+        tab.fetches && fetchedAt == nil
+    }
+}
+
+/// 원격 정보 카드 Diagnose 탭의 [Run] (ServerDiagnose): 입력이 꼴에 맞고, 서버가 응답 중이고, 그 도구가 돌고 있지 않을 때.
+/// 서버가 응답하지 않으면 서버 쪽을 잴 수 없어 비교가 안 된다 — 이 Mac 쪽만 재는 것은 망 화면의 진단 카드가 한다.
+public enum ServerDiagnoseRun {
+    public static func canRun(_ tool: ServerDiagnose.Tool, input: String, reachable: Bool, running: Bool) -> Bool {
+        reachable && !running && ServerDiagnose.request(tool, input: input) != nil
     }
 }
 

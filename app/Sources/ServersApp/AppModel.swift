@@ -147,6 +147,8 @@ final class AppModel {
     var remoteInfo: [String: [RemoteCommands.Query: RemoteInfoResult]] = [:]
     /// 원격 정보 카드에서 보고 있는 탭 (서버별)
     var infoTab: [String: RemoteCommands.Query] = [:]
+    /// 서버 시점 진단(원격 정보의 Diagnose 탭)의 마지막 결과: 서버 키 → 도구 → 한 번의 비교 (AppModel+Diagnostics · ServerDiagnose)
+    var serverDiagnoses: [String: [ServerDiagnose.Tool: ServerDiagnose.Run]] = [:]
     /// 서버별 "실시간" 탭 수집기 (그 탭을 처음 열 때 만든다 — AppModel+Live)
     @ObservationIgnored var liveMonitors: [String: ServerLiveMonitor] = [:]
     /// 오른쪽 아래 토스트 (StatusToast). 같은 글이 떠 있는 동안 또 오면 횟수만 올린다 (×2).
@@ -584,7 +586,7 @@ final class AppModel {
     }
 
     func canQuery(_ server: Server, _ query: RemoteCommands.Query) -> Bool {
-        RemoteCommands.query(query, for: server.type) != nil
+        RemoteCommands.supports(query, type: server.type)
     }
 
     // MARK: 클립보드

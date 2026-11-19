@@ -23,6 +23,7 @@
 - 그룹별 서버 목록과 상태 점 (응답 · 켜졌는데 SSH 안 됨 · 꺼짐), 운영·스테이징 태그
 - SSH 터미널 탭 ([libghostty](https://github.com/ghostty-org/ghostty) 기반), 로컬 셸 탭, 자주 쓰는 명령 모음
 - 원격 정보: Spec · Network · Services · Ports · Schedule · Live — 서버에 아무것도 설치하지 않고 읽기만 합니다
+- 서버 시점 진단 (Diagnose): 같은 대상을 이 Mac 과 서버에서 나란히 재서 어느 쪽에서 막히는지 가릅니다 (ping · TCP · HTTP · DNS)
 - Linux · Windows · OpenWrt 공유기 (방화벽 존 매트릭스, 접속 기기, WireGuard 피어)
 - 한 서버의 여러 계정, 서버별 비밀번호·키 파일
 - 서버별 메모·로그인 보관 (암호화) — 앱 안 브라우저에서 로그인 저장을 묻고, 누르면 채웁니다

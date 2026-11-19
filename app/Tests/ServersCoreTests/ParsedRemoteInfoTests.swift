@@ -33,6 +33,7 @@ final class ParsedRemoteInfoTests: XCTestCase {
             (.clients, "clients", "clients", "clients"),
             (.wireguard, "wireguard", "wireguard", "wireguard"),
             (.live, "none", "none", "none"),
+            (.diagnose, "none", "none", "none"),
         ]
         XCTAssertEqual(Set(table.map(\.0)), Set(RemoteCommands.Query.allCases), "새 조회를 더하면 이 표에도 줄을 더한다")
         for (query, linux, windows, openwrt) in table {
