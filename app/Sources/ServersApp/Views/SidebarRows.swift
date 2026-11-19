@@ -10,7 +10,7 @@ struct TunnelRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            StatusDot(tone: tunnel.tone).frame(width: Metrics.sidebarIcon)
+            StatusIcon(symbol: TunnelIcon.symbol(for: tunnel.spec.kind), tone: tunnel.tone)
             VStack(alignment: .leading, spacing: 1) {
                 Text(tunnel.title).fontWeight(.medium)
                 Text(tunnel.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)

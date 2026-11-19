@@ -15,3 +15,14 @@ public enum ServerIcon {
 public extension Server {
     var iconSymbol: String { ServerIcon.symbol(for: type) }
 }
+
+/// 사이드바 터널 행의 아이콘 — 종류마다 (2026-11-19 시안 B): SOCKS 는 어디로든 나가니 지구본, 포트는 화살표, DB 는 원통
+public enum TunnelIcon {
+    public static func symbol(for kind: TunnelKind) -> String {
+        switch kind {
+        case .socks: return "globe"
+        case .port: return "arrow.forward.circle"
+        case .db: return "cylinder"
+        }
+    }
+}
