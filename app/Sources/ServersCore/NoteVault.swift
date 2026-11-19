@@ -135,10 +135,16 @@ public enum NoteVault {
         return notes.filter { fits($0, site: site) } + notes.filter { !fits($0, site: site) }
     }
 
-    /// 이 페이지에 채울 수 있는 로그인인가 (적어 둔 주소 중 하나와 같을 때만 — 다른 사이트에는 채우지 않는다)
+    /// 이 페이지의 로그인인가 (적어 둔 주소 중 하나와 같을 때) — 맨 위로 올리기 · "채우기" 표시 · 로그인 칸 아래 목록(저절로 뜨므로 이 페이지 것만)
     public static func fits(_ note: SecretNote, site: String?) -> Bool {
         guard note.kind == .login, let site else { return false }
         return note.sites.contains(site)
+    }
+
+    /// 패널에서 골라 누른 로그인을 채울 수 있는가 — 보고 있는 웹 페이지만 있으면 주소가 달라도 채운다 (사용자가 직접 고른 것이라, 2026-11-19).
+    /// 페이지가 없으면(터미널·시작 페이지) 비밀번호 복사.
+    public static func canFill(_ note: SecretNote, site: String?) -> Bool {
+        note.kind == .login && site != nil
     }
 
     /// 검색: 제목·주소·ID, 가리지 않은 메모는 본문도 (대소문자 무시). 비밀번호·가린 본문은 찾지 않는다. 빈 검색어는 전부.

@@ -348,7 +348,7 @@ final class BrowserSession: NSObject, ObservableObject {
 
     /// 팝오버·칸 아래 목록에서 로그인을 눌렀다: 지금 페이지가 그 주소일 때만 채운다 (다른 사이트에 비밀번호를 넣지 않는다)
     func fill(_ note: SecretNote) {
-        guard NoteVault.fits(note, site: site) else { return }
+        guard NoteVault.canFill(note, site: site) else { return }
         fillPrompt = nil
         fillPromptHovered = false; fillBlurPending = false
         fillQuietUntil = Date().addingTimeInterval(1)

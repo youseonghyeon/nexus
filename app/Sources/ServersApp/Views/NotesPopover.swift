@@ -1,6 +1,6 @@
 // 메모·로그인 (탭 막대 오른쪽, 명령 모음 옆의 열쇠 버튼). 앱이 그리는 패널에 들어간다 (TabBarPanels).
 // 선택한 서버의 것만 보인다 — 암호화해 notes.bin 에 둔다 (ServersCore NoteVault).
-// 로그인: 누르면 보고 있는 브라우저 탭에 채운다(그 페이지의 로그인일 때만 — 맨 위에 올라온다). 그 밖에는 비밀번호 복사. 줄 끝에서 ID·PW 복사(글자 붙은 버튼)·편집.
+// 로그인: 누르면 보고 있는 브라우저 탭에 채운다(주소가 달라도 — 그 페이지의 로그인은 맨 위에 "채우기" 표시). 보는 웹 페이지가 없으면 비밀번호 복사. 줄 끝에서 ID·PW 복사(글자 붙은 버튼)·편집.
 // 메모: 누르면 펼쳐 본문을 보인다(가린 메모는 펼쳐야 보인다). 줄 끝에서 복사·편집. 추가·편집·삭제도 이 안에서.
 // 키보드: 글자로 거르기 → ↑↓ 로 고르기 → Return.
 
@@ -59,7 +59,7 @@ struct NotesPopover: View {
         case .memo:
             expanded = expanded == note.id ? nil : note.id
         case .login:
-            if NoteVault.fits(note, site: site) { model.fillLogin(note) } else { model.copySecret(note.password, label: "비밀번호") }
+            if NoteVault.canFill(note, site: site) { model.fillLogin(note) } else { model.copySecret(note.password, label: "비밀번호") }
             close()
         }
     }

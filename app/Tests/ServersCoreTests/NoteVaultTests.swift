@@ -144,6 +144,16 @@ final class NoteVaultTests: XCTestCase {
         XCTAssertFalse(NoteVault.fits(SecretNote(kind: .memo, sites: ["http://localhost:3000"]), site: "http://localhost:3000"))
     }
 
+    func testCanFillAnyPageFromPanel() {
+        XCTAssertTrue(NoteVault.canFill(login, site: "http://localhost:3000"))
+        XCTAssertTrue(NoteVault.canFill(login, site: "http://127.0.0.1:3000"), "주소가 달라도 패널에서 고르면 채운다")
+        XCTAssertFalse(NoteVault.fits(login, site: "http://127.0.0.1:3000"), "그래도 맨 위·채우기 표시·칸 아래 목록은 같은 주소만")
+        XCTAssertFalse(NoteVault.canFill(login, site: nil), "보는 페이지가 없으면 복사")
+        XCTAssertFalse(NoteVault.canFill(SecretNote(kind: .login, username: "a", password: "b"), site: nil), "빈 상태(주소 없는 로그인)도 페이지 없으면 복사")
+        XCTAssertTrue(NoteVault.canFill(SecretNote(kind: .login, username: "a", password: "b"), site: "http://localhost:3000"))
+        XCTAssertFalse(NoteVault.canFill(memo, site: "http://localhost:3000"), "메모는 채우지 않는다")
+    }
+
     func testMatchesNeverSearchesSecrets() {
         XCTAssertTrue(NoteVault.matches(login, ""))
         XCTAssertTrue(NoteVault.matches(login, "ADMIN"))
