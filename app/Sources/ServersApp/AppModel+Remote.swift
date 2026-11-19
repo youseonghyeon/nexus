@@ -120,7 +120,7 @@ extension AppModel {
                 entry.parsed = ParsedRemoteInfo.parse(query, lines: lines, type: server.type)
                 entry.fetchedAt = Date()
                 entry.error = nil
-                recordHistory(server, entry.parsed)   // 지난번과 달라진 것을 변화 기록에 (ServerHistory)
+                recordHistory(server, entry.parsed)   // 지난번과 달라진 것을 변경 이력에 (ServerHistory)
             } else {
                 entry.error = RemoteFailure.infoError(result, serverKey: server.key, type: server.type, allowPrompt: allowPrompt)
             }

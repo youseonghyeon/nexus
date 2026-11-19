@@ -1,5 +1,5 @@
-// 변화 기록 (history.json — ServersCore ServerHistory): 원격 정보를 받을 때마다 지난번과 견줘 달라진 것을 사건으로 남긴다.
-// 서버에 더 보내는 것은 없다 — 이미 받은 결과(Spec · Ports · Services)를 견줄 뿐이다. 화면은 서버 화면의 "변화 기록" 카드(HistoryCard).
+// 변경 이력 (history.json — ServersCore ServerHistory): 원격 정보를 받을 때마다 지난번과 견줘 달라진 것을 사건으로 남긴다.
+// 서버에 더 보내는 것은 없다 — 이미 받은 결과(Spec · Ports · Services)를 견줄 뿐이다. 화면은 서버 화면의 "변경 이력" 카드(HistoryCard).
 
 import Foundation
 import ServersCore
@@ -26,6 +26,6 @@ extension AppModel {
     func saveHistory(_ state: HistoryState) {
         guard state != history else { return }
         history = state
-        do { try ServerHistory.save(state) } catch { statusMessage = "변화 기록 저장 실패: \(error.localizedDescription)" }
+        do { try ServerHistory.save(state) } catch { statusMessage = "변경 이력 저장 실패: \(error.localizedDescription)" }
     }
 }

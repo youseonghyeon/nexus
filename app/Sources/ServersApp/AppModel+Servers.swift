@@ -250,7 +250,7 @@ extension AppModel {
         }
         saveBookmarks(BookmarkStore.renamingServer(from: old, to: new, in: browserBookmarks))   // 브라우저 즐겨찾기 (열린 탭은 loadConfig 가 닫는다)
         writeNotes(NoteVault.renamingServer(from: old, to: new, in: notes))   // 메모·로그인
-        saveHistory(ServerHistory.renamingServer(from: old, to: new, in: history))   // 변화 기록
+        saveHistory(ServerHistory.renamingServer(from: old, to: new, in: history))   // 변경 이력
         let aliases = HostAliasStore.renaming(from: old, to: new, in: hostAliases)
         if aliases != hostAliases {
             hostAliases = aliases

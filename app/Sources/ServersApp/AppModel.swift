@@ -147,7 +147,7 @@ final class AppModel {
     var remoteInfo: [String: [RemoteCommands.Query: RemoteInfoResult]] = [:]
     /// 원격 정보 카드에서 보고 있는 탭 (서버별)
     var infoTab: [String: RemoteCommands.Query] = [:]
-    /// 변화 기록 (history.json — 서버마다 마지막으로 본 값과 달라진 사건, ServerHistory). 바꾸는 것은 AppModel+History 의 메서드로
+    /// 변경 이력 (history.json — 서버마다 마지막으로 본 값과 달라진 사건, ServerHistory). 바꾸는 것은 AppModel+History 의 메서드로
     var history = ServerHistory.load()
     /// 서버 시점 진단(원격 정보의 Diagnose 탭)의 마지막 결과: 서버 키 → 도구 → 한 번의 실행 (AppModel+Diagnostics · ServerDiagnose)
     var serverDiagnoses: [String: [ServerDiagnose.Tool: ServerDiagnose.Run]] = [:]
