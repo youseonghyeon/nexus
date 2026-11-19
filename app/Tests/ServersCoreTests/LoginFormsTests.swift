@@ -188,6 +188,28 @@ final class LoginFormsTests: XCTestCase {
         try await wait("ID 먼저 화면") { firstSink.prompts.count == 1 }
     }
 
+    /// 페이지가 뜨자마자 자동 포커스 → 그 뒤에 배치가 자리를 잡아 칸이 옮겨 가는 화면 (2026-11-19 Grafana: 목록이 왼쪽에 남았다)
+    func testFollowsFieldThatMovesRightAfterFocus() async throws {
+        let style = "position:absolute;top:200px;width:300px;height:30px;box-sizing:border-box;margin:0"
+        let (view, sink) = try await page("<input id=u type=text style='\(style);left:100px' autofocus><input id=p type=password style='\(style);left:100px;top:250px'>")
+        try await wait("자동 포커스") { sink.prompts.count == 1 }
+        XCTAssertEqual(sink.prompts.last, .focus(LoginForms.Rect(x: 100, y: 200, width: 300, height: 30)))
+        _ = try await inPage(view, "u.style.left = '160px'")
+        try await wait("옮겨 간 자리") { sink.prompts.count == 2 }
+        XCTAssertEqual(sink.prompts.last, .focus(LoginForms.Rect(x: 160, y: 200, width: 300, height: 30)), "사이에 blur 없이 새 자리로")
+        // 움직이지 않으면 더 보내지 않는다
+        try await Task.sleep(for: .milliseconds(700))
+        XCTAssertEqual(sink.prompts.count, 2)
+        // 내려간 뒤(글자 입력)에는 칸이 움직여도 다시 띄우지 않는다
+        _ = try await inPage(view, "u.focus(); u.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))")
+        try await wait("다시 누름") { sink.prompts.count == 3 }
+        _ = try await inPage(view, "u.value = 'a'; u.dispatchEvent(new Event('input', { bubbles: true })); u.style.left = '220px'")
+        try await wait("입력") { sink.prompts.last == .blur }
+        let count = sink.prompts.count
+        try await Task.sleep(for: .milliseconds(1800))
+        XCTAssertEqual(sink.prompts.count, count, "내린 목록을 위치 다시 재기가 되살리지 않는다")
+    }
+
     func testDropdownFrame() {
         let field = LoginForms.Rect(x: 100, y: 200, width: 300, height: 30)
         func frame(_ field: LoginForms.Rect, _ width: Double = 800, _ height: Double = 600, content: Double = 88) -> LoginForms.Rect {

@@ -60,9 +60,19 @@ public enum LoginForms {
                 const all = passwords(document);
                 return all.includes(el) || all.some(pw => userFor(pw) === el) || (all.length === 0 && named(el));
             };
-            let open = false;
-            const show = el => { const r = el.getBoundingClientRect(); open = true; post({ focus: { x: r.left, y: r.top, width: r.width, height: r.height } }); };
-            const hide = () => { if (open) { open = false; post({ blur: true }); } };
+            let open = false, follow = [];
+            const rectOf = el => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, width: r.width, height: r.height }; };
+            // 연 뒤 1.6초 동안 몇 번 더 재서 칸이 옮겨 갔으면 새 자리로 — 페이지가 뜨자마자 자동 포커스된 뒤에 배치가 자리를 잡는 화면 (계속 감시하지는 않는다)
+            const show = el => {
+                let last = rectOf(el); open = true; post({ focus: last });
+                follow.forEach(clearTimeout);
+                follow = [80, 200, 400, 700, 1100, 1600].map(ms => setTimeout(() => {
+                    if (!open || document.activeElement !== el || !visible(el)) return;
+                    const now = rectOf(el);
+                    if (['x', 'y', 'width', 'height'].some(k => Math.abs(now[k] - last[k]) > 0.5)) { last = now; post({ focus: now }); }
+                }, ms));
+            };
+            const hide = () => { follow.forEach(clearTimeout); follow = []; if (open) { open = false; post({ blur: true }); } };
             document.addEventListener('focusin', e => { if (loginField(e.target)) show(e.target); else hide(); }, true);
             document.addEventListener('mousedown', e => { if (loginField(e.target)) show(e.target); }, true);
             document.addEventListener('focusout', () => setTimeout(() => { if (!loginField(document.activeElement)) hide(); }, 100), true);
