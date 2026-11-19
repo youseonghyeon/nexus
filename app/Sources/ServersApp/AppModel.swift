@@ -147,6 +147,8 @@ final class AppModel {
     var remoteInfo: [String: [RemoteCommands.Query: RemoteInfoResult]] = [:]
     /// 원격 정보 카드에서 보고 있는 탭 (서버별)
     var infoTab: [String: RemoteCommands.Query] = [:]
+    /// 변화 기록 (history.json — 서버마다 마지막으로 본 값과 달라진 사건, ServerHistory). 바꾸는 것은 AppModel+History 의 메서드로
+    var history = ServerHistory.load()
     /// 서버 시점 진단(원격 정보의 Diagnose 탭)의 마지막 결과: 서버 키 → 도구 → 한 번의 비교 (AppModel+Diagnostics · ServerDiagnose)
     var serverDiagnoses: [String: [ServerDiagnose.Tool: ServerDiagnose.Run]] = [:]
     /// 서버별 "실시간" 탭 수집기 (그 탭을 처음 열 때 만든다 — AppModel+Live)
@@ -307,6 +309,7 @@ final class AppModel {
                     let key = before.key
                     remoteInfo[key] = nil
                     liveMonitors[key] = nil   // 다른 서버의 값과 이어 계산하지 않게
+                    saveHistory(ServerHistory.removingServer(key, from: history))   // 다른 장비의 값과 견줘 가짜 변화를 만들지 않게
                     powerWatch.forget(key)   // 다른 서버의 켜짐·꺼짐으로 알리지 않게
                     // 옛 주소의 상태·캐시 (인증 필요 URL·원격 홈·마지막 업로드 폴더)
                     status.remote[key] = nil
@@ -326,6 +329,7 @@ final class AppModel {
                 for key in changes.removed {
                     remoteInfo[key] = nil; infoTab[key] = nil; powerPendings[key] = nil; liveMonitors[key] = nil
                     activeTabByOwner[key] = nil; status.remote[key] = nil
+                    saveHistory(ServerHistory.removingServer(key, from: history))
                     if activeAccounts.removeValue(forKey: key) != nil { saveActiveAccounts() }
                 }
                 // 지금 도는 갱신은 옛 목록으로 확인 중이다 — 끝나면서 위에서 지운 상태(옛 주소·사라진 서버)를 되살리지 않게 버린다 (refreshNow)

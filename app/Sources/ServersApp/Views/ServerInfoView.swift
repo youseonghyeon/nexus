@@ -33,6 +33,7 @@ struct ServerInfoView: View {
                 }
                 if RemoteCommands.query(.services, for: server.type) != nil {
                     RemoteInfoCard(server: server)
+                    HistoryCard(server: server)
                 }
                 if model.tunnels.contains(where: { $0.server.key == server.key }) {
                     InfoCard(title: "터널") { TunnelsCard(server: server) }

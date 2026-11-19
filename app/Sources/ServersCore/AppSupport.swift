@@ -1,5 +1,5 @@
 // 앱 상태 폴더: ~/Library/Application Support/Servers (저장소 밖).
-// servers.conf · passwords.bin · identities.json · recent.json · hosts.json · lan.json · snippets.json · bookmarks.json · notes.bin 이 여기 있다.
+// servers.conf · passwords.bin · identities.json · recent.json · hosts.json · lan.json · snippets.json · bookmarks.json · notes.bin · history.json 이 여기 있다.
 
 import Foundation
 
