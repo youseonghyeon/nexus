@@ -261,15 +261,15 @@ public enum BrowserStartPage {
         <div class="card hero"><div class="top"><div><h1>\(escape(hero.key)) \(tags)</h1><div class="sub">\(subtitle)</div></div>
         <div class="right"><span class="pill \(level)"><i></i>\(escape(hero.status))</span></div></div>
         <form onsubmit="return go()"><label class="box"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
-        <input id="q" placeholder="주소 또는 포트 번호" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus></label></form>
+        <input id="q" placeholder="검색어 · 주소 · 포트 번호" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus></label></form>
         <div id="band"></div></div>
         <div id="marks">\(bookmarksHTML)</div>
         <div id="ports">\(portsHTML)</div>
         </main>
         <script>
+        // 친 글자는 앱이 판정한다 (주소 · 포트 · Google 검색 — 위쪽 주소창과 같은 BrowserInput)
         function go(){var v=document.getElementById('q').value.trim();if(!v)return false;
-          if(/^[0-9]{1,5}$/.test(v))v='http://localhost:'+v+'/';else if(!/^[a-z][a-z0-9+.-]*:\\/\\//i.test(v))v='http://'+v;
-          location.href=v;return false}
+          try{window.webkit.messageHandlers.nexus.postMessage({open:v})}catch(_){}return false}
         document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.rm');if(!b)return;e.preventDefault();e.stopPropagation();
           try{window.webkit.messageHandlers.nexus.postMessage({remove:b.dataset.u})}catch(_){}} ,true);
         // 포트 부분이 들고 온 수(.band)를 대표 카드 아래 띠로 — 포트 부분은 앱이 통째로 갈아 끼운다

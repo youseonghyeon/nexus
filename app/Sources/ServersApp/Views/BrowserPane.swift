@@ -20,7 +20,7 @@ struct BrowserPane: View {
                     .disabled(browser.notice != nil)
                 Button { browser.showStart() } label: { Image(systemName: "house") }.accessibilityLabel("시작 페이지").help("시작 페이지 — 이 서버의 열린 포트")
                     .disabled(browser.notice != nil)
-                TextField("주소", text: $address)
+                TextField("검색어 또는 주소", text: $address)
                     .textFieldStyle(.plain)
                     .font(.callout.monospaced())
                     .padding(.horizontal, 8)

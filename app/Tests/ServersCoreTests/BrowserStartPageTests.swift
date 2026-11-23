@@ -81,6 +81,8 @@ final class BrowserStartPageTests: XCTestCase {
         XCTAssertTrue(html.contains("<span class=\"pill good\"><i></i>접속 가능</span>"))
         XCTAssertTrue(html.contains("<div id=\"ports\"><p>PORTS</p></div>"), "포트 부분만 갈아 끼울 자리")
         XCTAssertTrue(html.contains("id=\"q\""))
+        XCTAssertTrue(html.contains("postMessage({open:v})"), "입력칸의 글자는 앱이 판정 — 페이지가 스스로 주소를 만들지 않는다")
+        XCTAssertFalse(html.contains("location.href=v"))
         let noRole = BrowserStartPage.html(hero: .init(key: "a", target: "u@h", role: nil, tags: [], status: "꺼짐", level: .muted), portsHTML: "")
         XCTAssertTrue(noRole.contains("<div class=\"sub\">u@h</div>"))
         XCTAssertTrue(noRole.contains("pill muted"))

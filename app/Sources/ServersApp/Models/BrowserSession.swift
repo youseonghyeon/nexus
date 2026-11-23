@@ -182,10 +182,9 @@ final class BrowserSession: NSObject, ObservableObject {
         webView.stopLoading()
     }
 
+    /// 주소창·시작 페이지 입력칸에 친 글자: 주소면 그 주소, 아니면 Google 검색 (BrowserInput)
     func load(_ text: String) {
-        var candidate = text.trimmingCharacters(in: .whitespaces)
-        if !candidate.contains("://") { candidate = "http://" + candidate }
-        guard let url = URL(string: candidate), BrowserPolicy.isOpenable(url) else { return }
+        guard let url = BrowserInput.resolve(text), BrowserPolicy.isOpenable(url) else { return }
         open(URLRequest(url: BrowserPolicy.proxied(url)))
     }
 
@@ -365,12 +364,14 @@ final class BrowserSession: NSObject, ObservableObject {
         }
     }
 
-    /// 시작 페이지가 보낸 것만 받는다 — 이 탭이 여는 다른 웹 페이지도 같은 이름으로 보낼 수 있다
+    /// 시작 페이지가 보낸 것만 받는다 — 이 탭이 여는 다른 웹 페이지도 같은 이름으로 보낼 수 있다.
+    /// remove: 즐겨찾기 타일의 ✕ · open: 입력칸에 친 글자 (주소창과 같은 판정 — load)
     fileprivate func received(_ message: WKScriptMessage) {
         if message.name == LoginForms.handler { return receivedLogin(message) }
         guard showingStart, message.frameInfo.isMainFrame, webView.url?.absoluteString == "about:blank",
-              let body = message.body as? [String: Any], let address = body["remove"] as? String else { return }
-        bookmarks.remove(address)
+              let body = message.body as? [String: Any] else { return }
+        if let address = body["remove"] as? String { bookmarks.remove(address) }
+        if let text = body["open"] as? String { load(text) }
     }
 
     func goBack() {
