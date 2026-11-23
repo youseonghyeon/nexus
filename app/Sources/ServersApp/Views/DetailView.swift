@@ -11,8 +11,9 @@ struct DetailView: View {
     @Binding var columns: NavigationSplitViewVisibility
     /// 본문 폭 (툴바의 탭 막대 폭을 정한다)
     @State private var width: CGFloat = 600
-    /// 툴바 양 끝 여백 — 넘치면 툴바가 항목을 » 메뉴로 접어 탭이 사라지므로 넉넉히
-    private static let inset: CGFloat = 32
+    /// 툴바 양 끝 여백 — 넘치면 툴바가 항목을 » 메뉴로 접어 탭이 사라지므로 여유를 둔다.
+    /// 2026-11-19 시험 앱으로 잼: 4 는 접히고 8 부터 안 접힘 → 16 (오른쪽 끝 아이콘이 창 끝에서 12pt, 32 일 땐 28pt 로 떠 보였다)
+    private static let inset: CGFloat = 16
     /// 사이드바를 접었을 때: 신호등 + 토글·지금 확인 자리까지
     private static let collapsedInset: CGFloat = 170
 
