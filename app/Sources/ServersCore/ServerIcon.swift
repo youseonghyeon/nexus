@@ -26,3 +26,10 @@ public enum TunnelIcon {
         }
     }
 }
+
+/// 사이드바 전송 행의 아이콘 — 방향마다 (2026-11-19 시안 A): 문서에 위·아래 화살표
+public enum TransferIcon {
+    public static func symbol(for direction: TransferDirection) -> String {
+        direction == .upload ? "arrow.up.doc" : "arrow.down.doc"
+    }
+}

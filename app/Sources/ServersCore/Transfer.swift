@@ -36,15 +36,19 @@ public struct TransferSpec: Sendable, Equatable {
     /// upload 대상, 또는 download 의 첫 원본
     public var remotePath: String { remotePaths.first ?? "" }
 
-    public var title: String {
+    /// 알림·토스트·검색에 쓰는 이름 — 방향 화살표가 앞에 붙는다 (기호가 없는 자리)
+    public var title: String { "\(direction == .upload ? "↑" : "↓") \(name)" }
+
+    /// 화살표 없는 이름 — 사이드바 행은 방향을 기호(TransferIcon)로 보인다
+    public var name: String {
         switch direction {
         case .upload:
             let names = localPaths.map { ($0 as NSString).lastPathComponent }
             let shown = names.count <= 2 ? names.joined(separator: ", ") : "\(names[0]) 외 \(names.count - 1)개"
-            return "↑ \(shown) → \(server.key)"
+            return "\(shown) → \(server.key)"
         case .download:
-            guard remotePaths.count > 1 else { return "↓ \(server.key):\(remotePath)" }
-            return "↓ \(server.key): \(Self.name(remotePath)) 외 \(remotePaths.count - 1)개"
+            guard remotePaths.count > 1 else { return "\(server.key):\(remotePath)" }
+            return "\(server.key): \(Self.name(remotePath)) 외 \(remotePaths.count - 1)개"
         }
     }
 

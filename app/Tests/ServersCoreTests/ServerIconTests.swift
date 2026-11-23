@@ -23,4 +23,9 @@ final class ServerIconTests: XCTestCase {
         XCTAssertEqual(TunnelIcon.symbol(for: .port(remotePort: 3000)), "arrow.forward.circle")
         XCTAssertEqual(TunnelIcon.symbol(for: .db(host: "db", port: 5432, name: nil)), "cylinder")
     }
+
+    func testTransferSymbolByDirection() {
+        XCTAssertEqual(TransferIcon.symbol(for: .upload), "arrow.up.doc")
+        XCTAssertEqual(TransferIcon.symbol(for: .download), "arrow.down.doc")
+    }
 }

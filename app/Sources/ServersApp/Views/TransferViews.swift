@@ -224,16 +224,16 @@ struct DownloadPromptSheet: View {
     }
 }
 
-/// TRANSFERS 섹션의 한 행: 상태등 · 제목 · 진행률 · 취소/지우기. 클릭하면 상세 시트.
+/// TRANSFERS 섹션의 한 행: 방향 기호 + 상태 점 · 이름(화살표 없이) · 진행률 · 취소/지우기. 클릭하면 상세 시트.
 struct TransferRow: View {
     @Environment(AppModel.self) private var model
     @ObservedObject var transfer: TransferSession
 
     var body: some View {
         HStack(spacing: 8) {
-            StatusDot(tone: transfer.tone).frame(width: Metrics.sidebarIcon)
+            StatusIcon(symbol: TransferIcon.symbol(for: transfer.spec.direction), tone: transfer.tone)
             VStack(alignment: .leading, spacing: 2) {
-                Text(transfer.title).fontWeight(.medium).lineLimit(1).truncationMode(.middle)
+                Text(transfer.spec.name).fontWeight(.medium).lineLimit(1).truncationMode(.middle)
                 if case .running(.some) = transfer.state {
                     if let fraction = transfer.fraction { ProgressView(value: fraction).controlSize(.small) } else { ProgressView().progressViewStyle(.linear).controlSize(.small) }
                 }

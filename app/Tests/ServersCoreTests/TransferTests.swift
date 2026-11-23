@@ -17,6 +17,8 @@ final class TransferTests: XCTestCase {
         let down = TransferSpec(server: server, direction: .download, localPaths: ["/Users/me/Downloads"], remotePath: "/var/log/syslog")
         XCTAssertEqual(Array(down.arguments(home: "/h").suffix(2)), ["tester@100.64.0.1:/var/log/syslog", "/Users/me/Downloads"])
         XCTAssertEqual(down.title, "↓ nexus:/var/log/syslog")
+        XCTAssertEqual(up.name, "a b.zip, dir → nexus", "사이드바 행은 화살표 없이 — 방향은 기호로")
+        XCTAssertEqual(down.name, "nexus:/var/log/syslog")
         let many = TransferSpec(server: server, direction: .upload, localPaths: ["/a", "/b", "/c"], remotePath: "x")
         XCTAssertEqual(many.title, "↑ a 외 2개 → nexus")
     }
