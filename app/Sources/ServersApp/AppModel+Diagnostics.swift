@@ -12,6 +12,15 @@ struct DiagnosticState {
     var dns: DNSLookupResult?
     var arp: ArpTableResult?
     var running: Set<DiagnosticTask> = []
+    /// 고른 도구(카드 제목 줄의 탭)와 도구별 입력칸 글자 — 다른 화면에 다녀와도 결과와 같이 남는다 (앱을 끄면 사라진다)
+    var tool: AppModel.DiagnosticItem = .ping
+    var inputs: [AppModel.DiagnosticItem: String] = [:]
+}
+
+/// 한 서버의 Diagnose 탭에서 고른 도구와 도구별 입력칸 글자 (결과는 AppModel.serverDiagnoses)
+struct ServerDiagnoseForm {
+    var tool: ServerDiagnose.Tool = .ping
+    var inputs: [ServerDiagnose.Tool: String] = [:]
 }
 
 extension AppModel {
@@ -130,7 +139,18 @@ extension AppModel {
         }
     }
 
-    enum DiagnosticItem { case ping, http, tcp, dns, arp }
+    enum DiagnosticItem: String, CaseIterable {
+        case ping, http, tcp, dns, arp
+        var title: String { self == .ping ? "ping" : rawValue.uppercased() }
+    }
+
+    func setDiagnosticTool(_ tool: DiagnosticItem, screen: String) {
+        diagnostics[screen, default: DiagnosticState()].tool = tool
+    }
+
+    func setDiagnosticInput(_ text: String, for item: DiagnosticItem, screen: String) {
+        diagnostics[screen, default: DiagnosticState()].inputs[item] = text
+    }
 
     /// 진단 항목 [초기화]: 그 화면의 그 결과를 지운다 (실행 중이면 버튼이 꺼져 있다)
     func clearDiagnostic(_ item: DiagnosticItem, screen: String) {
@@ -233,6 +253,14 @@ extension AppModel {
             // 그 사이 다시 돌렸거나 지웠으면 버린다
             if serverDiagnoses[server.key]?[tool]?.at == run.at { serverDiagnoses[server.key]?[tool]?.outcome = outcome }
         }
+    }
+
+    func setServerDiagnoseTool(_ tool: ServerDiagnose.Tool, on server: Server) {
+        serverDiagnoseForms[server.key, default: ServerDiagnoseForm()].tool = tool
+    }
+
+    func setServerDiagnoseInput(_ text: String, for tool: ServerDiagnose.Tool, on server: Server) {
+        serverDiagnoseForms[server.key, default: ServerDiagnoseForm()].inputs[tool] = text
     }
 
     func clearServerDiagnose(_ tool: ServerDiagnose.Tool, on server: Server) {

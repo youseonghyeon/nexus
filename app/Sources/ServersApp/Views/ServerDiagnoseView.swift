@@ -8,17 +8,21 @@ import SwiftUI
 struct ServerDiagnoseView: View {
     @Environment(AppModel.self) private var model
     let server: Server
-    @State private var tool: ServerDiagnose.Tool = .ping
-    @State private var inputs: [ServerDiagnose.Tool: String] = [:]
-
-    private var input: Binding<String> { Binding(get: { inputs[tool] ?? "" }, set: { inputs[tool] = $0 }) }
+    /// 고른 도구와 입력칸 글자는 결과와 같이 AppModel 에 서버별로 둔다 (ServerDiagnoseForm) — 다른 화면에 다녀와도 남는다
+    private var tool: ServerDiagnose.Tool { model.serverDiagnoseForms[server.key]?.tool ?? .ping }
+    private var toolSelection: Binding<ServerDiagnose.Tool> {
+        Binding(get: { tool }, set: { model.setServerDiagnoseTool($0, on: server) })
+    }
+    private var input: Binding<String> {
+        Binding(get: { model.serverDiagnoseForms[server.key]?.inputs[tool] ?? "" }, set: { model.setServerDiagnoseInput($0, for: tool, on: server) })
+    }
 
     var body: some View {
         let run = model.serverDiagnose(server, tool)
         let canRun = ServerDiagnoseRun.canRun(tool, input: input.wrappedValue, reachable: model.isReachable(server), running: run?.running ?? false)
         // 망 화면의 진단 카드(DiagnosticCard)와 같은 꼴: 도구 탭 → 입력칸 한 줄 + [Run] → 결과 격자
         VStack(alignment: .leading, spacing: 10) {
-            PlainSegmented(items: ServerDiagnose.Tool.allCases, selection: $tool, title: \.title)
+            PlainSegmented(items: ServerDiagnose.Tool.allCases, selection: toolSelection, title: \.title)
             HStack(spacing: 8) {
                 TextField(tool.placeholder, text: input)
                     .textFieldStyle(.plain)
@@ -35,7 +39,7 @@ struct ServerDiagnoseView: View {
                 // 결과 줄은 진단 카드와 같은 부품으로 (DiagnosticResultRows) — 보낸 곳 자리에 장치 대신 서버 키
                 DiagnosticResultGrid(target: run.request.target, at: run.at, source: server.key,
                                      report: run.running ? nil : run.reportText(serverKey: server.key),
-                                     reset: { model.clearServerDiagnose(tool, on: server); inputs[tool] = "" }) {
+                                     reset: { model.clearServerDiagnose(tool, on: server); model.setServerDiagnoseInput("", for: tool, on: server) }) {
                     resultRows(run)
                 }
             }

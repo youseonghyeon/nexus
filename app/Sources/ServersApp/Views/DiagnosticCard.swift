@@ -15,19 +15,19 @@ struct DiagnosticCard: View {
     var title = "진단"
     /// Wi-Fi 화면의 장치(AppModel.diagnosticDevice)는 WiFiMonitor 값 — AppModel(@Observable) 관찰에 잡히지 않아 따로 지켜본다
     @ObservedObject var wifi: WiFiMonitor
-    @State private var pingInput = ""
-    @State private var httpInput = ""
-    @State private var tcpInput = ""
-    @State private var dnsInput = ""
     /// 경로를 다 펼친 결과 (그 결과의 시각) — 새로 재면 다시 접힌다
     @State private var allHopsAt: Date?
 
-    /// 고른 도구 (제목 줄의 탭)
-    @State private var tool: Tool = .ping
+    typealias Tool = AppModel.DiagnosticItem
 
-    enum Tool: String, CaseIterable {
-        case ping, http, tcp, dns, arp
-        var title: String { self == .ping ? "ping" : rawValue.uppercased() }
+    /// 고른 도구(제목 줄의 탭)와 입력칸 글자는 결과와 같이 AppModel 에 화면별로 둔다 (DiagnosticState) —
+    /// 뷰 상태로 두면 다른 화면에 다녀올 때 결과만 남고 탭은 ping · 칸은 빈 채로 돌아왔다
+    private var tool: Tool { model.diagnostics[screen]?.tool ?? .ping }
+    private var toolSelection: Binding<Tool> {
+        Binding(get: { tool }, set: { model.setDiagnosticTool($0, screen: screen) })
+    }
+    private func field(_ item: Tool) -> Binding<String> {
+        Binding(get: { model.diagnostics[screen]?.inputs[item] ?? "" }, set: { model.setDiagnosticInput($0, for: item, screen: screen) })
     }
 
     /// 이 화면에서 고를 수 있는 도구 — VPN 화면엔 ARP 가 없다 (utun 은 ARP 가 없다)
@@ -40,7 +40,7 @@ struct DiagnosticCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
                 Text(title).font(.cardTitle).foregroundStyle(.secondary)
-                PlainSegmented(items: tools, selection: $tool, title: \.title)
+                PlainSegmented(items: tools, selection: toolSelection, title: \.title)
                 Spacer()
                 // 이 화면의 장치로 패킷 캡처 창을 연다 (열면 바로 시작 — 관리자 인증)
                 Button("Capture…") {
@@ -100,11 +100,11 @@ struct DiagnosticCard: View {
         let running = model.isDiagnosticRunning(.ping, screen)
         let tracing = model.isDiagnosticRunning(.trace, screen)
         let locating = model.isDiagnosticRunning(.locate, screen)
-        let canRun = DiagnosticRun.canPing(pingInput, device: device, running: model.diagnosticRunning(screen))
+        let canRun = DiagnosticRun.canPing(field(.ping).wrappedValue, device: device, running: model.diagnosticRunning(screen))
         VStack(alignment: .leading, spacing: 10) {
-            input("ping", prompt: "IP 또는 이름", text: $pingInput, canRun: canRun,
+            input("ping", prompt: "IP 또는 이름", text: field(.ping), canRun: canRun,
                   help: "\(via) ping \(PingTest.count)회를 보내고 이어서 경로를 확인합니다") {
-                model.runDiagnosticPing(pingInput, screen: screen)
+                model.runDiagnosticPing(field(.ping).wrappedValue, screen: screen)
             }
             // 지금 장치로 보낸 결과만 (장치가 바뀌었으면 옛 결과는 숨긴다 — 실행 중인 것은 그대로 보인다)
             if let result = model.diagnostics[screen]?.ping, showsResult(result.device, .ping, .trace) {
@@ -115,7 +115,7 @@ struct DiagnosticCard: View {
                             Text(result.target).textSelection(.enabled)
                             Text("\(result.at.formatted(date: .omitted, time: .shortened)) · \(result.device)").font(.caption).foregroundStyle(.tertiary)
                             copyButton(result.reportText).disabled(running || tracing)
-                            resetButton { model.clearDiagnostic(.ping, screen: screen); pingInput = "" }.disabled(running || tracing || locating)
+                            resetButton { model.clearDiagnostic(.ping, screen: screen); model.setDiagnosticInput("", for: .ping, screen: screen) }.disabled(running || tracing || locating)
                             Button("주소 검색") { model.locateDiagnosticHops(screen: screen) }
                                 .buttonStyle(.borderless).controlSize(.small).font(.caption)
                                 .disabled(running || tracing || locating || IPLocate.targets(result.hops ?? []).isEmpty)
@@ -217,16 +217,16 @@ struct DiagnosticCard: View {
     @ViewBuilder
     private var tcpRows: some View {
         let running = model.isDiagnosticRunning(.tcp, screen)
-        let canRun = DiagnosticRun.canTCP(tcpInput, device: device, running: model.diagnosticRunning(screen))
+        let canRun = DiagnosticRun.canTCP(field(.tcp).wrappedValue, device: device, running: model.diagnosticRunning(screen))
         VStack(alignment: .leading, spacing: 10) {
-            input("TCP", prompt: "IPv4:포트 (예: 192.168.112.11:22)", text: $tcpInput, canRun: canRun,
+            input("TCP", prompt: "IPv4:포트 (예: 192.168.112.11:22)", text: field(.tcp), canRun: canRun,
                   help: "\(via) TCP 연결을 한 번 시도합니다 (최대 \(Int(TCPPortTest.timeout))초, 로그인하지 않습니다)") {
-                model.runDiagnosticTCP(tcpInput, screen: screen)
+                model.runDiagnosticTCP(field(.tcp).wrappedValue, screen: screen)
             }
             if let result = model.diagnostics[screen]?.tcp, showsResult(result.device, .tcp) {
                 resultGrid(target: "\(result.host):\(result.port)", at: result.at, device: result.device,
                            report: result.open == nil ? nil : result.reportText,
-                           reset: { model.clearDiagnostic(.tcp, screen: screen); tcpInput = "" }) {
+                           reset: { model.clearDiagnostic(.tcp, screen: screen); model.setDiagnosticInput("", for: .tcp, screen: screen) }) {
                     GridRow {
                         Text("결과").font(.fieldLabel).foregroundStyle(.secondary)
                         HStack(spacing: 8) {
@@ -244,16 +244,16 @@ struct DiagnosticCard: View {
     private var dnsRows: some View {
         let running = model.isDiagnosticRunning(.dns, screen)
         let server = model.diagnosticDNSServer(screen)
-        let canRun = DiagnosticRun.canDNS(dnsInput, device: device, server: server, running: model.diagnosticRunning(screen))
+        let canRun = DiagnosticRun.canDNS(field(.dns).wrappedValue, device: device, server: server, running: model.diagnosticRunning(screen))
         VStack(alignment: .leading, spacing: 10) {
-            input("DNS", prompt: "이름 (예: www.example.com)", text: $dnsInput, canRun: canRun,
+            input("DNS", prompt: "이름 (예: www.example.com)", text: field(.dns), canRun: canRun,
                   help: "\(server.map { "\($0) 에 " } ?? "이 화면의 DNS 서버에 ")이름 하나를 묻습니다") {
-                model.runDiagnosticDNS(dnsInput, screen: screen)
+                model.runDiagnosticDNS(field(.dns).wrappedValue, screen: screen)
             }
             if let result = model.diagnostics[screen]?.dns, showsResult(result.device, .dns) {
                 resultGrid(target: "\(result.name) @\(result.server)", at: result.at, device: result.device,
                            report: result.answers == nil && !result.timedOut ? nil : result.reportText,
-                           reset: { model.clearDiagnostic(.dns, screen: screen); dnsInput = "" }) {
+                           reset: { model.clearDiagnostic(.dns, screen: screen); model.setDiagnosticInput("", for: .dns, screen: screen) }) {
                     GridRow {
                         Text("결과").font(.fieldLabel).foregroundStyle(.secondary)
                         HStack(spacing: 8) {
@@ -371,16 +371,16 @@ struct DiagnosticCard: View {
     /// 입력칸 + [Run] → 결과(상태 코드 또는 실패) · 연결(붙은 IP) · 시간(단계별) · 이동(리다이렉트)
     @ViewBuilder
     private var httpRows: some View {
-        let canRun = DiagnosticRun.canHTTP(httpInput, device: device, running: model.diagnosticRunning(screen))
+        let canRun = DiagnosticRun.canHTTP(field(.http).wrappedValue, device: device, running: model.diagnosticRunning(screen))
         VStack(alignment: .leading, spacing: 10) {
-            input("HTTP", prompt: "URL (http:// 생략 가능)", text: $httpInput, canRun: canRun,
+            input("HTTP", prompt: "URL (http:// 생략 가능)", text: field(.http), canRun: canRun,
                   help: "\(via) 요청을 한 번 보냅니다 (본문은 저장하지 않고, 리다이렉트는 따라가지 않습니다)") {
-                model.runDiagnosticHTTP(httpInput, screen: screen)
+                model.runDiagnosticHTTP(field(.http).wrappedValue, screen: screen)
             }
             if let result = model.diagnostics[screen]?.http, showsResult(result.device, .http) {
                 resultGrid(target: result.url, at: result.at, device: result.device,
                            report: result.check == nil ? nil : result.reportText,
-                           reset: { model.clearDiagnostic(.http, screen: screen); httpInput = "" }) {
+                           reset: { model.clearDiagnostic(.http, screen: screen); model.setDiagnosticInput("", for: .http, screen: screen) }) {
                     HTTPCheckRows(check: result.check)
                 }
             }
