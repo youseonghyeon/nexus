@@ -66,15 +66,7 @@ struct SidebarView: View {
                             SidebarSectionTitle("Network")
                         }
                         Section {
-                            // 다른 행과 같은 아이콘 자리 — 상태가 없어 점만 없다
-                            HStack(spacing: 8) {
-                                StatusIcon(symbol: "laptopcomputer")
-                                Text("this Mac").fontWeight(.medium)
-                                Spacer()
-                                if !model.localTabs.isEmpty {
-                                    Image(systemName: "terminal.fill").font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
+                            LocalRow()
                             .tag(AppModel.localKey).sidebarSelection(model.selectedKey == AppModel.localKey)
                             .contextMenu { Button("New Local Shell") { model.openLocalShell() } }
                             SystemRow(monitor: model.system).tag(AppModel.systemKey).sidebarSelection(model.selectedKey == AppModel.systemKey)

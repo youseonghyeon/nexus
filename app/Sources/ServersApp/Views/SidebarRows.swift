@@ -163,6 +163,45 @@ struct LocalMonitorRow: View {
     }
 }
 
+/// LOCAL 의 this Mac 행: 마우스를 올리면 오른쪽 끝에 새 로컬 셸 버튼 (망 행의 켜기·끄기처럼 올렸을 때만).
+struct LocalRow: View {
+    @Environment(AppModel.self) private var model
+    @State private var hovering = false
+
+    var body: some View {
+        LocalRowContent(hasTabs: !model.localTabs.isEmpty, hovering: hovering) { model.openLocalShell() }
+            .onHover { hovering = $0 }
+    }
+}
+
+/// this Mac 행의 모양 (값만 받는다 — 스크래치에서 올린 모습까지 비트맵으로 확인).
+/// 다른 행과 같은 아이콘 자리 — 상태가 없어 점만 없다. 버튼은 열린 탭 표시와 같은 자리에 얹어 행 높이가 그대로다.
+struct LocalRowContent: View {
+    let hasTabs: Bool
+    let hovering: Bool
+    let openShell: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            StatusIcon(symbol: "laptopcomputer")
+            Text("this Mac").fontWeight(.medium)
+            Spacer()
+            if hasTabs {
+                Image(systemName: "terminal.fill").font(.caption).foregroundStyle(.secondary)
+                    .opacity(hovering ? 0 : 1)
+            }
+        }
+        .contentShape(Rectangle())
+        .overlay(alignment: .trailing) {
+            Button(action: openShell) { Image(systemName: "terminal") }
+                .accessibilityLabel("새 로컬 셸")
+                .buttonStyle(CompactButtonStyle())
+                .help("새 로컬 셸")
+                .opacity(hovering ? 1 : 0)
+        }
+    }
+}
+
 /// 시스템 행: "CPU 12% · 메모리 62%". 첫 표본 전엔 회색.
 struct SystemRow: View {
     @ObservedObject var monitor: SystemMonitor
