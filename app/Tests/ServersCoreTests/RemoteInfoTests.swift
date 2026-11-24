@@ -61,6 +61,35 @@ final class RemoteInfoTests: XCTestCase {
         XCTAssertNil(RemoteInfo.parsePorts(["0.0.0.0:49152"]).first?.label)
     }
 
+    /// UDP 포트 — 실제 출력: Fixtures/ss-ports-udp.txt (ubuntu:24.04 컨테이너에서 RemoteCommands.linuxPorts 그대로, 2026-11-24:
+    /// TCP 53·8080·127.0.0.1:5432 · UDP 53·51820·127.0.0.1:9125)
+    func testPortsWithUDP() throws {
+        let items = RemoteInfo.parsePorts(try fixtureText("ss-ports-udp").split(separator: "\n").map(String.init))
+        XCTAssertEqual(items.map(\.id), ["53", "5432", "8080", "53/udp", "9125/udp", "51820/udp"], "TCP 를 번호순으로 다 적은 뒤 UDP — 같은 번호(53)도 따로")
+        XCTAssertEqual(items.map(\.udp), [false, false, false, true, true, true])
+        XCTAssertEqual(items.map(\.label), ["dns", "postgres", "http-alt", "dns", nil, "wireguard"], "UDP 는 UDP 이름표로 (51820 은 UDP 뿐)")
+        XCTAssertEqual(items.map(\.open), [true, false, true, true, false, true], "모든 주소로 듣는 것만 open (화면에서 딱지)")
+        XCTAssertEqual(items.map(\.tunnelAddress), ["*", "127.0.0.1", "*", nil, nil, nil], "UDP 는 ssh 터널로 닿지 못한다")
+
+        // UDP 를 쓰는 곳마다: 브라우저 시작 페이지는 TCP 만 (같은 번호의 UDP 가 타일·그 밖 자리를 먹지 않는다), 물어볼 대상에도 없다
+        let sections = BrowserStartPage.sections(ports: items, probes: [:], probed: true)
+        XCTAssertEqual(Set(sections.web.map(\.port) + sections.bare.map(\.port) + sections.other.map(\.port)), [53, 5432, 8080])
+        XCTAssertEqual(sections.web.count + sections.bare.count + sections.other.count, 3, "53 이 두 번 나오지 않는다")
+        XCTAssertEqual(BrowserStartPage.probeTargets(ports: items).map(\.port), [8080], "53·5432 는 비웹으로 아는 번호, UDP 는 묻지 않는다")
+        XCTAssertFalse(WebProbe.isCandidate(PortItem(port: 9000, udp: true, addresses: ["*"], label: nil, tunnelAddress: "*")))
+        // 변경 이력은 TCP 만 견준다 (UDP 는 잠깐 열리는 포트가 많다) — UDP 만 달라져서는 사건이 없다
+        XCTAssertEqual(ServerHistory.observe(.ports(items), type: .linux)?.ports, ["53": "dns", "5432": "postgres", "8080": "http-alt"])
+        let before = ServerHistory.record(ServerHistory.observe(.ports(items), type: .linux)!, serverKey: "s", in: HistoryState())
+        let fewer = ServerHistory.observe(.ports(items.filter { $0.id != "51820/udp" }), type: .linux)!
+        XCTAssertEqual(ServerHistory.record(fewer, serverKey: "s", in: before.state).events, [])
+        XCTAssertNil(ServerHistory.observe(.ports(items.filter(\.udp)), type: .linux), "TCP 가 하나도 없으면 못 읽은 것으로 본다")
+        // 옛 형식(UDP 줄 없음) · Windows 꼴은 그대로
+        XCTAssertEqual(RemoteInfo.parsePorts(["0.0.0.0:22", "[::]:22"]).map(\.id), ["22"])
+        XCTAssertEqual(RemoteInfo.parsePorts(["0.0.0.0:22|6788|sshd"]).map(\.udp), [false])
+        XCTAssertTrue(RemoteCommands.linuxPorts.contains("ss -lnuH"))
+        XCTAssertFalse(RemoteCommands.linuxPorts.contains("sudo"))
+    }
+
     /// 장치에 묶인 소켓 (ss 의 %장치) — 실제 출력: Fixtures/ss-ports-bound.txt (ubuntu:24.04 컨테이너, SO_BINDTODEVICE lo)
     func testPortsBoundToDevice() throws {
         let lines = try fixtureText("ss-ports-bound").split(separator: "\n").map(String.init)

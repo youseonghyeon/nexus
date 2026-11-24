@@ -28,8 +28,10 @@ public struct UpdateItem: Sendable, Equatable, Identifiable {
 
 /// 리스닝 포트 한 줄 — 같은 포트의 IPv4·IPv6·장치별 소켓은 한 줄로 묶는다 (2026-10-14: 포트마다 두 줄씩, 주소가 "…%tailscale0" 로 두 줄에 걸쳐 지저분했다)
 public struct PortItem: Sendable, Equatable, Identifiable {
-    public var id: Int { port }
+    public var id: String { udp ? "\(port)/udp" : "\(port)" }
     public let port: Int
+    /// UDP 포트 (리눅스만 읽는다). 같은 번호의 TCP 와는 다른 줄이다 — 터널·브라우저·변경 이력은 TCP 만 본다.
+    public let udp: Bool
     /// 대기 주소들 ("*" = 모든 주소). 순서: * → IPv4 → IPv6. ss 의 %장치 는 뗀 값
     public let addresses: [String]
     /// 묶인 장치 (ss 의 "100.101.0.1%tailscale0" 의 tailscale0) — 없으면 빈 배열
@@ -42,9 +44,13 @@ public struct PortItem: Sendable, Equatable, Identifiable {
     /// 장치에 묶인 특정 IP(100.101.0.1%tailscale0)는 서버 자신이 그 IP 로 접속해도 받는다 (같은 재현).
     public let tunnelAddress: String?
 
-    public init(port: Int, addresses: [String], devices: [String] = [], label: String?, process: String? = nil, tunnelAddress: String?) {
-        self.port = port; self.addresses = addresses; self.devices = devices; self.label = label; self.process = process; self.tunnelAddress = tunnelAddress
+    public init(port: Int, udp: Bool = false, addresses: [String], devices: [String] = [], label: String?, process: String? = nil, tunnelAddress: String?) {
+        self.port = port; self.udp = udp; self.addresses = addresses; self.devices = devices; self.label = label; self.process = process
+        self.tunnelAddress = tunnelAddress
     }
+
+    /// 모든 주소로 듣는다 — 바깥에서 닿는 포트 (화면에서 딱지. Services 의 docker 포트 딱지와 같은 뜻)
+    public var open: Bool { addresses.contains("*") }
 
     /// 화면 한 줄: "*" · "100.101.0.1 · fd7a:115c:a1e0::1111:2222"
     public var addressText: String { addresses.joined(separator: " · ") }
@@ -215,9 +221,22 @@ public enum RemoteInfo {
         9090: "http-alt", 9100: "node-exporter", 10250: "kubelet", 27017: "mongodb", 41641: "tailscale",
     ]
 
+    /// UDP 로 알려진 번호 (TCP 이름표와 따로 — 53 은 둘 다 dns 지만 123·51820 은 UDP 뿐)
+    public static let knownUDPPorts: [Int: String] = [
+        53: "dns", 67: "dhcp", 68: "dhcp", 123: "ntp", 137: "netbios", 138: "netbios", 161: "snmp", 323: "chrony", 500: "ipsec",
+        514: "syslog", 1900: "ssdp", 3478: "stun", 4500: "ipsec nat-t", 5353: "mdns", 8472: "vxlan", 41641: "tailscale", 51820: "wireguard",
+    ]
+
     /// "0.0.0.0:22", "*:6443", "[::]:22", ":::135", "100.101.0.1%tailscale0:10004", "[::1]%lo:10004", Windows "0.0.0.0:22|6788|sshd" → 포트별 한 줄. 포트 순으로 정렬.
     /// 와일드카드(v4/v6, 장치에 묶인 것 포함)는 "*". 실제 ss 출력: Tests/…/Fixtures/ss-ports-bound.txt (ubuntu:24.04 컨테이너, 2026-10-14).
+    /// 끝이 "/udp" 인 줄은 UDP 포트 — TCP 를 번호순으로 다 적은 뒤 UDP 를 번호순으로 (같은 번호여도 따로).
     public static func parsePorts(_ lines: [String]) -> [PortItem] {
+        let udpLines = lines.map { $0.trimmingCharacters(in: .whitespaces) }.filter { $0.hasSuffix("/udp") }
+        let tcp = parsePorts(lines.filter { !$0.trimmingCharacters(in: .whitespaces).hasSuffix("/udp") }, udp: false)
+        return tcp + parsePorts(udpLines.map { String($0.dropLast(4)) }, udp: true)
+    }
+
+    private static func parsePorts(_ lines: [String], udp: Bool) -> [PortItem] {
         var addresses: [Int: [String]] = [:], devices: [Int: [String]] = [:], processes: [Int: [String]] = [:]
         // 루프백으로 닿는 모든 주소 대기가 있는가 (장치 없음 또는 lo 에 묶임)
         var openWildcard: Set<Int> = []
@@ -247,8 +266,9 @@ public enum RemoteInfo {
             let sorted = addresses[port]!.sorted { (rank($0), $0) < (rank($1), $1) }
             // 터널 주소: 열린 와일드카드 → "*"(서버 자신), 아니면 특정 주소(IPv4 먼저), 장치에 묶인 와일드카드뿐이면 없음
             // 링크로컬(fe80::)은 scope 없이는 서버에서 연결이 안 되므로 터널 주소로 쓰지 않는다
-            let tunnel = openWildcard.contains(port) ? "*" : sorted.first { $0 != "*" && !$0.lowercased().hasPrefix("fe80:") }
-            return PortItem(port: port, addresses: sorted, devices: devices[port] ?? [], label: knownPorts[port],
+            // UDP 는 ssh 터널(TCP)로 닿지 못한다 — 터널 주소 없음
+            let tunnel = udp ? nil : (openWildcard.contains(port) ? "*" : sorted.first { $0 != "*" && !$0.lowercased().hasPrefix("fe80:") })
+            return PortItem(port: port, udp: udp, addresses: sorted, devices: devices[port] ?? [], label: udp ? knownUDPPorts[port] : knownPorts[port],
                             process: processes[port]?.joined(separator: ", "), tunnelAddress: tunnel)
         }
     }

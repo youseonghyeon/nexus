@@ -81,6 +81,7 @@ public enum BrowserStartPage {
     public static func sections(ports: [PortItem], probes: [Int: WebProbeResult], probed: Bool) -> (web: [Tile], bare: [Chip], other: [Other]) {
         var seen: Set<Int> = []
         var web: [Tile] = [], bare: [Chip] = [], other: [Other] = []
+        let ports = ports.filter { !$0.udp }   // 브라우저가 열 수 있는 것은 TCP 뿐 (같은 번호의 UDP 가 타일 자리를 먹지 않게)
         let listed = Set(ports.map(\.port))
         func host(_ item: PortItem?) -> String { item.flatMap(host(for:)) ?? "localhost" }
         func url(_ port: Int, _ item: PortItem?) -> String { "\(probes[port]?.scheme ?? "http")://\(host(item)):\(port)/" }

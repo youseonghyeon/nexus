@@ -38,9 +38,9 @@ public enum WebProbe {
     /// 번호로 아는 비웹 포트: 알려진 포트 중 이름에 http 가 없는 것 (ssh·dns·smb·mysql·postgres·redis·rdp·etcd …)
     public static let nonWebPorts: Set<Int> = Set(RemoteInfo.knownPorts.filter { !$0.value.contains("http") }.keys)
 
-    /// 물어볼 포트인가: 서버 자신이 닿을 수 있고(tunnelAddress) 비웹으로 알려지지 않은 것
+    /// 물어볼 포트인가: 서버 자신이 닿을 수 있고(tunnelAddress) 비웹으로 알려지지 않은 TCP 포트
     public static func isCandidate(_ item: PortItem) -> Bool {
-        item.tunnelAddress != nil && !nonWebPorts.contains(item.port)
+        !item.udp && item.tunnelAddress != nil && !nonWebPorts.contains(item.port)
     }
 
     /// https 를 먼저 물을 포트 (나머지는 http 먼저)

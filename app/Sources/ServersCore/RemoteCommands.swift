@@ -38,7 +38,8 @@ public enum RemoteCommands {
     """
 
 
-    public static let linuxPorts = "ss -lntH 2>/dev/null | awk '{print $4}' | sort -V -u"
+    /// TCP 대기 포트, 이어서 UDP ("주소:포트/udp" — RemoteInfo.parsePorts). 실제 출력: Tests/…/Fixtures/ss-ports-udp.txt
+    public static let linuxPorts = "ss -lntH 2>/dev/null | awk '{print $4}' | sort -V -u; ss -lnuH 2>/dev/null | awk '{print $4 \"/udp\"}' | sort -V -u"
 
     /// Linux Spec 과 같은 "KEY          value" 형식 (RemoteInfo.parseSpec 이 그대로 읽는다). 메모리는 KB, 디스크는 바이트.
     public static let windowsSpec = """

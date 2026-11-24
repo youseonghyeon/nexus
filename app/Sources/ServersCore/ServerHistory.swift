@@ -101,6 +101,9 @@ public enum ServerHistory {
         case let .ports(items):
             // ssh 로 들어온 서버에 열린 포트가 하나도 없을 수는 없다 — 빈 목록은 못 읽은 것
             guard !items.isEmpty else { return nil }
+            // TCP 만 견준다 — UDP 는 프로그램이 잠깐 여는 포트가 많아 볼 때마다 열림·닫힘이 쌓인다
+            let items = items.filter { !$0.udp }
+            guard !items.isEmpty else { return nil }
             return ServerSnapshot(ports: Dictionary(items.map { (String($0.port), $0.label ?? $0.process ?? "") }) { first, _ in first })
         case let .services(report):
             guard let report else { return nil }

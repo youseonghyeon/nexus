@@ -171,15 +171,22 @@ struct PortsTable: View {
                     Text("Service").frame(width: 110, alignment: .leading)
                     if showsProcess { Text("Process").frame(width: PortsTableRow.processWidth, alignment: .leading) }
                     Text("Address")
+                    // 번호의 딱지가 무엇인지 (열린 포트가 있을 때만)
+                    if items.contains(where: \.open) { HoverNote(label: "포트 표시 설명") { PortsLegend() } }
                     Spacer()
                 }
                 .font(.caption).foregroundStyle(.secondary)
                 .padding(.horizontal, 6).padding(.bottom, 4)
             }
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                // TCP 를 다 적은 뒤 UDP — 각 구역의 첫 줄 앞에 작은 머리 "TCP N" · "UDP N" (Services 의 구역 머리와 같은 글씨)
+                if index == 0 || item.udp != items[index - 1].udp {
+                    Text("\(item.udp ? "UDP" : "TCP")  \(items.filter { $0.udp == item.udp }.count)")
+                        .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 6).padding(.top, index == 0 ? 4 : 10).padding(.bottom, 4)
+                }
                 PortsTableRow(server: server, item: item, showsProcess: showsProcess)
-                // 오른쪽 끝 [터널…] 이 어느 행인지 보이게 희미한 구분선
-                if index < items.count - 1 { Divider().opacity(0.4) }
+                // 오른쪽 끝 [터널…] 이 어느 행인지 보이게 희미한 구분선 (TCP · UDP 사이에는 머리가 가른다)
+                if index < items.count - 1, items[index + 1].udp == item.udp { Divider().opacity(0.4) }
             }
             if items.isEmpty { Text("(리스닝 포트 없음)").foregroundStyle(.secondary) }
         }
@@ -199,7 +206,11 @@ private struct PortsTableRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Text(verbatim: "\(item.port)").monospacedDigit().frame(width: 56, alignment: .trailing)
+            // 모든 주소로 듣는 포트는 번호를 딱지로 (바깥에서 닿는다 — Services 의 docker 포트와 같은 표시)
+            Group {
+                if item.open { PortBadge(text: "\(item.port)") } else { Text(verbatim: "\(item.port)").monospacedDigit() }
+            }
+            .frame(width: 56, alignment: .trailing)
             Text(item.label ?? "–").foregroundStyle(item.label == nil ? .tertiary : .primary).frame(width: 110, alignment: .leading)
             if showsProcess {
                 Text(item.process ?? "–").lineLimit(1).truncationMode(.middle).foregroundStyle(item.process == nil ? .tertiary : .primary)
@@ -214,6 +225,7 @@ private struct PortsTableRow: View {
             Spacer()
             Button("Tunnel…") { if let address = item.tunnelAddress { model.promptTunnelToPort(server, port: item.port, address: address) } }
                 .buttonStyle(CompactButtonStyle())
+                .hidden(item.udp)   // ssh 터널은 TCP 만 — UDP 줄에는 버튼을 두지 않는다 (자리는 남긴다)
                 .disabled(!model.isReachable(server) || item.tunnelAddress == nil)   // 장치에 묶인 와일드카드뿐이면 닿을 주소를 모른다
                 .help("이 포트로 로컬 터널 (로컬 포트는 입력창에서 지정)")
                 .opacity(hovering ? 1 : 0)   // 자리는 남겨 둬 행 높이·폭이 바뀌지 않게
@@ -224,5 +236,26 @@ private struct PortsTableRow: View {
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { model.copy(item.primaryAddress.contains(":") ? "[\(item.primaryAddress)]:\(item.port)" : "\(item.primaryAddress):\(item.port)") }
+    }
+}
+
+/// Address 칸 제목 옆 ⓘ 의 설명: 번호의 딱지가 무엇인지 (올리면 바로 뜬다 — HoverNote)
+private struct PortsLegend: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Listening Ports").font(.cardTitle).foregroundStyle(.secondary)
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
+                GridRow { PortBadge(text: "443"); Text("외부 공개 (모든 주소)") }
+                GridRow { Text(verbatim: "5432").monospacedDigit().foregroundStyle(.secondary); Text("해당 주소 전용") }
+            }
+        }
+        .fixedSize()
+    }
+}
+
+private extension View {
+    /// 조건부로 감춘다 (자리는 남긴다)
+    @ViewBuilder func hidden(_ hide: Bool) -> some View {
+        if hide { hidden() } else { self }
     }
 }
