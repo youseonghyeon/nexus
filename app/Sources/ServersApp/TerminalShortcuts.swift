@@ -8,6 +8,7 @@
 // ⌘V 는 파일 넣기를 먼저 묻는다 (pasteFiles — 클립보드 이미지·파일을 경로로, SSH 탭은 이미지·문서를 서버로 올려서). 안 받으면 Ghostty 기본 붙여 넣기.
 // ⌘W 도 같다: 터미널 뷰가 먼저 가져가면 탭이 아니라 창이 닫힌다. ⌘W 는 모든 창에서 여기서만 처리한다 — 판정은 CloseCommand
 // (본창: 보이는 탭 → 없으면 창 숨기기(전체 화면이면 그대로) · 시트·팝오버·모달 패널: 무시 · 설정 창: 그 창 닫기). 메뉴 [Close Tab] 의 ⌘W 까지 가지 않는다.
+// ⌘F · ⌘G · ⌘⇧G(터미널 안 찾기)도 여기서 — Ghostty 기본 키(찾기)라 터미널 뷰가 가져가는데, 래퍼가 찾기 화면을 띄우지 않아 아무 일도 없다 (판정은 TerminalFind).
 // ⌘1–⌘9(사이드바 번호의 서버 고르기)도 여기서 — Ghostty 기본 키(탭 이동)라 터미널 뷰가 가져간다. ⌘ 만 누르고 있으면 번호를 보인다
 // (flagsChanged → QuickSelectState, 판정은 ServersCore QuickSelect). 숫자는 키 위치로 (한글 입력기·AZERTY 와 무관).
 
@@ -27,9 +28,10 @@ enum TerminalShortcuts {
     /// stepTab(forward): ⌘⇧] 면 true, ⌘⇧[ 면 false 로 부른다. toggleSnippets: ⌘P — 본창에서 열고, 열려 있으면(팝오버가 키 창) 닫는다.
     /// hasVisibleTab·closeTab: ⌘W — 본창에 보이는 탭이 있는가 · 그 탭(그 셸)만 닫기. pasteFiles: ⌘V — 처리했으면 true (AppModel.pasteIntoTerminal).
     /// selectNumber: ⌘1–⌘9 — 그 번호의 서버를 골랐으면 true (번호가 없는 자리면 흘린다).
+    /// find: ⌘F · ⌘G · ⌘⇧G — 받았으면 true (보이는 탭이 터미널이 아니면 흘린다 — AppModel.handleFindKey).
     static func install(stepTab: @escaping (Bool) -> Void, toggleSnippets: @escaping () -> Void, snippetsOpen: @escaping () -> Bool,
                         hasVisibleTab: @escaping () -> Bool, closeTab: @escaping () -> Void, pasteFiles: @escaping (AppTerminalView) -> Bool,
-                        selectNumber: @escaping (Int) -> Bool) {
+                        selectNumber: @escaping (Int) -> Bool, find: @escaping (TerminalFind.Key) -> Bool) {
         guard monitor == nil else { return }
         // 번호 보이기: 본창이 키 창일 때 ⌘ 만 누르고 있으면. 다른 앱으로 가면(⌘Tab) 뗌 이벤트가 오지 않으니 거기서 지운다.
         flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
@@ -62,6 +64,13 @@ enum TerminalShortcuts {
                 case keyReturn, keyKeypadEnter: window.toggleFullScreen(nil); return nil
                 default: break
                 }
+            }
+            // 터미널 안 찾기: 본창에서만 (찾기 칸에 포커스가 있어도 ⌘G 가 되게 — 터미널이 첫 응답자인지는 보지 않는다)
+            if let window = event.window, window.delegate is AppDelegate {
+                let pressed = modifiers.intersection([.command, .shift, .option, .control])
+                if pressed == .command, key("f"), find(.find) { return nil }
+                if pressed == .command, key("g"), find(.next) { return nil }
+                if pressed == [.command, .shift], key("g"), find(.previous) { return nil }
             }
             if modifiers.intersection([.command, .shift, .option, .control]) == .command, key("w") {
                 let window = event.window ?? NSApp.keyWindow

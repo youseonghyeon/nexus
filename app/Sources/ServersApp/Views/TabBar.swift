@@ -266,7 +266,12 @@ struct TabPane: View {
 
     var body: some View {
         switch tab.content {
-        case let .terminal(terminal): TerminalPane(terminal: terminal, isVisible: isVisible)
+        case let .terminal(terminal):
+            TerminalPane(terminal: terminal, isVisible: isVisible)
+                // 터미널 안 찾기 칸 (⌘F) — 보이는 탭에만, 오른쪽 위에 얹는다
+                .overlay(alignment: .topTrailing) {
+                    if isVisible, tab.finding { TerminalFindBar(tab: tab).padding(10) }
+                }
         case let .browser(browser): if isVisible { BrowserPane(browser: browser) }
         }
     }

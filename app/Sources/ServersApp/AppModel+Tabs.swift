@@ -103,6 +103,42 @@ extension AppModel {
         return true
     }
 
+    // MARK: 터미널 안 찾기 (TerminalFind)
+
+    /// ⌘F · ⌘G · ⌘⇧G. 받았으면 true (보이는 탭이 터미널이 아니면 false — 키를 흘린다).
+    func handleFindKey(_ key: TerminalFind.Key) -> Bool {
+        let tab = visibleTab.flatMap { $0.terminal != nil && $0.isAlive ? $0 : nil }
+        guard let command = TerminalFind.command(for: key, terminalVisible: tab != nil, finding: tab?.finding ?? false), let tab else { return false }
+        switch command {
+        case .open:
+            tab.finding = true
+            tab.findFocusRequest += 1
+            // 닫았다 다시 열면 지난 글자가 남아 있다 — 그 글자로 다시 찾는다
+            if !tab.findText.isEmpty { tab.terminal?.performBindingAction(TerminalFind.searchAction(tab.findText)) }
+        case .next: stepFind(tab, forward: true)
+        case .previous: stepFind(tab, forward: false)
+        }
+        return true
+    }
+
+    /// 찾는 글자가 바뀌었다 (찾기 칸)
+    func updateFind(_ tab: TerminalTab, text: String) {
+        tab.findText = text
+        tab.terminal?.performBindingAction(TerminalFind.searchAction(text))
+    }
+
+    func stepFind(_ tab: TerminalTab, forward: Bool) {
+        guard !tab.findText.isEmpty else { return }
+        tab.terminal?.performBindingAction(forward ? TerminalFind.nextAction : TerminalFind.previousAction)
+    }
+
+    /// 찾기 칸을 닫는다: 강조를 지우고 키 입력을 터미널로 돌려준다 (글자는 남겨 둔다)
+    func closeFind(_ tab: TerminalTab) {
+        tab.finding = false
+        tab.terminal?.performBindingAction(TerminalFind.endAction)
+        tab.terminal?.requestFocus()
+    }
+
     /// 드래그 순서 변경: moving 을 같은 소유자 탭들 안 index 번째로. Dashboard 는 배열 밖이라 항상 맨 앞.
     func moveTab(_ moving: UUID, to index: Int) {
         let order = TabSelection.move(moving, to: index, in: tabRefs).map(\.id)

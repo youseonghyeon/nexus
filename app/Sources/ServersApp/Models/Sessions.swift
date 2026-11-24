@@ -26,6 +26,10 @@ final class TerminalTab: Identifiable, ObservableObject {
     @Published var isAlive = true
     /// 사용자가 붙인 탭 이름. 있으면 셸이 보내는 제목(OSC) 대신 쓴다. nil 이면 자동 제목.
     @Published var customTitle: String?
+    /// 터미널 안 찾기 (⌘F — TerminalFind): 찾기 칸이 열려 있나 · 찾는 글자 · 칸으로 포커스를 옮기라는 신호 (값이 바뀔 때마다)
+    @Published var finding = false
+    @Published var findText = ""
+    @Published var findFocusRequest = 0
     /// surface 가 닫힘을 요청했을 때 (프로세스 종료 후). AppModel 이 탭을 목록에서 뺀다.
     var onClosed: (@MainActor (TerminalTab) -> Void)?
     /// 터미널에 파일을 끌어 놓았을 때 (TerminalDropView). 받았으면 true. canDropFiles 가 false 면 끌기를 받지 않는다.

@@ -89,6 +89,7 @@ Homebrew 를 쓰지 않으면 [Releases](https://github.com/youseonghyeon/nexus/
 | ⌘W | 보이는 탭 닫기 |
 | ⌘⇧[ / ⌘⇧] | 이전 / 다음 탭 |
 | ⌘P | 명령 모음 |
+| ⌘F | 터미널에서 찾기 (⌘G 다음 · ⌘⇧G 이전) |
 | ⌘R | 지금 상태 확인 |
 | ⌥⌘P | 패킷 캡처 |
 | ⌘, | 설정 |

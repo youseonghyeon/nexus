@@ -37,7 +37,8 @@ struct ServersApp: App {
                                                   guard let key = QuickSelect.key(for: number, in: QuickSelectState.shared.keys) else { return false }
                                                   model.selectedKey = key
                                                   return true
-                                              })
+                                              },
+                                              find: { model.handleFindKey($0) })
                     // 메뉴바: 창을 닫아 둔 채로 망·서버·터널 상태를 보고 망 스위치·터널을 조작한다 (MenuBarController — 아이콘 아래 패널)
                     appDelegate.installMenuBar(model: model)
                     appDelegate.installNotificationHandler(model: model)
@@ -100,6 +101,9 @@ struct ServersApp: App {
                 // 키는 TerminalShortcuts 가 창에 가기 전에 먼저 받는다 (터미널에 포커스가 있어도) — 여기엔 메뉴 클릭만 오고, 단축키를 찾아볼 수 있게 적어 둔다
                 Button("명령 모음") { model.toggleSnippets() }
                     .keyboardShortcut("p", modifiers: .command)
+                Button("터미널에서 찾기") { _ = model.handleFindKey(.find) }
+                    .keyboardShortcut("f", modifiers: .command)
+                    .disabled(model.visibleTerminal == nil)
                 Button("이전 탭") { model.stepTab(forward: false) }
                     .keyboardShortcut("[", modifiers: [.command, .shift])
                 Button("다음 탭") { model.stepTab(forward: true) }
