@@ -1,0 +1,8 @@
+## CONTAINERS
+SOURCE|docker|ok
+C|fx-created|Created|busybox||
+C|fx-plain|Up 2 seconds|busybox||
+C|fx-range|Up 2 seconds|busybox|0.0.0.0:18100->8100/tcp, [::]:18100->8100/tcp, 0.0.0.0:18101->8101/tcp, [::]:18101->8101/tcp, 0.0.0.0:18102->8102/tcp, [::]:18102->8102/tcp|
+C|fx-dns|Up 2 seconds|busybox|9000/tcp, 0.0.0.0:15353->53/udp, [::]:15353->53/udp|shop
+C|fx-web|Up 2 seconds|busybox|0.0.0.0:18080->80/tcp, [::]:18080->80/tcp, 127.0.0.1:18443->443/tcp|shop
+## END

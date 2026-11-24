@@ -4,6 +4,8 @@
 //      가짜 docker(컨테이너 4개)·kubeconfig 권한 거부 k3s (sudo 없음 → denied)
 //   2: flaky.service(1초 뒤 exit 1, Restart=always)가 재시작 대기(auto-restart)일 때, docker·k3s 없음
 // systemd 없는 ubuntu:24.04 는 "SYSTEMD=off", 데몬이 꺼진 docker 는 "SOURCE|docker|off" 를 냈다 (아래 손 입력 테스트).
+// Fixtures/services-docker-ps.txt 의 C| 줄은 이 Mac 의 docker 에 임시 컨테이너 다섯(포트·범위·udp·내놓지 않은 포트·compose 라벨)을 띄워
+//   ServicesScript.linux 의 docker ps 형식으로 받은 실제 출력이다 (2026-11-24, 이름의 앞 글자만 줄였다).
 // Windows 출력은 서버에서 떠 오지 못해 스크립트 모양대로 손으로 만든 것이다 (실제 값은 사용자 확인).
 
 import Foundation
@@ -31,7 +33,6 @@ final class ServicesReportTests: XCTestCase {
         XCTAssertFalse(report.mainRunning.contains { $0.name == "dbus" })
         let nginx = try XCTUnwrap(report.running.first { $0.name == "nginx" })
         XCTAssertEqual(nginx.restarts, 0)
-        XCTAssertNotNil(nginx.memory)
         XCTAssertNotNil(nginx.uptime)
         XCTAssertFalse(ServicesFormat.detail(nginx).contains("재시작"), "재시작 0 은 적지 않는다")
 
@@ -61,10 +62,8 @@ final class ServicesReportTests: XCTestCase {
         let report = ServicesParser.parse(lines, type: .linux)
         XCTAssertEqual(report?.running.map(\.name), ["app", "other"])
         let app = report?.running.first
-        XCTAssertNil(app?.memory, "[not set] 은 없음")
         XCTAssertEqual(app?.uptime ?? -1, 600, accuracy: 0.001)
         XCTAssertEqual(app.map(ServicesFormat.detail), "10분 · 재시작 3")
-        XCTAssertNil(report?.running.last?.memory, "무한대는 없음")
         XCTAssertNil(report?.running.last?.uptime, "0 은 모름")
         XCTAssertEqual(report?.containers.map(\.tone), [.good, .bad, .warn])
         XCTAssertEqual(report?.containers.first?.age, "3d")
@@ -98,6 +97,75 @@ final class ServicesReportTests: XCTestCase {
         XCTAssertEqual(gone?.removed, true)
         XCTAssertEqual(gone.map(ServicesFormat.failure), "삭제된 서비스의 실패 기록")
         XCTAssertEqual(ServicesParser.parse(["UPTIME=1", "## UNITS", "SYSTEMD=off", "## CONTAINERS", "## END"], type: .linux)?.noSystemd, true)
+    }
+
+    /// docker ps 형식에 보탠 칸: 포트 · compose 프로젝트 (실제 출력 픽스처)
+    func testDockerPortsAndComposeProject() throws {
+        let lines = RemoteCommands.cleanOutput(try fixtureText("services-docker-ps"), type: .linux)
+        let items = try XCTUnwrap(ServicesParser.parse(lines, type: .linux)).containers
+        XCTAssertEqual(items.map(\.name), ["fx-created", "fx-plain", "fx-range", "fx-dns", "fx-web"])
+        XCTAssertEqual(items.map(\.detail), Array(repeating: "busybox", count: 5), "이미지는 그대로 (변경 이력이 이 값으로 견준다)")
+        XCTAssertEqual(items.map(\.project), [nil, nil, nil, "shop", "shop"])
+        XCTAssertEqual(items.map { ServicesFormat.dockerPorts($0.ports) },
+                       ["", "", "18100-18102→8100-8102", "15353→53/udp", "18080→80, 18443→443"],
+                       "IPv4·IPv6 는 하나로 · 이어지는 포트는 범위로 · 내놓지 않은 9000/tcp 는 뺀다 · 루프백 주소는 적지 않는다")
+        let web = ServicesFormat.dockerPortList(items[4].ports)
+        XCTAssertEqual(web.map(\.open), [true, false], "모든 주소에 내놓은 것만 open (화면에서 딱지)")
+        // 묶음: 프로젝트는 처음 나온 순서, 프로젝트 없는 것은 맨 뒤 기타
+        let groups = ContainerGroup.byProject(items)
+        XCTAssertEqual(groups.map(\.title), ["shop", "기타"])
+        XCTAssertEqual(groups.map { $0.items.map(\.name) }, [["fx-dns", "fx-web"], ["fx-created", "fx-plain", "fx-range"]])
+        // compose 를 안 쓰는 서버 · 빈 목록 · 옛 형식(이미지까지 — Windows)
+        XCTAssertEqual(ContainerGroup.byProject(Array(items.prefix(3))).map(\.title), [nil], "머리 없이 한 줄기")
+        XCTAssertEqual(ContainerGroup.byProject([]), [])
+        let old = ServicesParser.parse(["## CONTAINERS", "SOURCE|docker|ok", "C|web|Up 3 days (healthy)|nginx:1.27", "C|bare|Created", "## END"], type: .windows)?.containers
+        XCTAssertEqual(old?.map(\.detail), ["nginx:1.27", ""])
+        XCTAssertEqual(old?.map(\.ports), ["", ""])
+        XCTAssertEqual(old?.map(\.project), [nil, nil])
+        // 프로젝트 이름이 "기타" 여도 묶음이 섞이지 않는다
+        let clash = [ContainerItem(kind: .docker, name: "a", status: "Up 1 second", project: "기타"), ContainerItem(kind: .docker, name: "b", status: "Up 1 second")]
+        XCTAssertEqual(Set(ContainerGroup.byProject(clash).map(\.id)).count, 2)
+    }
+
+    func testDockerPortsShapes() {
+        XCTAssertEqual(ServicesFormat.dockerPorts("0.0.0.0:5432->5432/tcp, :::5432->5432/tcp"), "5432", "옛 docker 의 IPv6 꼴(:::) · 같은 포트는 한 번")
+        XCTAssertEqual(ServicesFormat.dockerPorts("0.0.0.0:8000-8010->9000-9010/tcp"), "8000-8010→9000-9010", "docker 가 범위로 준 것")
+        XCTAssertEqual(ServicesFormat.dockerPorts("127.0.0.1:9000->9000/tcp, [::1]:9000->9000/tcp"), "9000", "루프백 둘은 하나로 · 주소 없이")
+        XCTAssertEqual(ServicesFormat.dockerPortList("127.0.0.2:9000->9000/tcp, 0.0.0.0:9000->9000/tcp").map(\.open), [false, true], "같은 번호라도 묶인 곳이 다르면 따로")
+        XCTAssertEqual(ServicesFormat.dockerPorts("127.0.0.2:9000->9000/tcp"), "9000", "127.0.0.0/8 전부 루프백 — 주소 없이")
+        XCTAssertEqual(ServicesFormat.dockerPortList(":::80->80/tcp, [::]:90->90/tcp").map(\.open), [true, true], "IPv6 의 모든 주소도 open")
+        XCTAssertEqual(ServicesFormat.dockerPortList("192.0.2.10:53->53/udp").map(\.open), [false], "특정 주소에 묶인 것은 open 이 아니다 (주소를 붙인다)")
+        let many = ServicesFormat.dockerPortsShown("0.0.0.0:1->1/tcp, 0.0.0.0:3->3/tcp, 0.0.0.0:5->5/tcp, 0.0.0.0:7->7/tcp")
+        XCTAssertEqual(many.shown.count, 3); XCTAssertEqual(many.more, 1)
+        XCTAssertEqual(ServicesFormat.dockerPortsShown("").shown, [])
+        XCTAssertEqual(ServicesFormat.dockerPorts("192.0.2.10:53->53/udp, 192.0.2.10:53->53/tcp"), "192.0.2.10:53/udp, 192.0.2.10:53", "프로토콜이 다르면 따로")
+        XCTAssertEqual(ServicesFormat.dockerPorts("0.0.0.0:81->80/tcp, 0.0.0.0:83->82/tcp"), "81→80, 83→82", "한 칸 건너뛰면 범위가 아니다")
+        XCTAssertEqual(ServicesFormat.dockerPorts("0.0.0.0:1->1/tcp, 0.0.0.0:3->3/tcp, 0.0.0.0:5->5/tcp, 0.0.0.0:7->7/tcp, 0.0.0.0:9->9/tcp"), "1, 3, 5 +2", "넷 이상은 앞 셋 + 나머지 수")
+        XCTAssertEqual(ServicesFormat.dockerPorts("80/tcp, 443/tcp"), "", "내놓지 않은 것뿐이면 빈 글")
+        XCTAssertEqual(ServicesFormat.dockerPorts(""), "")
+        XCTAssertEqual(ServicesFormat.dockerPorts("garbage, 0.0.0.0:x->y/tcp, ->/"), "", "못 읽는 꼴은 버린다")
+    }
+
+    func testDockerStatusBecomesUptimeAndNote() {
+        func both(_ s: String) -> [String?] { let r = ServicesFormat.dockerStatus(s); return [r.uptime, r.note] }
+        XCTAssertEqual(both("Up 5 days (healthy)"), ["5일", nil], "healthy 는 점이 말한다")
+        XCTAssertEqual(both("Up 5 days"), ["5일", nil])
+        XCTAssertEqual(both("Up 4 days (unhealthy)"), ["4일", "unhealthy"])
+        XCTAssertEqual(both("Up 2 seconds (health: starting)"), ["2초", "starting"])
+        XCTAssertEqual(both("Up 3 hours (Paused)"), ["3시간", "paused"])
+        XCTAssertEqual(both("Up About a minute"), ["1분", nil])
+        XCTAssertEqual(both("Up About an hour (healthy)"), ["1시간", nil])
+        XCTAssertEqual(both("Up Less than a second"), ["방금", nil])
+        XCTAssertEqual(both("Up 1 second"), ["1초", nil])
+        XCTAssertEqual(both("Up 2 weeks"), ["2주", nil])
+        XCTAssertEqual(both("Up 3 months"), ["3개월", nil])
+        XCTAssertEqual(both("Up 2 years"), ["2년", nil])
+        XCTAssertEqual(both("Up some new wording"), ["some new wording", nil], "모르는 꼴은 원문")
+        // 떠 있지 않으면 가동 시간 없이 상태 글 그대로
+        XCTAssertEqual(both("Exited (1) 2 hours ago"), [nil, "Exited (1) 2 hours ago"])
+        XCTAssertEqual(both("Restarting (1) 10 seconds ago"), [nil, "Restarting (1) 10 seconds ago"])
+        XCTAssertEqual(both("Created"), [nil, "Created"])
+        XCTAssertEqual(both(""), [nil, ""])
     }
 
     /// 2026-10-05 nexus k3s 화면에 나온 파드 이름들 (사용자 스크린샷)

@@ -302,6 +302,21 @@ struct StatusToast: View {
     }
 }
 
+/// 바깥에서 닿는 포트의 딱지 (서버 태그의 회색 배지와 같은 면) — Services 의 docker 포트 · Ports 표의 번호
+struct PortBadge: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let text: String
+
+    var body: some View {
+        Text(verbatim: text)
+            .font(.system(size: 11, weight: .medium)).monospacedDigit()
+            .padding(.horizontal, 5).padding(.vertical, 1)
+            .background(colorScheme == .light ? Palette.plainBadgeLight : Color.secondary.opacity(0.22),
+                        in: RoundedRectangle(cornerRadius: Metrics.chipRadius, style: .continuous))
+            .foregroundStyle(colorScheme == .light ? Palette.plainBadgeTextLight : Color.primary.opacity(0.85))
+    }
+}
+
 /// Grid 안의 "라벨  값" 한 줄. 값은 선택·복사할 수 있다.
 struct InfoRow: View {
     let label: String

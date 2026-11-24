@@ -19,7 +19,7 @@ final class ServerHistoryTests: XCTestCase {
     }
     private func port(_ number: Int, _ label: String? = nil) -> PortItem { PortItem(port: number, addresses: ["*"], label: label, tunnelAddress: "127.0.0.1") }
     private func unit(_ name: String) -> ServiceUnit {
-        ServiceUnit(name: name, description: "", uptime: nil, memory: nil, restarts: nil, state: "failed", result: "exit-code", changedAgo: 10, basic: false)
+        ServiceUnit(name: name, description: "", uptime: nil, restarts: nil, state: "failed", result: "exit-code", changedAgo: 10, basic: false)
     }
     /// 한 서버에 결과를 차례로 넣으며 생긴 사건 글만 모은다
     private func feed(_ steps: [ParsedRemoteInfo], type: ServerType = .linux) -> (state: HistoryState, texts: [[String]]) {

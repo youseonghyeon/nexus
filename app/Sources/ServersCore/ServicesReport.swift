@@ -1,5 +1,5 @@
 // 원격 정보의 Services 탭: 정해 둔 서비스 대신 서버가 실제로 돌리는 것을 보여 준다.
-//   실패한 서비스(맨 위 — 죽었다 살아나기를 되풀이하는 auto-restart 포함) · 실행 중인 서비스 전체(가동 시간·메모리·재시작 횟수, 기본 서비스는 접음) · 컨테이너(docker·k3s 파드).
+//   실패한 서비스(맨 위 — 죽었다 살아나기를 되풀이하는 auto-restart 포함) · 실행 중인 서비스 전체(재시작 횟수·가동 시간, 기본 서비스는 접음) · 컨테이너(docker 는 compose 프로젝트별 · 내놓은 포트, k3s 파드).
 //   리눅스는 서비스 줄을 누르면 최근 로그(journalctl). Windows 는 로그 없음.
 // 스크립트 출력은 "## 구역" 머리 + systemctl show 꼴 "키=값" 블록(빈 줄로 나눔) + 컨테이너 "C|…"·"P|…" 줄. 탭은 cleanOutput 이 공백으로 바꾸므로 쓰지 않는다.
 // 리눅스는 실패·재시작 대기·실행 중 유닛을 한 번의 show 로 읽고(## UNITS) SubState 로 나눈다 — 목록과 값을 따로 읽으면 그 사이 상태가 바뀌어
@@ -14,7 +14,6 @@ public struct ServiceUnit: Sendable, Equatable, Identifiable {
     public let description: String
     /// 켜진 지 (초). 모르면 nil
     public let uptime: TimeInterval?
-    public let memory: UInt64?
     public let restarts: Int?
     /// 실패: 상태(SubState)·결과(Result)와 바뀐 지 (초)
     public let state: String?
@@ -41,9 +40,14 @@ public struct ContainerItem: Sendable, Equatable, Identifiable {
     /// 파드: 준비 "1/1" · 재시작 횟수
     public let ready: String?
     public let restarts: Int?
+    /// docker: 호스트로 내놓은 포트 (docker ps 의 Ports 원문 — 화면 꼴은 ServicesFormat.dockerPorts) · compose 프로젝트 (없으면 nil)
+    public let ports: String
+    public let project: String?
 
-    public init(kind: Kind, name: String, status: String, detail: String = "", age: String? = nil, ready: String? = nil, restarts: Int? = nil) {
+    public init(kind: Kind, name: String, status: String, detail: String = "", age: String? = nil, ready: String? = nil, restarts: Int? = nil,
+                ports: String = "", project: String? = nil) {
         self.kind = kind; self.name = name; self.status = status; self.detail = detail; self.age = age; self.ready = ready; self.restarts = restarts
+        self.ports = ports; self.project = project
     }
 
     /// 파드 네임스페이스 ("app/calapp-…" 의 app). docker 는 nil
@@ -145,6 +149,27 @@ public struct ServicesReport: Sendable, Equatable {
     public var basicRunning: [ServiceUnit] { running.filter(\.basic) }
 }
 
+/// docker 컨테이너를 compose 프로젝트별로 묶는다 (파드의 네임스페이스처럼). 프로젝트는 처음 나온 순서, 프로젝트 없는 것은 맨 뒤 "기타".
+/// compose 를 하나도 안 쓰는 서버는 묶음 하나 · 제목 없음 (지금까지처럼 한 줄기).
+public struct ContainerGroup: Sendable, Equatable, Identifiable {
+    public var id: String { title ?? "" }
+    /// 묶음 머리에 적을 이름. nil 이면 머리를 두지 않는다
+    public let title: String?
+    public let items: [ContainerItem]
+
+    public static let otherTitle = "기타"
+
+    public static func byProject(_ items: [ContainerItem]) -> [ContainerGroup] {
+        guard items.contains(where: { $0.project != nil }) else { return items.isEmpty ? [] : [ContainerGroup(title: nil, items: items)] }
+        var order: [String] = []
+        for project in items.compactMap(\.project) where !order.contains(project) { order.append(project) }
+        var groups = order.map { name in ContainerGroup(title: name, items: items.filter { $0.project == name }) }
+        let loose = items.filter { $0.project == nil }
+        if !loose.isEmpty { groups.append(ContainerGroup(title: order.contains(otherTitle) ? otherTitle + " (compose 밖)" : otherTitle, items: loose)) }
+        return groups
+    }
+}
+
 public enum ServicesScript {
     /// 리눅스 (`sh -s` 로 stdin). 시각은 부팅 후 µs(…Monotonic)로 받아 /proc/uptime 과 빼서 경과로 — systemd 버전마다 시각 글꼴이 달라서.
     /// docker·k3s 는 그냥 → 안 되면 sudo -n(암호 없이 될 때만) → 그래도 안 되면 denied.
@@ -156,7 +181,7 @@ public enum ServicesScript {
     echo "## UNITS"
     if command -v systemctl >/dev/null 2>&1; then
       units=$(systemctl list-units --type=service --state=failed,auto-restart,running --no-legend --plain --no-pager 2>/dev/null | awk '{print $1}')
-      [ -n "$units" ] && systemctl show --no-pager -p Id,Description,LoadState,ActiveState,SubState,Result,NRestarts,MemoryCurrent,ActiveEnterTimestampMonotonic,StateChangeTimestampMonotonic $units 2>/dev/null
+      [ -n "$units" ] && systemctl show --no-pager -p Id,Description,LoadState,ActiveState,SubState,Result,NRestarts,ActiveEnterTimestampMonotonic,StateChangeTimestampMonotonic $units 2>/dev/null
     else
       echo "SYSTEMD=off"
     fi
@@ -165,7 +190,8 @@ public enum ServicesScript {
     # 오류 문구는 mktemp 파일로 받는다 (/tmp 의 짐작되는 이름은 다른 사용자가 미리 만들어 둘 수 있다). mktemp 가 없으면 버리고 off 로 본다.
     E=$(mktemp 2>/dev/null) || E=""
     if command -v docker >/dev/null 2>&1; then
-      fmt='{{.Names}}|{{.Status}}|{{.Image}}'
+      # 포트·compose 프로젝트는 뒤에 붙인다 (없으면 빈 칸) — 이름|상태|이미지|포트|프로젝트
+      fmt='{{.Names}}|{{.Status}}|{{.Image}}|{{.Ports}}|{{.Label "com.docker.compose.project"}}'
       if out=$($T docker ps -a --format "$fmt" 2>"${E:-/dev/null}"); then state=ok
       elif [ -n "$E" ] && grep -qi "permission denied" "$E" 2>/dev/null; then
         if out=$($T sudo -n docker ps -a --format "$fmt" 2>/dev/null); then state=ok; else state=denied; fi
@@ -244,9 +270,8 @@ public enum ServicesParser {
                 return elapsed >= 0 ? elapsed : nil   // 컨테이너(lxcfs)처럼 /proc/uptime 이 짧으면 모름
 
             }
-            let memory = block["MemoryCurrent"].flatMap(UInt64.init).flatMap { $0 == UInt64.max ? nil : $0 }   // [not set]·무한대는 없음
             var unit = ServiceUnit(name: name, description: block["Description"] ?? "",
-                                   uptime: since("ActiveEnterTimestampMonotonic"), memory: memory,
+                                   uptime: since("ActiveEnterTimestampMonotonic"),
                                    restarts: block["NRestarts"].flatMap(Int.init),
                                    state: block["SubState"], result: block["Result"], changedAgo: since("StateChangeTimestampMonotonic"),
                                    basic: isBasic(name: name, path: block["Path"], type: type))
@@ -279,9 +304,11 @@ public enum ServicesParser {
                     report.truncated[parts[1]] = Int(parts[2])
                 case "SOURCE" where parts.count >= 3:
                     report.sources[parts[1]] = parts[2] == "ok" ? .ok : (parts[2] == "off" ? .off : .denied)
-                case "C" where parts.count >= 3:
+                case "C" where parts.count >= 3:   // C|이름|상태|이미지[|포트|compose 프로젝트] — 뒤 둘은 리눅스만 (Windows 는 이미지까지)
                     report.containers.append(ContainerItem(kind: .docker, name: parts[1], status: parts[2],
-                                                           detail: parts.count > 3 ? parts[3...].joined(separator: "|") : "", age: nil))
+                                                           detail: parts.count > 3 ? parts[3] : "", age: nil,
+                                                           ports: parts.count > 4 ? parts[4] : "",
+                                                           project: parts.count > 5 && !parts[5].isEmpty ? parts[5] : nil))
                 case "P" where parts.count >= 6:   // P|ns/이름|상태|준비|재시작|나이
                     report.containers.append(ContainerItem(kind: .pod, name: parts[1], status: parts[2], age: parts[5],
                                                            ready: parts[3], restarts: Int(parts[4])))
@@ -391,11 +418,109 @@ public enum ServicesFormat {
         seconds < 60 ? "방금" : "\(duration(seconds)) 전"
     }
 
-    /// 실행 중 줄 오른쪽: "3일 2시간 · 120 MB · 재시작 2" (모르는 것은 뺀다, 재시작 0 은 안 적는다)
+    /// 실행 중 줄 오른쪽: "3일 2시간 · 재시작 2" (모르는 것은 뺀다, 재시작 0 은 안 적는다)
     public static func detail(_ unit: ServiceUnit) -> String {
-        [unit.uptime.map(duration), unit.memory.map { DiskFormat.bytes($0) },
-         unit.restarts.flatMap { $0 > 0 ? "재시작 \($0)" : nil }]
+        [unit.uptime.map(duration), unit.restarts.flatMap { $0 > 0 ? "재시작 \($0)" : nil }]
             .compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// docker 상태 글 → 가동 시간 열에 둘 글과 따로 적을 상태.
+    /// 떠 있으면 가동 시간을 서비스 줄과 같은 꼴로("Up 5 days (healthy)" → "5일") — healthy 는 점이 말하므로 적지 않고, unhealthy · starting · paused 만 적는다.
+    /// 떠 있지 않으면 가동 시간은 없고 상태 글 그대로("Exited (1) 2 hours ago").
+    public static func dockerStatus(_ status: String) -> (uptime: String?, note: String?) {
+        guard status.lowercased().hasPrefix("up ") else { return (nil, status) }
+        var rest = String(status.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+        var note: String?
+        if rest.hasSuffix(")"), let open = rest.lastIndex(of: "(") {
+            let inside = rest[rest.index(after: open)...].dropLast().lowercased()
+            rest = rest[..<open].trimmingCharacters(in: .whitespaces)
+            switch inside {
+            case "healthy": note = nil
+            case "health: starting": note = "starting"
+            default: note = inside   // unhealthy · paused
+            }
+        }
+        return (dockerDuration(rest), note)
+    }
+
+    /// docker 의 경과 글("5 days" · "About an hour" · "Less than a second")을 이 앱의 꼴로. 모르는 꼴은 원문
+    static func dockerDuration(_ text: String) -> String {
+        let t = text.lowercased()
+        if t == "less than a second" { return "방금" }
+        if t == "about a minute" { return "1분" }
+        if t == "about an hour" { return "1시간" }
+        let units = ["second": "초", "minute": "분", "hour": "시간", "day": "일", "week": "주", "month": "개월", "year": "년"]
+        let words = t.split(separator: " ")
+        guard words.count == 2, let n = Int(words[0]) else { return text }
+        let word = words[1].hasSuffix("s") ? String(words[1].dropLast()) : String(words[1])
+        return units[word].map { "\(n)\($0)" } ?? text
+    }
+
+    /// 컨테이너 줄에 적는 포트 하나. open 은 모든 주소(0.0.0.0 · ::)에 내놓아 바깥에서 닿는 것 — 화면에서 딱지로.
+    public struct DockerPort: Sendable, Equatable {
+        /// 어디에 묶였나: 모든 주소 · 루프백 · 그 밖의 특정 주소
+        public enum Scope: Sendable { case open, loopback, address }
+        public let text: String
+        public let scope: Scope
+        public var open: Bool { scope == .open }
+    }
+
+    /// docker ps 의 Ports → 호스트로 내놓은 것만 짧게: "0.0.0.0:8080->80/tcp, [::]:8080->80/tcp" → "8080→80".
+    /// 호스트·컨테이너 포트가 같으면 한 번만("5432"), udp 는 "/udp". 루프백에 묶인 것은 주소 없이 번호만
+    /// (줄마다 "127.0.0.1:" 이 되풀이돼 번호가 묻혔다 — 2026-11-24), 모든 주소에 내놓은 것은 open 으로 표시한다. 그 밖의 특정 주소에 묶였으면 주소를 붙인다("192.0.2.10:53").
+    /// IPv4·IPv6 로 두 번 나오는 것은 하나로, 한 칸씩 이어지는 포트는 범위로("18100-18102→8100-8102"). 내놓지 않은 포트("9000/tcp")는 뺀다.
+    public static func dockerPortList(_ raw: String) -> [DockerPort] {
+        struct Mapping { var host: String; var from: Int; var to: Int; var count: Int; var proto: String }
+        var list: [Mapping] = []
+        for entry in raw.split(separator: ",") {
+            let text = entry.trimmingCharacters(in: .whitespaces)
+            guard let arrow = text.range(of: "->"), let slash = text.lastIndex(of: "/"), slash > arrow.upperBound else { continue }
+            let left = text[..<arrow.lowerBound], right = text[arrow.upperBound..<slash]
+            let proto = String(text[text.index(after: slash)...])
+            guard let colon = left.lastIndex(of: ":") else { continue }
+            var host = String(left[..<colon]).trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+            if host == "0.0.0.0" || host == "::" || host.isEmpty { host = "" }   // 모든 주소
+            if host == "::1" { host = "127.0.0.1" }                               // 루프백은 한 가지로
+            func range(_ s: Substring) -> (Int, Int)? {
+                let ends = s.split(separator: "-").compactMap { Int($0) }
+                return ends.count == 1 ? (ends[0], ends[0]) : (ends.count == 2 && ends[1] >= ends[0] ? (ends[0], ends[1]) : nil)
+            }
+            guard let h = range(left[left.index(after: colon)...]), let c = range(right), h.1 - h.0 == c.1 - c.0 else { continue }
+            let mapping = Mapping(host: host, from: h.0, to: c.0, count: h.1 - h.0 + 1, proto: proto)
+            if list.contains(where: { $0.host == mapping.host && $0.proto == mapping.proto && $0.from <= mapping.from
+                && mapping.from + mapping.count <= $0.from + $0.count && $0.to - $0.from == mapping.to - mapping.from }) { continue }   // IPv4·IPv6 겹침
+            // 바로 앞 것에 한 칸 이어지면 범위로 늘린다
+            if let i = list.lastIndex(where: { $0.host == mapping.host && $0.proto == mapping.proto
+                && $0.from + $0.count == mapping.from && $0.to + $0.count == mapping.to }) {
+                list[i].count += mapping.count
+            } else {
+                list.append(mapping)
+            }
+        }
+        return list.map { m in
+            func span(_ start: Int) -> String { m.count > 1 ? "\(start)-\(start + m.count - 1)" : "\(start)" }
+            let ports = (m.from == m.to ? span(m.from) : span(m.from) + "→" + span(m.to)) + (m.proto == "tcp" ? "" : "/" + m.proto)
+            let scope: DockerPort.Scope = m.host.isEmpty ? .open : (isLoopback(m.host) ? .loopback : .address)
+            return DockerPort(text: (scope == .address ? m.host + ":" : "") + ports, scope: scope)
+        }
+    }
+
+    /// 127.0.0.0/8
+    private static func isLoopback(_ host: String) -> Bool {
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        return parts.count == 4 && parts[0] == "127" && parts.allSatisfy { UInt8($0) != nil }
+    }
+
+    /// 줄에 보일 포트(앞 limit 개)와 남은 수 — 넷 이상이면 앞 셋 + "+N"
+    public static func dockerPortsShown(_ raw: String, limit: Int = 3) -> (shown: [DockerPort], more: Int) {
+        let all = dockerPortList(raw)
+        return all.count > limit ? (Array(all.prefix(limit)), all.count - limit) : (all, 0)
+    }
+
+    /// 한 줄 글로: "80, 443, 8405 +2"
+    public static func dockerPorts(_ raw: String, limit: Int = 3) -> String {
+        let ports = dockerPortsShown(raw, limit: limit)
+        return ports.shown.map(\.text).joined(separator: ", ") + (ports.more > 0 ? " +\(ports.more)" : "")
     }
 
     /// 실패 줄 오른쪽: "exit-code · 3시간 4분 전" · 재시작을 되풀이하면 "재시작 반복 5회 · exit-code"

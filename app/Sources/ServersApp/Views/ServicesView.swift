@@ -1,5 +1,6 @@
 // 원격 정보 Services 탭: 실패(맨 위) · 실행 중(기본 서비스는 접음) · 컨테이너(파드는 네임스페이스별, 끝난 작업은 접음). 파싱은 ServersCore ServicesReport.
-// 숫자(가동·메모리·재시작·준비·나이)는 오른쪽 고정 폭 열로 맞춘다 — 이름 길이에 따라 들쭉날쭉하지 않게.
+// 숫자(준비·재시작·가동·나이)는 오른쪽 고정 폭 열로 맞춘다 — 이름 길이에 따라 들쭉날쭉하지 않게. 가동 시간이 맨 오른쪽 (서비스·docker·파드 모두 같은 자리).
+// docker 컨테이너는 compose 프로젝트별로 묶고(ContainerGroup), 호스트로 내놓은 포트를 가동 시간 앞에 적는다.
 // 리눅스는 서비스 줄을 누르면 최근 로그 시트. Windows 는 로그가 없어 누를 수 없다 (이유 문구 없이).
 
 import ServersCore
@@ -8,7 +9,6 @@ import SwiftUI
 /// 오른쪽 열 폭 (서비스·파드 공통)
 private enum Column {
     static let uptime: CGFloat = 92
-    static let memory: CGFloat = 72
     static let restarts: CGFloat = 72
     static let ready: CGFloat = 36
     static let status: CGFloat = 140
@@ -69,9 +69,8 @@ struct ServicesView: View {
 
     private func runningRow(_ unit: ServiceUnit) -> some View {
         ServiceRow(unit: unit, dot: (unit.restarts ?? 0) > 0 ? StatusTone.warn.color : StatusTone.good.color, canOpenLog: canOpenLog, openLog: { openLog(unit) }) {
-            Text(unit.uptime.map(ServicesFormat.duration) ?? "").frame(width: Column.uptime, alignment: .trailing)
-            Text(unit.memory.map { DiskFormat.bytes($0) } ?? "").frame(width: Column.memory, alignment: .trailing)
             Text((unit.restarts ?? 0) > 0 ? "재시작 \(unit.restarts!)" : "").frame(width: Column.restarts, alignment: .trailing)
+            Text(unit.uptime.map(ServicesFormat.duration) ?? "").frame(width: Column.uptime, alignment: .trailing)
         }
     }
 
@@ -96,10 +95,17 @@ struct ServicesView: View {
             }
         }
         if let state = report.sources["docker"] {
-            section("docker 컨테이너 \(dockers.count)") {
+            // 포트를 내놓은 컨테이너가 있을 때만 제목 옆에 ⓘ — 딱지·숫자·화살표가 무엇인지 (올리면 바로 뜨는 HoverNote)
+            section("docker 컨테이너 \(dockers.count)", legend: dockers.contains { !ServicesFormat.dockerPortList($0.ports).isEmpty }) {
                 if let note = sourceNote("docker", state, empty: dockers.isEmpty) { note }
                 if let total = report.truncated["docker"] { Text("컨테이너가 \(total)개라 앞 200개만 보입니다").foregroundStyle(.secondary) }
-                group(dockers, key: "docker", foldTitle: "멈춘 컨테이너")
+                // compose 프로젝트별 (파드의 네임스페이스처럼) — compose 를 안 쓰는 서버는 머리 없이 한 줄기
+                ForEach(ContainerGroup.byProject(dockers)) { project in
+                    if let title = project.title {
+                        Text("\(title)  \(project.items.count)").font(.caption).foregroundStyle(.secondary).padding(.top, 4)
+                    }
+                    group(project.items, key: "docker|\(project.id)", foldTitle: "멈춘 컨테이너")
+                }
             }
         }
     }
@@ -142,11 +148,63 @@ struct ServicesView: View {
         }
     }
 
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func section<Content: View>(_ title: String, legend: Bool = false, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.caption).foregroundStyle(.secondary).padding(.bottom, 2)
+            HStack(spacing: 4) {
+                Text(title)
+                if legend {
+                    HoverNote(label: "포트 표시 설명") { DockerPortsLegend() }
+                }
+            }
+            .font(.caption).foregroundStyle(.secondary).padding(.bottom, 2)
             content()
         }
+    }
+}
+
+/// 컨테이너가 호스트로 내놓은 포트: 번호만. 모든 주소(0.0.0.0)에 내놓아 바깥에서 닿는 것만 무채색 딱지(서버 태그의 회색 배지와 같은 면) —
+/// 번호마다 밝기를 달리했더니 한 줄 안에서 글자가 덜 그려진 것처럼 보였다 (2026-11-24 사용자 지적). 열린 것은 문제 상태가 아니라 색은 쓰지 않는다.
+/// 딱지·숫자의 뜻은 구역 제목 옆 ⓘ 에 올리면 바로 뜨는 설명(HoverNote · DockerPortsLegend)에.
+private struct DockerPortsLabel: View {
+    let raw: String
+
+    var body: some View {
+        let ports = ServicesFormat.dockerPortsShown(raw)
+        if !ports.shown.isEmpty {
+            HStack(spacing: 5) {
+                ForEach(Array(ports.shown.enumerated()), id: \.offset) { index, port in
+                    if port.open {
+                        PortBadge(text: port.text)
+                    } else {
+                        // 딱지 없는 번호끼리 이어질 때만 쉼표 (딱지는 면이 갈라 준다)
+                        let comma = index + 1 < ports.shown.count && !ports.shown[index + 1].open
+                        Text(verbatim: port.text + (comma ? "," : ""))
+                    }
+                }
+                if ports.more > 0 { Text(verbatim: "+\(ports.more)") }
+            }
+            .fixedSize()
+        }
+    }
+}
+
+/// docker 구역 제목 옆 ⓘ 의 설명: 줄 오른쪽 포트 표시가 무엇인지 — 왼쪽은 줄에 보이는 모양 그대로, 오른쪽은 뜻
+private struct DockerPortsLegend: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Published Ports").font(.cardTitle).foregroundStyle(.secondary)
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
+                GridRow { PortBadge(text: "443"); Text("외부 공개 (0.0.0.0)") }
+                GridRow { sample("8405"); Text("서버 내부 전용 (127.0.0.1)") }
+                GridRow { sample("192.0.2.10:53"); Text("해당 주소 전용") }
+                GridRow { sample("8081→8080"); Text("Host → Container") }
+            }
+        }
+        .fixedSize()
+    }
+
+    private func sample(_ text: String) -> some View {
+        Text(verbatim: text).foregroundStyle(.secondary).monospacedDigit()
     }
 }
 
@@ -200,7 +258,8 @@ private struct LogHelp: ViewModifier {
     }
 }
 
-/// 컨테이너·파드 한 줄: 점 · 이름(꼬리 해시는 흐리게) · 상태(Running 이 아닐 때만) · 준비 · 재시작 · 나이. 누르면 최근 로그(리눅스 docker) 또는 전체 이름 복사.
+/// 컨테이너·파드 한 줄: 점 · 이름(꼬리 해시는 흐리게) · 상태(Running 이 아닐 때만) · 준비 · 재시작 · 나이.
+/// docker 는 내놓은 포트(DockerPortsLabel) · 상태(healthy 는 점으로 충분해 적지 않는다) · 가동 시간 — 떠 있지 않으면 상태 글 그대로. 누르면 최근 로그(리눅스 docker) 또는 전체 이름 복사.
 private struct ContainerRow: View {
     let item: ContainerItem
     let opensLog: Bool
@@ -226,7 +285,12 @@ private struct ContainerRow: View {
                     Text((item.restarts ?? 0) > 0 ? "재시작 \(item.restarts!)" : "").frame(width: Column.restarts, alignment: .trailing)
                     Text(ServicesFormat.podAge(item.age)).frame(width: Column.uptime, alignment: .trailing)
                 } else {
-                    Text(item.status)
+                    let status = ServicesFormat.dockerStatus(item.status)
+                    if !item.ports.isEmpty {
+                        DockerPortsLabel(raw: item.ports).padding(.trailing, status.note == nil ? 0 : 14)
+                    }
+                    if let note = status.note { Text(note) }
+                    if let uptime = status.uptime { Text(uptime).frame(width: Column.uptime, alignment: .trailing) }
                 }
             }
             .lineLimit(1).truncationMode(.tail)

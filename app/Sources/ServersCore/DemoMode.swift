@@ -325,10 +325,10 @@ public struct DemoRunner: CommandRunner {
         \(blocks)
         ## CONTAINERS
         SOURCE|docker|ok
-        C|web|Up 3 days (healthy)|nginx:1.27
-        C|api|Up 3 days (healthy)|app/api:2.4
-        C|worker|Up 5 hours|app/worker:2.4
-        C|db|Up 2 weeks (healthy)|postgres:16
+        C|web|Up 3 days (healthy)|nginx:1.27|0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp|shop
+        C|api|Up 3 days (healthy)|app/api:2.4|127.0.0.1:8080->8080/tcp|shop
+        C|worker|Up 5 hours|app/worker:2.4||shop
+        C|db|Up 2 weeks (healthy)|postgres:16|127.0.0.1:5432->5432/tcp|
         ## END
 
         """
