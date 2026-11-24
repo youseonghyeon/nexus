@@ -9,8 +9,7 @@ import XCTest
 
 final class ServerDiagnoseTests: XCTestCase {
     private func fixture(_ name: String) throws -> String {
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/diagnose-\(name).txt")
-        return try String(contentsOf: url, encoding: .utf8)
+        try fixtureText("diagnose-\(name)")
     }
     private func request(_ tool: ServerDiagnose.Tool, _ input: String) throws -> ServerDiagnose.Request {
         try XCTUnwrap(ServerDiagnose.request(tool, input: input), input)

@@ -7,7 +7,7 @@ import XCTest
 final class TunnelTests: XCTestCase {
     /// 가짜 ssh: 배너를 찍고 대기하거나(open), 즉시 실패한다(closed). 실제 ssh 는 실행하지 않는다.
     private func fakeSSH(_ body: String) throws -> String {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("tunnel-\(UUID().uuidString)")
+        let dir = tempPath("tunnel")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let stub = dir.appendingPathComponent("ssh")
         try ("#!/bin/sh\n" + body + "\n").write(to: stub, atomically: true, encoding: .utf8)
@@ -138,7 +138,7 @@ final class TunnelTests: XCTestCase {
 
     // 리뷰 2차 #3·#6: stop() 은 워치독·ssh·손자(비밀번호 팝업 자리)까지 끝내고, 앱(stdin 파이프)이 사라지면 ssh 도 끝난다
     func testStopKillsWholeTreeAndWatchdogFollowsStdin() async throws {
-        let marker = FileManager.default.temporaryDirectory.appendingPathComponent("grandchild-\(UUID().uuidString)").path
+        let marker = tempPath("grandchild").path
         // 가짜 ssh: 손자(sleep)를 띄우고 자기도 대기. 손자가 죽으면 marker 파일이 지워진다.
         let stub = try fakeSSH("touch '\(marker)'; (sleep 30; rm -f '\(marker)') & g=$!; trap 'kill $g; rm -f \"\(marker)\"; exit 143' TERM; printf '✔ open\\n'; wait $g")
         let process = TunnelProcess()
@@ -179,8 +179,7 @@ final class TunnelTests: XCTestCase {
     func testWatchdogScriptIsValidSh() throws {
         let (sh, args) = TunnelWatchdog.command(executable: "/usr/bin/true", arguments: ["-x"])
         XCTAssertEqual(sh, "/bin/sh"); XCTAssertEqual(args.prefix(2), ["-c", TunnelWatchdog.script]); XCTAssertEqual(args.suffix(3), ["sh", "/usr/bin/true", "-x"])
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = ["-n", "-c", TunnelWatchdog.script]
-        try p.run(); p.waitUntilExit(); XCTAssertEqual(p.terminationStatus, 0)
+        XCTAssertEqual(try shellSyntaxStatus("/bin/sh", TunnelWatchdog.script), 0)
         // 종료 코드는 자식(ssh)의 것: exit 7 → 7
         let run = Process(); run.executableURL = URL(fileURLWithPath: "/bin/sh")
         run.arguments = ["-c", TunnelWatchdog.script, "sh", "/bin/sh", "-c", "exit 7"]

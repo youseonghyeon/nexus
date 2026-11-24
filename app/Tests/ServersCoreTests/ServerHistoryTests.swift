@@ -167,7 +167,7 @@ final class ServerHistoryTests: XCTestCase {
     }
 
     func testSaveLoadRoundTripAndBrokenFileStartsEmpty() throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString)/Servers/history.json")
+        let url = tempPath("history").appendingPathComponent("Servers/history.json")
         XCTAssertEqual(ServerHistory.load(from: url), HistoryState())
         let state = feed([.ports([port(22)]), .ports([port(22), port(80)]), .spec(spec(), updates: [update("curl", security: true)])]).state
         try ServerHistory.save(state, to: url)

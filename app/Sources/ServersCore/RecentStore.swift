@@ -54,18 +54,11 @@ public enum RecentStore {
 
     /// 없거나 깨졌으면 빈 상태 (기록은 부가 기능이라 오류로 막지 않는다)
     public static func load(from url: URL = defaultURL) -> RecentState {
-        guard let data = try? Data(contentsOf: url) else { return RecentState() }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return (try? decoder.decode(RecentState.self, from: data)) ?? RecentState()
+        (try? AppSupport.readJSON(RecentState.self, from: url, isoDates: true)) ?? RecentState()
     }
 
     public static func save(_ state: RecentState, to url: URL = defaultURL) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.write(state, to: url)
+        try AppSupport.writeJSON(state, to: url, isoDates: true)
     }
 
     /// 기록 추가·갱신: 같은 id 는 로컬 포트·시각만 갱신. 최근 순으로 정렬하고 서버당 상한을 넘는 오래된 것은 버린다.
@@ -96,11 +89,5 @@ public enum RecentStore {
 
     public static func remove(id: String, from state: RecentState) -> RecentState {
         RecentState(tunnels: state.tunnels.filter { $0.id != id })
-    }
-}
-
-private extension JSONEncoder {
-    func write<T: Encodable>(_ value: T, to url: URL) throws {
-        try encode(value).write(to: url, options: .atomic)
     }
 }

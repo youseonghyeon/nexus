@@ -44,7 +44,7 @@ public enum TCPPortTest {
     public static func target(_ input: String) -> (host: String, port: Int)? {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         let parts = text.split(whereSeparator: { $0 == ":" || $0 == " " }).map(String.init)
-        guard parts.count == 2, NetworkServiceDraft.ipv4(parts[0]) != nil,
+        guard parts.count == 2, IPv4.parse(parts[0]) != nil,
               let port = Int(parts[1]), (1...65535).contains(port) else { return nil }
         return (parts[0], port)
     }

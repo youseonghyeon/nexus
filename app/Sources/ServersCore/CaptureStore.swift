@@ -84,7 +84,6 @@ public struct CaptureWireGuardPeer: Sendable, Identifiable, Equatable {
     public var lastHandshake: Double?
     public var handshakes = 0
     public var dataPackets = 0
-    public var lastData: Double?
 }
 
 public struct CaptureStore: Sendable {
@@ -338,7 +337,6 @@ public struct CaptureStore: Sendable {
             state.lastHandshake = time
         } else if case .data = message {
             state.dataPackets += 1
-            state.lastData = time
         }
         wireguard[peer] = state
     }

@@ -244,8 +244,7 @@ final class StatusTests: XCTestCase {
     func testEligibilityTable() throws {
         let monitor = StatusMonitor(config: try ServerConfigParser.parse(fixture), runner: FakeRunner())
         func server(_ network: ServerNetwork, vpn: String? = nil) -> Server {
-            Server(key: "s", group: "g", network: network, type: .linux, ip: "192.0.2.9", user: "u", port: 22,
-                   check: .ssh, role: nil, env: nil, wolMac: nil, vpn: vpn)
+            Server.sample(network: network, type: .linux, ip: "192.0.2.9", check: .ssh, vpn: vpn)
         }
         func snap(_ configure: (inout StatusSnapshot) -> Void) -> StatusSnapshot {
             var s = StatusSnapshot(); configure(&s); return s

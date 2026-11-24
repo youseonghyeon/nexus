@@ -56,4 +56,40 @@ final class RemoteCommandsTests: XCTestCase {
         // 2026-11-10: function R 은 r=Invoke-History 에 가려 값 줄이 전부 "위치 매개 변수를 찾을 수 없습니다" 였다
         XCTAssertTrue(WindowsLive.script.contains("function NxRow "))
     }
+
+    /// 탭마다 서버로 보내는 명령과 stdin (종류 × 탭 전부) — 조립하는 코드를 정리해도 보내는 글은 그대로여야 한다
+    func testQueryCommandTable() {
+        func ps(_ script: String) -> String { RemoteCommands.powerShellCommand(script) }
+        let table: [ServerType: [RemoteCommands.Query: (command: String, stdin: String?)]] = [
+            .linux: [.spec: ("bash -s", RemoteCommands.linuxSpec), .services: ("sh -s", ServicesScript.linux), .ports: (RemoteCommands.linuxPorts, nil),
+                     .live: ("sh -s", LinuxLive.script), .network: ("sh -s", LinuxInfoScripts.network), .schedule: ("sh -s", LinuxInfoScripts.schedule)],
+            .windows: [.spec: (ps(RemoteCommands.windowsSpec), nil), .services: (ps(ServicesScript.windows), nil), .ports: (ps(RemoteCommands.windowsPorts), nil),
+                       .live: (ps(WindowsLive.script), nil), .network: (ps(WindowsNetwork.script), nil)],
+            .openwrt: [.spec: ("sh -s", OpenWrt.specScript), .network: ("sh -s", OpenWrt.networkScript), .firewall: ("sh -s", OpenWrt.firewallScript),
+                       .clients: ("sh -s", OpenWrt.clientsScript), .wireguard: ("sh -s", OpenWrt.wireguardScript), .services: ("sh -s", OpenWrt.servicesScript),
+                       .ports: (OpenWrt.portsCommand, nil), .live: ("sh -s", LinuxLive.script)],
+        ]
+        for type in [ServerType.linux, .windows, .openwrt] {
+            for query in RemoteCommands.Query.allCases {
+                let got = RemoteCommands.query(query, for: type), want = table[type]?[query]
+                XCTAssertEqual(got?.command, want?.command, "\(type) \(query)")
+                XCTAssertEqual(got?.stdin, want?.stdin, "\(type) \(query)")
+                XCTAssertEqual(got == nil, want == nil, "\(type) \(query)")
+            }
+        }
+    }
+
+    func testOutputParsersReadTheLastNonEmptyLine() {
+        XCTAssertEqual(RemoteCommands.parseSize("motd\n  1024  \n\n \n"), 1024)
+        XCTAssertNil(RemoteCommands.parseSize("1024\nbye"))
+        XCTAssertNil(RemoteCommands.parseSize("0"))
+        XCTAssertNil(RemoteCommands.parseSize(" \n"))
+        XCTAssertEqual(RemoteCommands.parseWriteAccess("banner\r\n writable \r\n"), .writable)
+        XCTAssertEqual(RemoteCommands.parseWriteAccess("writable\nreadonly\n\n"), .readonly)
+        XCTAssertNil(RemoteCommands.parseWriteAccess(""))
+        XCTAssertNil(RemoteCommands.parseWriteAccess("writable\nother"))
+        XCTAssertEqual(RemoteCommands.parseHome("motd\n /home/me \n\n", type: .linux), "/home/me")
+        XCTAssertNil(RemoteCommands.parseHome("/home/me\nbye", type: .linux))
+        XCTAssertNil(RemoteCommands.parseHome("\n \n", type: .openwrt))
+    }
 }

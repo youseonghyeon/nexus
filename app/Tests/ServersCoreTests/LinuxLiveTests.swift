@@ -105,10 +105,7 @@ final class LinuxLiveTests: XCTestCase {
             ("OpenWrt.wireguardScript", OpenWrt.wireguardScript), ("OpenWrt.servicesScript", OpenWrt.servicesScript),
         ]
         for (name, script) in scripts {
-            let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = ["-n", "-c", script]
-            p.standardError = FileHandle.nullDevice
-            try p.run(); p.waitUntilExit()
-            XCTAssertEqual(p.terminationStatus, 0, name)
+            XCTAssertEqual(try shellSyntaxStatus("/bin/sh", script, quiet: true), 0, name)
         }
         // @BLK: 디스크가 아닌 장치는 읽기 전에 거르고, 값은 내장 read 로 (장치마다 cat 을 띄우지 않는다)
         XCTAssertTrue(LinuxLive.script.contains(#"case "$b" in loop*|ram*|zram*|nbd*|fd*|sr*|mmcblk*boot*|mmcblk*rpmb) continue ;; esac"#))

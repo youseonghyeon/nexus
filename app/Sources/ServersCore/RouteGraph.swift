@@ -57,11 +57,11 @@ public struct RouteGraph: Sendable, Equatable {
     /// 그 IPv4 주소로 나가는 연결이 타는 줄: 가장 긴 대역이 이긴다. 장치에 묶인 default 는 보통 연결이 쓰지 않으니 후보에서 뺀다.
     /// IPv4 꼴이 아니거나 맞는 줄이 없으면 nil.
     public static func match(_ address: String, in table: RouteTable) -> RouteEntry? {
-        guard let ip = NetworkServiceDraft.ipv4(address.trimmingCharacters(in: .whitespaces)) else { return nil }
+        guard let ip = IPv4.parse(address.trimmingCharacters(in: .whitespaces)) else { return nil }
         var best: (entry: RouteEntry, length: Int)?
         for entry in table.entries where entry.kind != .scoped {
             guard let (network, length) = prefix(of: entry.destination) else { continue }
-            let mask: UInt32 = length == 0 ? 0 : ~UInt32(0) << UInt32(32 - length)
+            let mask = IPv4.mask(prefix: length)
             if ip & mask == network & mask, best == nil || length > best!.length { best = (entry, length) }
         }
         return best?.entry
@@ -71,7 +71,7 @@ public struct RouteGraph: Sendable, Equatable {
     private static func prefix(of destination: String) -> (UInt32, Int)? {
         if destination == "default" { return (0, 0) }
         let parts = destination.split(separator: "/", omittingEmptySubsequences: false)
-        guard let network = NetworkServiceDraft.ipv4(String(parts[0])) else { return nil }
+        guard let network = IPv4.parse(String(parts[0])) else { return nil }
         if parts.count == 1 { return (network, 32) }
         guard parts.count == 2, let length = Int(parts[1]), (0...32).contains(length) else { return nil }
         return (network, length)
@@ -118,11 +118,11 @@ public struct RouteGraph: Sendable, Equatable {
     /// 그 IPv4 주소가 타는 main 테이블 경로: 가장 긴 대역, 같으면 metric 이 작은 것. 판정할 수 없는 서버(supportsLookup)·IPv4 아님·맞는 줄 없음이면 nil.
     /// blackhole·unreachable 도 "거기서 버린다"는 답이라 그대로 돌려준다.
     public static func hit(_ address: String, in routing: OpenWrtRouting) -> Hit? {
-        guard supportsLookup(routing), let ip = NetworkServiceDraft.ipv4(address.trimmingCharacters(in: .whitespaces)) else { return nil }
+        guard supportsLookup(routing), let ip = IPv4.parse(address.trimmingCharacters(in: .whitespaces)) else { return nil }
         var best: (route: OpenWrtRoute, length: Int)?
         for route in routing.routes where route.table == "main" && route.kind != "throw" {
             guard let (network, length) = prefix(of: route.destination) else { continue }
-            let mask: UInt32 = length == 0 ? 0 : ~UInt32(0) << UInt32(32 - length)
+            let mask = IPv4.mask(prefix: length)
             guard ip & mask == network & mask else { continue }
             if let current = best, length < current.length || (length == current.length && (route.metric ?? 0) >= (current.route.metric ?? 0)) { continue }
             best = (route, length)

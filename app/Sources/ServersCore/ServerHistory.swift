@@ -71,18 +71,11 @@ public enum ServerHistory {
     public static var defaultURL: URL { AppSupport.baseURL.appendingPathComponent("history.json") }
 
     public static func load(from url: URL = defaultURL) -> HistoryState {
-        guard let data = try? Data(contentsOf: url) else { return HistoryState() }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return (try? decoder.decode(HistoryState.self, from: data)) ?? HistoryState()
+        (try? AppSupport.readJSON(HistoryState.self, from: url, isoDates: true)) ?? HistoryState()
     }
 
     public static func save(_ state: HistoryState, to url: URL = defaultURL) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        try encoder.encode(state).write(to: url, options: .atomic)
+        try AppSupport.writeJSON(state, to: url, pretty: false, isoDates: true)
     }
 
     // MARK: 받은 결과 → 견줄 값

@@ -233,9 +233,8 @@ final class ServerConfigEditorTests: XCTestCase {
     }
 
     func testWriteKeepsPermissions() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let dir = tempPath("config-editor")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
         let path = dir.appendingPathComponent("servers.conf").path
         try text.write(toFile: path, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path)
@@ -351,7 +350,7 @@ final class ServerConfigEditorTests: XCTestCase {
         let result = try ServerConfigEditor.updating(a, for: "sandbox", in: text)
         XCTAssertTrue(result.contains("role=Hyper-V\ntunnel_ports=Grafana:3000,8080\nproxy_port=1081\n\n# win 은"), "블록 끝, 다음 블록 주석 앞")
         let sandbox = try XCTUnwrap(try ServerConfigParser.parse(result).server("sandbox"))
-        XCTAssertEqual(sandbox.tunnelPorts.map(\.label), ["Grafana Tunnel", "Tunnel 8080"])
+        XCTAssertEqual(sandbox.tunnelPorts, a.tunnelPorts)
         XCTAssertEqual(sandbox.proxyPort, 1081)
     }
 

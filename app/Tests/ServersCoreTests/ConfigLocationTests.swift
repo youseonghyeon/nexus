@@ -4,7 +4,7 @@ import XCTest
 
 final class ConfigLocationTests: XCTestCase {
     private func tempDir() -> String {
-        FileManager.default.temporaryDirectory.appendingPathComponent("config-location-\(UUID().uuidString)").path
+        tempPath("config-location").path
     }
 
     /// 저장소 servers.conf 의 머리 주석과 새 목록 템플릿(ConfigLocation.header)은 함께 고친다 (AGENTS.md) — 어긋나면 여기서 잡는다

@@ -151,7 +151,7 @@ public enum NetworkProbe {
     /// 그 주소로 가는 패킷이 나갈 장치 (라우팅 표 조회만, 망에 나가지 않는다). 장치에 묶지 않는 서버(Direct·Tailscale)의 표시용.
     /// IPv4 주소일 때만 묻는다 — 이름을 넘기면 route 가 DNS 를 물어 망에 나가고, 안 풀리는 이름이면 라운드마다 시간 제한까지 기다린다. 이름이면 nil.
     public static func routeInterface(to host: String, runner: any CommandRunner) async -> String? {
-        guard NetworkServiceDraft.ipv4(host) != nil else { return nil }
+        guard IPv4.parse(host) != nil else { return nil }
         let result = await runner.run("route", ["-n", "get", host], timeout: 5)
         return result.ok ? parseRoute(result.stdout).interface : nil
     }

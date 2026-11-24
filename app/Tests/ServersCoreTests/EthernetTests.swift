@@ -214,8 +214,8 @@ final class EthernetTests: XCTestCase {
         XCTAssertEqual(Ethernet.dottedMask(hex: "0xff000000"), "255.0.0.0")
         XCTAssertNil(Ethernet.dottedMask(hex: "255.255.255.0"))
         XCTAssertNil(Ethernet.dottedMask(hex: "0xzz"))
-        XCTAssertEqual(NetworkServiceDraft.dotted(0x0A320A11), "10.50.10.17", "ipv4 의 반대")
-        XCTAssertEqual(NetworkServiceDraft.ipv4(NetworkServiceDraft.dotted(0xC0A80001)).map(NetworkServiceDraft.dotted), "192.168.0.1")
+        XCTAssertEqual(IPv4.dotted(0x0A320A11), "10.50.10.17", "parse 의 반대")
+        XCTAssertEqual(IPv4.parse(IPv4.dotted(0xC0A80001)).map(IPv4.dotted), "192.168.0.1")
     }
 
     // MARK: 상태·대표

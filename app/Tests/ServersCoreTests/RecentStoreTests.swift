@@ -30,8 +30,7 @@ final class RecentStoreTests: XCTestCase {
     }
 
     func testSaveAndLoadRoundTrip() throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("recent-\(UUID().uuidString)/Servers/recent.json")
-        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent().deletingLastPathComponent()) }
+        let url = tempPath("recent").appendingPathComponent("Servers/recent.json")
         XCTAssertEqual(RecentStore.load(from: url), RecentState(), "파일이 없으면 빈 상태")
         let state = RecentStore.record(RecentTunnel(serverKey: "was", kind: .db(host: "h", port: 5432, name: "acme"), localPort: 15432), in: RecentState())
         try RecentStore.save(state, to: url)

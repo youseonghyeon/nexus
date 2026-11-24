@@ -6,7 +6,7 @@ import XCTest
 
 final class NoteVaultTests: XCTestCase {
     private func tempURL() -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("notes-\(UUID().uuidString)/Servers/notes.bin")
+        tempPath("notes").appendingPathComponent("Servers/notes.bin")
     }
     private var key: VaultKey { PasswordVault.resolveKey(store: MemoryKeyStore()) }
 

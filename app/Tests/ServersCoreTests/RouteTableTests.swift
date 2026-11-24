@@ -6,8 +6,7 @@ final class RouteTableTests: XCTestCase {
     /// Fixtures/netstat-routes-inet.txt 는 이 Mac(WireGuard 전체 터널 + 유선·Wi-Fi 같은 대역 + OrbStack·VM 브리지)에서
     /// `netstat -rn -f inet` 을 그대로 받은 것 (98줄, ARP 의 MAC 만 0 으로 가림)
     private func realOutput() throws -> String {
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/netstat-routes-inet.txt")
-        return try String(contentsOf: url, encoding: .utf8)
+        try fixtureText("netstat-routes-inet")
     }
 
     /// 수백 줄 중 남는 건 default 3 · 대역 4 — 호스트 캐시(W)·ARP·멀티캐스트·lo0·169.254·브로드캐스트·자기 주소·브리지 default 는 빠진다
@@ -21,8 +20,7 @@ final class RouteTableTests: XCTestCase {
 
     /// Fixtures/scutil-nwi.txt 는 같은 Mac 에서 `scutil --nwi` 를 그대로 받은 것 (utun6 > en11 > en0)
     private func realOrder() throws -> String {
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/scutil-nwi.txt")
-        return try String(contentsOf: url, encoding: .utf8)
+        try fixtureText("scutil-nwi")
     }
 
     /// 실제 출력: IPv4 블록 순서만 (IPv6 블록·REACH·"Network interfaces:" 줄은 안 읽는다) → default 에 1·2·3

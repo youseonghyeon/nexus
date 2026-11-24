@@ -432,7 +432,7 @@ public enum OpenWrtClients {
         }
 
         // uci show dhcp: "dhcp.<섹션>=host" 뒤에 ".mac='aa:…' 'bb:…'" · ".ip='…'" · ".name='…'"
-        for f in uciSections(s["STATIC"] ?? [], type: "host") {
+        for f in UCI.sections(s["STATIC"] ?? [], type: "host") {
             for raw in f["mac"] ?? [] {
                 guard let mac = Arp.normalizeMAC(raw) else { continue }
                 touch(mac) { e in
@@ -471,7 +471,7 @@ public enum OpenWrtClients {
 
         // GL.iNet 별칭: "gl-client.@client[0]=client" · ".mac='D8:…'" · ".alias='window-pc'" — 목록에 이미 있는 장비에만 이름으로
         var aliases: [String: String] = [:]
-        for f in uciSections(s["ALIAS"] ?? [], type: "client") {
+        for f in UCI.sections(s["ALIAS"] ?? [], type: "client") {
             guard let mac = f["mac"]?.first.flatMap(Arp.normalizeMAC), let alias = f["alias"]?.first, !alias.isEmpty else { continue }
             aliases[mac] = alias
         }
@@ -484,42 +484,6 @@ public enum OpenWrtClients {
             let ka = OpenWrt.ipSortKey(a.ip), kb = OpenWrt.ipSortKey(b.ip)
             return ka == kb ? a.mac < b.mac : ka.lexicographicallyPrecedes(kb)
         }
-    }
-
-    /// uci show 출력에서 그 종류(=host · =client) 섹션들의 옵션 → 값 목록. 섹션 이름 순.
-    static func uciSections(_ lines: [String], type: String) -> [[String: [String]]] {
-        var matched: Set<String> = []
-        var fields: [String: [String: [String]]] = [:]
-        for line in lines {
-            guard let eq = line.firstIndex(of: "=") else { continue }
-            let path = line[..<eq].split(separator: ".").map(String.init)
-            let value = String(line[line.index(after: eq)...])
-            if path.count == 2, value == type { matched.insert(path[1]); continue }
-            guard path.count == 3 else { continue }
-            fields[path[1], default: [:]][path[2]] = uciValues(value)
-        }
-        return matched.sorted().map { fields[$0] ?? [:] }
-    }
-
-    /// uci show 값 "'a' 'b c'" → ["a", "b c"]. 값 안의 ' 는 uci 가 '\'' 로 내보낸다 ("Bob'\''s" → "Bob's"). 따옴표 없는 값은 통째로.
-    static func uciValues(_ text: String) -> [String] {
-        guard text.hasPrefix("'") else { return text.isEmpty ? [] : [text] }
-        let chars = Array(text)
-        var values: [String] = [], current = "", inside = false, i = 0
-        while i < chars.count {
-            let ch = chars[i]
-            if ch == "'" {
-                if inside, i + 3 < chars.count, chars[i + 1] == "\\", chars[i + 2] == "'", chars[i + 3] == "'" {
-                    current.append("'"); i += 4; continue
-                }
-                if inside { values.append(current); current = "" }
-                inside.toggle()
-            } else if inside {
-                current.append(ch)
-            }
-            i += 1
-        }
-        return values
     }
 }
 
@@ -567,9 +531,7 @@ public enum WireGuardReport: Sendable, Equatable {
         // network.<섹션>.public_key='…' / .description='…' — 같은 섹션끼리 이어 공개 키 → 이름
         var keys: [String: String] = [:], labels: [String: String] = [:]
         for line in s["NAMES"] ?? [] {
-            guard let eq = line.firstIndex(of: "=") else { continue }
-            let path = line[..<eq].split(separator: ".").map(String.init)
-            guard path.count == 3, let value = OpenWrtClients.uciValues(String(line[line.index(after: eq)...])).first else { continue }
+            guard let (path, raw) = UCI.entry(line), path.count == 3, let value = UCI.values(raw).first else { continue }
             let section = path[0] + "." + path[1]
             if path[2] == "public_key" { keys[section] = value }
             else if path[2] == "description" || (path[2] == "name" && labels[section] == nil) { labels[section] = value }

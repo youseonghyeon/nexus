@@ -118,19 +118,7 @@ public enum LocalCommands {
 
     /// ifconfig 출력에서 (장치, IPv4). lo0 은 뺀다.
     public static func parseInterfaceAddresses(_ text: String) -> [(device: String, ip: String)] {
-        var out: [(device: String, ip: String)] = []
-        var device = ""
-        for raw in text.split(separator: "\n") {
-            if let colon = raw.firstIndex(of: ":"), !raw.hasPrefix("\t"), !raw.hasPrefix(" ") {
-                device = String(raw[..<colon])
-                continue
-            }
-            let line = raw.trimmingCharacters(in: .whitespaces)
-            guard line.hasPrefix("inet "), device != "lo0" else { continue }
-            let parts = line.split(separator: " ")
-            if parts.count >= 2 { out.append((device, String(parts[1]))) }
-        }
-        return out
+        Ifconfig.blocks(text).filter { $0.device != "lo0" }.flatMap { block in block.inetAddresses.map { (device: block.device, ip: $0) } }
     }
 }
 

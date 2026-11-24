@@ -4,7 +4,7 @@ import XCTest
 
 final class LanStoreTests: XCTestCase {
     private func tempDir() -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("lan-store-\(UUID().uuidString)")
+        tempPath("lan-store")
     }
 
     func testLoadOrSeedCreatesFileOnceThenPrefersFile() throws {

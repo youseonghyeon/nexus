@@ -72,10 +72,7 @@ public enum NetworkInfoFetcher {
     public static func prefixLength(mask: String) -> Int? {
         let parts = mask.split(separator: ".").compactMap { UInt32($0) }
         guard parts.count == 4, parts.allSatisfy({ $0 <= 255 }) else { return nil }
-        let bits = parts.reduce(UInt32(0)) { ($0 << 8) | $1 }
-        let ones = bits.nonzeroBitCount
-        guard ones == 0 || bits == (UInt32.max << (32 - ones)) else { return nil }
-        return ones
+        return IPv4.prefixLength(mask: parts.reduce(UInt32(0)) { ($0 << 8) | $1 })
     }
 
     // MARK: Tailscale

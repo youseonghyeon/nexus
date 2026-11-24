@@ -3,23 +3,6 @@
 
 import Foundation
 
-/// 터미널 색 한 벌: 바탕·글자·커서·16색. 쓰는 곳은 서버별 테마(ServerTerminalTheme) — 예전 Rosé Pine 두 벌(그룹 테마 · 설정의 터미널 색)은 2026-11-24 에 뺐다.
-public struct TerminalPalette: Sendable, Equatable {
-    public let background: String
-    public let foreground: String
-    public let cursor: String
-    public let colors: [String]
-
-    public init(background: String, foreground: String, cursor: String, colors: [String]) {
-        self.background = background; self.foreground = foreground; self.cursor = cursor; self.colors = colors
-    }
-}
-
-/// POSIX 단일 인용. zsh 의 %q 와 달리 어떤 셸에서도 같은 결과다.
-public func shellQuote(_ s: String) -> String {
-    "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
-}
-
 /// 터미널 없이 비밀번호를 팝업으로 받는 ssh 설정. ssh 는 SSH_ASKPASS 프로그램을 불러 그 출력으로 비밀번호를 받는다.
 public enum AskPass {
     /// ssh 에 넘길 환경변수. REQUIRE=force 로 TTY 유무와 관계없이 헬퍼를 쓴다.
@@ -85,13 +68,9 @@ public enum SessionCommand {
         host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
     }
 
-    /// bindAddress 는 로컬 리스너 쪽(127.0.0.x — 어느 앱이나 붙는다), bindInterface 는 서버로 나가는 바깥쪽 연결(내부망 장치)이다.
+    /// 포트 터널 · DB 터널(remoteHost 가 DB 주소) 공용. bindAddress 는 로컬 리스너 쪽(127.0.0.x — 어느 앱이나 붙는다), bindInterface 는 서버로 나가는 바깥쪽 연결(내부망 장치)이다.
     public static func tunnelArguments(to server: Server, remotePort: Int, remoteHost: String = "127.0.0.1", localPort: Int, bindAddress: String = "127.0.0.1", banner: String, bindInterface: String? = nil) -> [String] {
         tunnelBase(server, banner: banner, bindInterface: bindInterface) + ["-L", "\(bindAddress):\(localPort):\(forwardHost(remoteHost)):\(remotePort)", server.target]
-    }
-
-    public static func dbTunnelArguments(via server: Server, host: String, port: Int, localPort: Int, bindAddress: String = "127.0.0.1", banner: String, bindInterface: String? = nil) -> [String] {
-        tunnelBase(server, banner: banner, bindInterface: bindInterface) + ["-L", "\(bindAddress):\(localPort):\(forwardHost(host)):\(port)", server.target]
     }
 
     /// SOCKS5 프록시 (ssh -D): 로컬 포트로 들어온 연결을 server 가 대신 나간다. Chrome 프록시 모드가 쓴다.

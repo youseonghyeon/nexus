@@ -172,21 +172,14 @@ public struct RouteTable: Sendable, Equatable {
     /// ifconfig 출력 → 장치별 첫 IPv4 · MTU
     public static func parseInterfaceDetails(_ text: String) -> [String: InterfaceDetail] {
         var out: [String: InterfaceDetail] = [:]
-        var device = ""
-        for raw in text.split(separator: "\n") {
-            if let colon = raw.firstIndex(of: ":"), !raw.hasPrefix("\t"), !raw.hasPrefix(" ") {
-                device = String(raw[..<colon])
-                var detail = InterfaceDetail()
-                if let range = raw.range(of: " mtu ") {
-                    detail.mtu = Int(raw[range.upperBound...].prefix { $0.isNumber })
-                }
-                out[device] = detail
-                continue
+        for block in Ifconfig.blocks(text) {
+            guard let header = block.header else { continue }   // 장치 줄보다 먼저 나온 줄은 버린다
+            var detail = InterfaceDetail()
+            if let range = header.range(of: " mtu ") {
+                detail.mtu = Int(header[range.upperBound...].prefix { $0.isNumber })
             }
-            let line = raw.trimmingCharacters(in: .whitespaces)
-            guard line.hasPrefix("inet "), !device.isEmpty, out[device]?.ip == nil else { continue }
-            let parts = line.split(separator: " ")
-            if parts.count >= 2 { out[device]?.ip = String(parts[1]) }
+            if !block.device.isEmpty { detail.ip = block.inetAddresses.first }
+            out[block.device] = detail   // 같은 이름이 다시 나오면 뒤의 것
         }
         return out
     }

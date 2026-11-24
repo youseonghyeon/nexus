@@ -17,6 +17,12 @@ final class ServicesReportTests: XCTestCase {
         RemoteCommands.cleanOutput(try fixtureText("services-linux-\(n)"), type: .linux)
     }
 
+    /// 화면이 쓰는 dockerPortsShown 의 결과를 한 줄 글로: "80, 443, 8405 +2"
+    private func dockerPorts(_ raw: String) -> String {
+        let ports = ServicesFormat.dockerPortsShown(raw)
+        return ports.shown.map(\.text).joined(separator: ", ") + (ports.more > 0 ? " +\(ports.more)" : "")
+    }
+
     func testLinuxFailedRunningAndContainers() throws {
         let report = try XCTUnwrap(ServicesParser.parse(try fixture(1), type: .linux))
         XCTAssertEqual(report.failed.map(\.name), ["broken"])
@@ -106,7 +112,7 @@ final class ServicesReportTests: XCTestCase {
         XCTAssertEqual(items.map(\.name), ["fx-created", "fx-plain", "fx-range", "fx-dns", "fx-web"])
         XCTAssertEqual(items.map(\.detail), Array(repeating: "busybox", count: 5), "이미지는 그대로 (변경 이력이 이 값으로 견준다)")
         XCTAssertEqual(items.map(\.project), [nil, nil, nil, "shop", "shop"])
-        XCTAssertEqual(items.map { ServicesFormat.dockerPorts($0.ports) },
+        XCTAssertEqual(items.map { dockerPorts($0.ports) },
                        ["", "", "18100-18102→8100-8102", "15353→53/udp", "18080→80, 18443→443"],
                        "IPv4·IPv6 는 하나로 · 이어지는 포트는 범위로 · 내놓지 않은 9000/tcp 는 뺀다 · 루프백 주소는 적지 않는다")
         let web = ServicesFormat.dockerPortList(items[4].ports)
@@ -128,22 +134,22 @@ final class ServicesReportTests: XCTestCase {
     }
 
     func testDockerPortsShapes() {
-        XCTAssertEqual(ServicesFormat.dockerPorts("0.0.0.0:5432->5432/tcp, :::5432->5432/tcp"), "5432", "옛 docker 의 IPv6 꼴(:::) · 같은 포트는 한 번")
-        XCTAssertEqual(ServicesFormat.dockerPorts("0.0.0.0:8000-8010->9000-9010/tcp"), "8000-8010→9000-9010", "docker 가 범위로 준 것")
-        XCTAssertEqual(ServicesFormat.dockerPorts("127.0.0.1:9000->9000/tcp, [::1]:9000->9000/tcp"), "9000", "루프백 둘은 하나로 · 주소 없이")
+        XCTAssertEqual(dockerPorts("0.0.0.0:5432->5432/tcp, :::5432->5432/tcp"), "5432", "옛 docker 의 IPv6 꼴(:::) · 같은 포트는 한 번")
+        XCTAssertEqual(dockerPorts("0.0.0.0:8000-8010->9000-9010/tcp"), "8000-8010→9000-9010", "docker 가 범위로 준 것")
+        XCTAssertEqual(dockerPorts("127.0.0.1:9000->9000/tcp, [::1]:9000->9000/tcp"), "9000", "루프백 둘은 하나로 · 주소 없이")
         XCTAssertEqual(ServicesFormat.dockerPortList("127.0.0.2:9000->9000/tcp, 0.0.0.0:9000->9000/tcp").map(\.open), [false, true], "같은 번호라도 묶인 곳이 다르면 따로")
-        XCTAssertEqual(ServicesFormat.dockerPorts("127.0.0.2:9000->9000/tcp"), "9000", "127.0.0.0/8 전부 루프백 — 주소 없이")
+        XCTAssertEqual(dockerPorts("127.0.0.2:9000->9000/tcp"), "9000", "127.0.0.0/8 전부 루프백 — 주소 없이")
         XCTAssertEqual(ServicesFormat.dockerPortList(":::80->80/tcp, [::]:90->90/tcp").map(\.open), [true, true], "IPv6 의 모든 주소도 open")
         XCTAssertEqual(ServicesFormat.dockerPortList("192.0.2.10:53->53/udp").map(\.open), [false], "특정 주소에 묶인 것은 open 이 아니다 (주소를 붙인다)")
         let many = ServicesFormat.dockerPortsShown("0.0.0.0:1->1/tcp, 0.0.0.0:3->3/tcp, 0.0.0.0:5->5/tcp, 0.0.0.0:7->7/tcp")
         XCTAssertEqual(many.shown.count, 3); XCTAssertEqual(many.more, 1)
         XCTAssertEqual(ServicesFormat.dockerPortsShown("").shown, [])
-        XCTAssertEqual(ServicesFormat.dockerPorts("192.0.2.10:53->53/udp, 192.0.2.10:53->53/tcp"), "192.0.2.10:53/udp, 192.0.2.10:53", "프로토콜이 다르면 따로")
-        XCTAssertEqual(ServicesFormat.dockerPorts("0.0.0.0:81->80/tcp, 0.0.0.0:83->82/tcp"), "81→80, 83→82", "한 칸 건너뛰면 범위가 아니다")
-        XCTAssertEqual(ServicesFormat.dockerPorts("0.0.0.0:1->1/tcp, 0.0.0.0:3->3/tcp, 0.0.0.0:5->5/tcp, 0.0.0.0:7->7/tcp, 0.0.0.0:9->9/tcp"), "1, 3, 5 +2", "넷 이상은 앞 셋 + 나머지 수")
-        XCTAssertEqual(ServicesFormat.dockerPorts("80/tcp, 443/tcp"), "", "내놓지 않은 것뿐이면 빈 글")
-        XCTAssertEqual(ServicesFormat.dockerPorts(""), "")
-        XCTAssertEqual(ServicesFormat.dockerPorts("garbage, 0.0.0.0:x->y/tcp, ->/"), "", "못 읽는 꼴은 버린다")
+        XCTAssertEqual(dockerPorts("192.0.2.10:53->53/udp, 192.0.2.10:53->53/tcp"), "192.0.2.10:53/udp, 192.0.2.10:53", "프로토콜이 다르면 따로")
+        XCTAssertEqual(dockerPorts("0.0.0.0:81->80/tcp, 0.0.0.0:83->82/tcp"), "81→80, 83→82", "한 칸 건너뛰면 범위가 아니다")
+        XCTAssertEqual(dockerPorts("0.0.0.0:1->1/tcp, 0.0.0.0:3->3/tcp, 0.0.0.0:5->5/tcp, 0.0.0.0:7->7/tcp, 0.0.0.0:9->9/tcp"), "1, 3, 5 +2", "넷 이상은 앞 셋 + 나머지 수")
+        XCTAssertEqual(dockerPorts("80/tcp, 443/tcp"), "", "내놓지 않은 것뿐이면 빈 글")
+        XCTAssertEqual(dockerPorts(""), "")
+        XCTAssertEqual(dockerPorts("garbage, 0.0.0.0:x->y/tcp, ->/"), "", "못 읽는 꼴은 버린다")
     }
 
     func testDockerStatusBecomesUptimeAndNote() {

@@ -90,8 +90,7 @@ final class PowerWatchTests: XCTestCase {
     // MARK: 스냅샷 → 전원 상태
 
     private func server(_ key: String, _ network: ServerNetwork, ip: String = "192.0.2.1") -> Server {
-        Server(key: key, group: "g", network: network, type: .linux, ip: ip, user: "u", port: 22,
-               check: .tcp, role: nil, env: nil, wolMac: nil)
+        Server.sample(key: key, network: network, type: .linux, ip: ip, check: .tcp)
     }
 
     private lazy var servers = [server("win", .tailscale), server("nexus", .tailscale), server("was", .lan), server("web", .lan),

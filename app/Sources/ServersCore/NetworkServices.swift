@@ -115,38 +115,19 @@ public struct NetworkServiceDraft: Sendable, Equatable {
         }
         if existing.contains(where: { $0.caseInsensitiveCompare(d.name) == .orderedSame }) { return "이미 있는 서비스 이름입니다 (\(d.name))" }
         if d.port.isEmpty { return "어댑터를 고르세요" }
-        guard let ip = Self.ipv4(d.ip) else { return "IP 가 IPv4 형식이 아닙니다 (예: 10.50.10.17)" }
-        guard let mask = Self.ipv4(d.mask), NetworkInfoFetcher.prefixLength(mask: d.mask).map({ $0 > 0 && $0 < 32 }) == true else {
+        guard let ip = IPv4.parse(d.ip) else { return "IP 가 IPv4 형식이 아닙니다 (예: 10.50.10.17)" }
+        guard let mask = IPv4.parse(d.mask), NetworkInfoFetcher.prefixLength(mask: d.mask).map({ $0 > 0 && $0 < 32 }) == true else {
             return "서브넷이 올바르지 않습니다 (예: 255.255.255.0)"
         }
-        guard let router = Self.ipv4(d.router) else { return "게이트웨이가 IPv4 형식이 아닙니다 (예: 10.50.10.254)" }
+        guard let router = IPv4.parse(d.router) else { return "게이트웨이가 IPv4 형식이 아닙니다 (예: 10.50.10.254)" }
         if ip & mask != router & mask { return "게이트웨이가 IP 와 같은 대역이 아닙니다" }
         if ip == router { return "IP 와 게이트웨이가 같습니다" }
-        if d.dnsServers.contains(where: { Self.ipv4($0) == nil }) { return "DNS 가 IPv4 형식이 아닙니다 (쉼표로 여러 개, 예: 10.50.10.1, 8.8.8.8)" }
+        if d.dnsServers.contains(where: { IPv4.parse($0) == nil }) { return "DNS 가 IPv4 형식이 아닙니다 (쉼표로 여러 개, 예: 10.50.10.1, 8.8.8.8)" }
         // 대역의 첫 주소(네트워크)·끝 주소(브로드캐스트)는 장치에 붙일 수 없다
         for (label, value) in [("IP 가", ip), ("게이트웨이가", router)] where value & ~mask == 0 || value | mask == .max {
             return "\(label) 대역의 네트워크·브로드캐스트 주소입니다"
         }
         return nil
-    }
-
-    /// 32비트 값 → "10.50.10.17" (ipv4 의 반대)
-    public static func dotted(_ value: UInt32) -> String {
-        (0..<4).map { String((value >> (24 - 8 * UInt32($0))) & 0xFF) }.joined(separator: ".")
-    }
-
-    /// "10.50.10.17" → 32비트 값. 형식이 틀리면 nil (앞자리 0 거부)
-    public static func ipv4(_ text: String) -> UInt32? {
-        let parts = text.split(separator: ".", omittingEmptySubsequences: false)
-        guard parts.count == 4 else { return nil }
-        var value: UInt32 = 0
-        for part in parts {
-            // 앞자리 0(010) 은 받지 않는다 — inet_aton 계열은 8진수로 읽어 다른 주소가 된다
-            guard !part.isEmpty, part.count <= 3, part.allSatisfy(\.isASCII), part.count == 1 || part.first != "0",
-                  let n = UInt32(part), n <= 255 else { return nil }
-            value = value << 8 | n
-        }
-        return value
     }
 }
 

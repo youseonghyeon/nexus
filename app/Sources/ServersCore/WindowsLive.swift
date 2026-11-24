@@ -60,11 +60,6 @@ public struct LiveGPU: Sendable, Equatable, Identifiable {
     /// W
     public let power: Double?
 
-    public var memoryFraction: Double? {
-        guard let used = memoryUsed, let total = memoryTotal, total > 0 else { return nil }
-        return Double(used) / Double(total)
-    }
-
     /// "3, 1843, 8192, 35, 19.41, NVIDIA GeForce RTX 3070 Ti"
     static func parse(_ line: String) -> LiveGPU? {
         let f = line.split(separator: ",", maxSplits: 5, omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }

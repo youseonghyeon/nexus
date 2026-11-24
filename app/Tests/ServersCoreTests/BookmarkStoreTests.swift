@@ -72,8 +72,7 @@ final class BookmarkStoreTests: XCTestCase {
     }
 
     func testSaveLoadRoundTripAndBrokenFile() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("bookmarks-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: dir) }
+        let dir = tempPath("bookmarks")
         let file = dir.appendingPathComponent("bookmarks.json")
         XCTAssertEqual(BookmarkStore.load(from: file), BookmarkState(), "파일이 없으면 빈 상태")
         let state = add("http://localhost:3000/d/x", "결제 지연", icon: "data:image/png;base64,AAAA")

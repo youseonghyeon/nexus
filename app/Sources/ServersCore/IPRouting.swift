@@ -156,7 +156,7 @@ enum IPv4Prefix {
     /// 인터페이스 주소("192.168.8.103/24")가 경로 대역("192.168.8.0/24") 안에 같은 접두사로 있는가
     static func sameNetwork(_ address: String, _ destination: String) -> Bool {
         guard let a = parse(address), let d = parse(destination), a.prefix == d.prefix else { return false }
-        let mask: UInt32 = a.prefix == 0 ? 0 : ~UInt32(0) << (32 - a.prefix)
+        let mask = IPv4.mask(prefix: a.prefix)
         return a.address & mask == d.address & mask
     }
 }

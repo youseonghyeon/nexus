@@ -75,14 +75,10 @@ public enum IdentityStore {
 
     /// 없거나 깨졌으면 빈 목록 (키 파일이 없으면 지금처럼 기본 키·비밀번호로 접속한다)
     public static func load(from url: URL = defaultURL) -> [String: String] {
-        guard let data = try? Data(contentsOf: url) else { return [:] }
-        return (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]
+        (try? AppSupport.readJSON([String: String].self, from: url)) ?? [:]
     }
 
     public static func save(_ identities: [String: String], to url: URL = defaultURL) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(identities).write(to: url, options: .atomic)
+        try AppSupport.writeJSON(identities, to: url)
     }
 }

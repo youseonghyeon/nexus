@@ -5,6 +5,18 @@
 
 import Foundation
 
+/// 터미널 색 한 벌: 바탕·글자·커서·16색. 쓰는 곳은 서버별 테마(ServerTerminalTheme) — 예전 Rosé Pine 두 벌(그룹 테마 · 설정의 터미널 색)은 2026-11-24 에 뺐다.
+public struct TerminalPalette: Sendable, Equatable {
+    public let background: String
+    public let foreground: String
+    public let cursor: String
+    public let colors: [String]
+
+    public init(background: String, foreground: String, cursor: String, colors: [String]) {
+        self.background = background; self.foreground = foreground; self.cursor = cursor; self.colors = colors
+    }
+}
+
 public struct ServerTerminalTheme: Sendable, Equatable, Identifiable {
     public let id: String
     public let title: String

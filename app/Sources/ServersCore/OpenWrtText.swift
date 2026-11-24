@@ -25,6 +25,6 @@ extension OpenWrtClient {
     public static func leaseText(_ remaining: TimeInterval?) -> String {
         guard let remaining else { return "" }
         if remaining == .infinity { return "무기한" }
-        return remaining > 0 ? ServicesFormat.duration(remaining) : "만료"
+        return remaining > 0 ? DurationFormat.compact(remaining) : "만료"
     }
 }

@@ -261,7 +261,7 @@ struct DiagnosticCard: View {
                             Text(result.text).textSelection(.enabled)
                             if let ms = result.ms { Text("\(ms) ms").font(.caption).foregroundStyle(.tertiary) }
                             if let ttl = result.ttl {
-                                Text("TTL \(ServicesFormat.duration(TimeInterval(ttl)))").font(.caption).foregroundStyle(.tertiary)
+                                Text("TTL \(DurationFormat.compact(TimeInterval(ttl)))").font(.caption).foregroundStyle(.tertiary)
                                     .help("이 답이 캐시에 남는 시간 (\(ttl)초)")
                             }
                         }

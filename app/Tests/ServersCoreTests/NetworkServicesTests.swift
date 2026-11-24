@@ -102,9 +102,7 @@ final class NetworkServicesTests: XCTestCase {
     }
 
     private func zshSyntaxOK(_ script: String) throws -> Bool {
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/zsh"); p.arguments = ["-n", "-c", script]
-        try p.run(); p.waitUntilExit()
-        return p.terminationStatus == 0
+        try shellSyntaxStatus("/bin/zsh", script) == 0
     }
 
     func testScripts() throws {

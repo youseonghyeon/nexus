@@ -6,7 +6,7 @@ import XCTest
 
 final class WriteAccessTests: XCTestCase {
     func testLinuxCommandRuns() throws {
-        let home = FileManager.default.temporaryDirectory.appendingPathComponent("write-\(UUID().uuidString)")
+        let home = tempPath("write")
         let fm = FileManager.default
         for name in ["open", "it's dir", "-dash", "locked", "새 폴더"] {
             try fm.createDirectory(at: home.appendingPathComponent(name), withIntermediateDirectories: true)

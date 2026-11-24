@@ -11,10 +11,9 @@ final class LanOrderScriptTests: XCTestCase {
     private struct Outcome { let code: Int32; let stdout: String; let stderr: String; let order: [String]; let reorders: Int }
 
     private func run(_ body: String, order: [String]) throws -> Outcome {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("lan-order-\(UUID().uuidString)")
+        let dir = tempPath("lan-order")
         let bin = dir.appendingPathComponent("bin")
         try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
         let orderFile = dir.appendingPathComponent("order").path, log = dir.appendingPathComponent("log").path
         try (order.joined(separator: "\n") + "\n").write(toFile: orderFile, atomically: true, encoding: .utf8)
         let fake = """

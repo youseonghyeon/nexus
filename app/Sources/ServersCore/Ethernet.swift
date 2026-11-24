@@ -110,28 +110,24 @@ public enum Ethernet {
     /// `ifconfig` 전체 출력 → 장치별 값. 장치 줄은 들여쓰기 없이 "en8: flags=…".
     public static func parseInterfaces(_ text: String) -> [String: InterfaceState] {
         var out: [String: InterfaceState] = [:]
-        var device: String?
-        for raw in text.split(separator: "\n") {
-            if !raw.hasPrefix("\t"), !raw.hasPrefix(" "), let colon = raw.firstIndex(of: ":") {
-                device = String(raw[..<colon])
-                if let device { out[device] = InterfaceState() }
-                continue
+        for block in Ifconfig.blocks(text) where block.header != nil {   // 장치 줄보다 먼저 나온 줄은 버린다
+            var state = InterfaceState()
+            for line in block.lines {
+                let parts = line.split(separator: " ").map(String.init)
+                if line.hasPrefix("ether "), parts.count >= 2 {
+                    state.mac = parts[1]
+                } else if line.hasPrefix("inet "), parts.count >= 2 {
+                    state.addresses.append(parts[1])
+                    guard state.ipv4 == nil else { continue }
+                    state.ipv4 = parts[1]
+                    if let i = parts.firstIndex(of: "netmask"), i + 1 < parts.count { state.netmask = dottedMask(hex: parts[i + 1]) }
+                } else if line.hasPrefix("media:") || line.hasPrefix("status:") {
+                    let link = NetworkProbe.parseLinkMedia(line)
+                    if line.hasPrefix("media:") { state.media = link.media }
+                    else { state.active = link.status == "active" }
+                }
             }
-            guard let device else { continue }
-            let line = raw.trimmingCharacters(in: .whitespaces)
-            let parts = line.split(separator: " ").map(String.init)
-            if line.hasPrefix("ether "), parts.count >= 2 {
-                out[device]?.mac = parts[1]
-            } else if line.hasPrefix("inet "), parts.count >= 2 {
-                out[device]?.addresses.append(parts[1])
-                guard out[device]?.ipv4 == nil else { continue }
-                out[device]?.ipv4 = parts[1]
-                if let i = parts.firstIndex(of: "netmask"), i + 1 < parts.count { out[device]?.netmask = dottedMask(hex: parts[i + 1]) }
-            } else if line.hasPrefix("media:") || line.hasPrefix("status:") {
-                let link = NetworkProbe.parseLinkMedia(line)
-                if line.hasPrefix("media:") { out[device]?.media = link.media }
-                else { out[device]?.active = link.status == "active" }
-            }
+            out[block.device] = state   // 같은 이름이 다시 나오면 뒤의 것
         }
         return out
     }
@@ -139,7 +135,7 @@ public enum Ethernet {
     /// "0xffffff00" → "255.255.255.0"
     public static func dottedMask(hex: String) -> String? {
         guard hex.hasPrefix("0x"), let value = UInt32(hex.dropFirst(2), radix: 16) else { return nil }
-        return NetworkServiceDraft.dotted(value)
+        return IPv4.dotted(value)
     }
 
     /// 링크 속도 Mbps: "1000baseT <full-duplex>" → 1000, "2500Base-T" → 2500, "10GBase-T" → 10000, "100baseTX" → 100

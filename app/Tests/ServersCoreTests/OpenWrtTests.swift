@@ -784,11 +784,11 @@ final class OpenWrtTests: XCTestCase {
     }
 
     func testUciValues() {
-        XCTAssertEqual(OpenWrtClients.uciValues("'a' 'b c'"), ["a", "b c"])
-        XCTAssertEqual(OpenWrtClients.uciValues("'x'"), ["x"])
-        XCTAssertEqual(OpenWrtClients.uciValues("host"), ["host"])
-        XCTAssertEqual(OpenWrtClients.uciValues(""), [])
-        XCTAssertEqual(OpenWrtClients.uciValues(#"'Bob'\''s iPhone'"#), ["Bob's iPhone"], "uci 가 ' 를 '\\'' 로 내보낸다")
+        XCTAssertEqual(UCI.values("'a' 'b c'"), ["a", "b c"])
+        XCTAssertEqual(UCI.values("'x'"), ["x"])
+        XCTAssertEqual(UCI.values("host"), ["host"])
+        XCTAssertEqual(UCI.values(""), [])
+        XCTAssertEqual(UCI.values(#"'Bob'\''s iPhone'"#), ["Bob's iPhone"], "uci 가 ' 를 '\\'' 로 내보낸다")
     }
 
     // MARK: WireGuard

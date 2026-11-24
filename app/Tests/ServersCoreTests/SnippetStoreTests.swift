@@ -103,8 +103,7 @@ final class SnippetStoreTests: XCTestCase {
     }
 
     func testSaveLoadAndBrokenFile() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("snippets-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: dir) }
+        let dir = tempPath("snippets")
         let url = dir.appendingPathComponent("Servers/snippets.json")
         XCTAssertEqual(try SnippetStore.load(from: url), SnippetState(), "파일이 없으면 빈 목록")
         let state = SnippetStore.upsert(CommandSnippet(type: .windows, title: "t", command: "c"), in: SnippetState())

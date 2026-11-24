@@ -36,9 +36,8 @@ final class AskPassTests: XCTestCase {
 
     func testCancelTerminatesParentSSH() throws {
         // 부모 이름이 ssh 이면 취소 시 부모를 SIGTERM 으로 끝낸다 → 다음 프롬프트로 넘어가지 않는다
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("askpass-parent-\(UUID().uuidString)")
+        let dir = tempPath("askpass-parent")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
         // 가짜 "ssh": 헬퍼를 두 번 부른다. 첫 취소에서 자기 자신이 죽어야 하므로 두 번째 프롬프트는 나오지 않는다.
         let fakeSSH = dir.appendingPathComponent("ssh")
         try "#!/bin/sh\n\"\(helper)\" 'password: '; echo prompt-2; \"\(helper)\" 'password: '; echo survived\n".write(to: fakeSSH, atomically: true, encoding: .utf8)
@@ -66,9 +65,8 @@ final class AskPassTests: XCTestCase {
 
     /// 세션 비밀번호: 같은 부모(ssh)의 첫 호출은 창 없이 대입, 두 번째(틀림)는 창. 부모가 다르면 다시 첫 호출.
     func testSessionPasswordUsedOnceThenPrompts() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("askpass-session-\(UUID().uuidString)")
+        let dir = tempPath("askpass-session")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
         let fakeSSH = dir.appendingPathComponent("ssh")
         try "#!/bin/sh\n\"\(helper)\" 'password: '; \"\(helper)\" 'password: '; \"\(helper)\" 'password: '\n".write(to: fakeSSH, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fakeSSH.path)
@@ -95,9 +93,8 @@ final class AskPassTests: XCTestCase {
         XCTAssertFalse(AskPassHelper.usesSessionPassword(for: "Enter passphrase for key '/Users/me/.ssh/aws.pem': "))
         XCTAssertFalse(AskPassHelper.usesSessionPassword(for: "Are you sure you want to continue connecting (yes/no/[fingerprint])? "))
 
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("askpass-passphrase-\(UUID().uuidString)")
+        let dir = tempPath("askpass-passphrase")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
         // 가짜 "ssh": 키 암호 → 비밀번호 순서로 묻는다. 암호 물음은 창(훅 답), 비밀번호 물음은 첫 호출이라 세션 비밀번호
         let fakeSSH = dir.appendingPathComponent("ssh")
         try "#!/bin/sh\n\"\(helper)\" \"Enter passphrase for key '/k/aws.pem': \"; \"\(helper)\" 'password: '\n".write(to: fakeSSH, atomically: true, encoding: .utf8)
@@ -121,9 +118,8 @@ final class AskPassTests: XCTestCase {
     }
 
     func testClaimFirstUseMarker() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("askpass-marker-\(UUID().uuidString)")
+        let dir = tempPath("askpass-marker")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
         let marker = AskPassHelper.markerURL(parent: 4242, directory: dir)
         XCTAssertEqual(marker.lastPathComponent, "servers-askpass-4242")
         XCTAssertTrue(AskPassHelper.claimFirstUse(marker: marker))

@@ -54,7 +54,7 @@ public enum Arp {
             let ip = String(line[line.index(after: open)..<close])
             let rawMAC = String(line[atRange.upperBound..<onRange.lowerBound]).trimmingCharacters(in: .whitespaces)
             let device = line[onRange.upperBound...].split(separator: " ").first.map(String.init) ?? ""
-            guard !device.isEmpty, NetworkServiceDraft.ipv4(ip) != nil else { return nil }
+            guard !device.isEmpty, IPv4.parse(ip) != nil else { return nil }
             if let first = ip.split(separator: ".").first.flatMap({ Int($0) }), (224...239).contains(first) { return nil }
             let mac = rawMAC == "(incomplete)" ? nil : normalizeMAC(rawMAC)
             if mac == "ff:ff:ff:ff:ff:ff" { return nil }
@@ -71,12 +71,12 @@ public enum Arp {
 
     /// ifconfig <장치> 의 "inet 10.50.10.17 netmask 0xffffff00" 들 → 같은 대역인가
     public static func isLocal(_ ip: String, ifconfig: String) -> Bool {
-        guard let target = NetworkServiceDraft.ipv4(ip) else { return false }
+        guard let target = IPv4.parse(ip) else { return false }
         for raw in ifconfig.split(whereSeparator: \.isNewline) {
             let parts = raw.trimmingCharacters(in: .whitespaces).split(separator: " ").map(String.init)
-            guard parts.first == "inet", parts.count >= 4, let address = NetworkServiceDraft.ipv4(parts[1]),
+            guard parts.first == "inet", parts.count >= 4, let address = IPv4.parse(parts[1]),
                   let i = parts.firstIndex(of: "netmask"), i + 1 < parts.count,
-                  let maskText = Ethernet.dottedMask(hex: parts[i + 1]), let mask = NetworkServiceDraft.ipv4(maskText) else { continue }
+                  let maskText = Ethernet.dottedMask(hex: parts[i + 1]), let mask = IPv4.parse(maskText) else { continue }
             if address & mask == target & mask { return true }
         }
         return false
@@ -110,11 +110,11 @@ public enum Arp {
     /// 그 서비스 대역만: ip·mask(점 표기)로 정한 대역(예: 10.50.10.17/255.255.255.0 → 10.50.10.0–255)에 드는 이웃.
     /// 같은 NIC 에 서비스가 둘이면 다른 서비스 망의 이웃이 섞인다 (2026-10-15 Intranet 화면에 172.30.1.x). 대역 텍스트는 "10.50.10.0/24"
     public static func inSubnet(_ entries: [ArpEntry], ip: String, mask: String) -> (entries: [ArpEntry], subnet: String)? {
-        guard let address = NetworkServiceDraft.ipv4(ip), let maskBits = NetworkServiceDraft.ipv4(mask),
+        guard let address = IPv4.parse(ip), let maskBits = IPv4.parse(mask),
               let prefix = NetworkInfoFetcher.prefixLength(mask: mask) else { return nil }
         let network = address & maskBits
-        let kept = entries.filter { NetworkServiceDraft.ipv4($0.ip).map { $0 & maskBits == network } == true }
-        let text = NetworkServiceDraft.dotted(network) + "/\(prefix)"
+        let kept = entries.filter { IPv4.parse($0.ip).map { $0 & maskBits == network } == true }
+        let text = IPv4.dotted(network) + "/\(prefix)"
         return (kept, text)
     }
 
@@ -123,11 +123,11 @@ public enum Arp {
     /// 대역 안의 주소 전부 (네트워크·브로드캐스트·자기 주소 제외). 꼴이 틀리거나 /24(254 개)보다 넓으면 nil — 표만 읽는다.
     /// /31·/32 는 훑을 이웃이 없어 nil
     public static func sweepTargets(ip: String, mask: String) -> [String]? {
-        guard let address = NetworkServiceDraft.ipv4(ip), let maskBits = NetworkServiceDraft.ipv4(mask),
+        guard let address = IPv4.parse(ip), let maskBits = IPv4.parse(mask),
               let prefix = NetworkInfoFetcher.prefixLength(mask: mask), prefix >= 24, prefix <= 30 else { return nil }
         let network = address & maskBits, broadcast = network | ~maskBits
         let hosts = (network + 1..<broadcast).filter { $0 != address }
-        return hosts.map(NetworkServiceDraft.dotted)
+        return hosts.map(IPv4.dotted)
     }
 
     /// 주소마다 ping 한 번(장치에 묶음, 1초)을 병렬로 (동시에 concurrency 개) — 응답은 보지 않는다, ARP 표를 채우는 게 목적

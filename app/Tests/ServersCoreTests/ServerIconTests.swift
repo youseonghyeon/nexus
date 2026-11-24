@@ -12,7 +12,7 @@ final class ServerIconTests: XCTestCase {
 
     func testServerUsesItsType() {
         func server(_ type: ServerType) -> Server {
-            Server(key: "s", group: "g", network: .direct, type: type, ip: "10.0.0.1", user: "u", port: 22, check: .ssh, role: nil, env: nil, wolMac: nil)
+            Server.sample(network: .direct, type: type, ip: "10.0.0.1", check: .ssh)
         }
         XCTAssertEqual(server(.openwrt).iconSymbol, "wifi.router")
         XCTAssertEqual(server(.windows).iconSymbol, "desktopcomputer")

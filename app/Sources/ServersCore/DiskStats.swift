@@ -295,14 +295,7 @@ public enum DiskHealth {
 
 public enum DiskFormat {
     /// 10진 단위: 100 이상은 정수, 그 아래는 소수 한 자리
-    public static func bytes(_ value: Double) -> String {
-        let units: [(Double, String)] = [(1e12, "TB"), (1e9, "GB"), (1e6, "MB"), (1e3, "KB")]
-        for (scale, unit) in units where value >= scale {
-            let v = value / scale
-            return v >= 100 ? String(format: "%.0f %@", v, unit) : String(format: "%.1f %@", v, unit)
-        }
-        return String(format: "%.0f B", value)
-    }
+    public static func bytes(_ value: Double) -> String { ByteFormat.decimal(value) }
 
     public static func bytes(_ value: UInt64) -> String { bytes(Double(value)) }
 

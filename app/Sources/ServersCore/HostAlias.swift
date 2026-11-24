@@ -18,15 +18,11 @@ public enum HostAliasStore {
 
     /// 없거나 깨졌으면 빈 배정표 (다음 배정부터 다시 시작 — hosts 의 옛 줄은 표식으로 남아 있어 겹치면 교체된다)
     public static func load(from url: URL = defaultURL) -> HostAliasState {
-        guard let data = try? Data(contentsOf: url) else { return HostAliasState() }
-        return (try? JSONDecoder().decode(HostAliasState.self, from: data)) ?? HostAliasState()
+        (try? AppSupport.readJSON(HostAliasState.self, from: url)) ?? HostAliasState()
     }
 
     public static func save(_ state: HostAliasState, to url: URL = defaultURL) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(state).write(to: url, options: .atomic)
+        try AppSupport.writeJSON(state, to: url)
     }
 
     /// 배정 키: 포트 터널은 서버 키, DB 터널은 "<서버키>-db" (경유 서버와 DB 를 다른 주소로). SOCKS 는 서버 주소로 열지 않지만 서버 키로 둔다.

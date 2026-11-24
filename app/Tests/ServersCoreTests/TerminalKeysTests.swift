@@ -7,8 +7,7 @@ import XCTest
 
 final class TerminalKeysTests: XCTestCase {
     func testCheckScriptReadsTheSameKeybindsAsTheApp() throws {
-        let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("scripts/terminal-keybinds.conf")
+        let file = TestPaths.appDir.appendingPathComponent("scripts/terminal-keybinds.conf")
         XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), TerminalKeys.configText,
                        "문제: scripts/terminal-keybinds.conf 가 TerminalKeys.unbound 와 다릅니다 · 해결: 두 곳을 같게 고치고 make check-shortcuts 를 돌리세요 · 참조: app/Sources/ServersCore/TerminalKeys.swift")
     }

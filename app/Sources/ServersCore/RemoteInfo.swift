@@ -1,4 +1,4 @@
-// 원격 조회(spec/ports) 출력을 구조화한다 (services 는 ServicesReport). 입력은 RemoteCommands 의 스크립트 출력(정리된 줄).
+// 원격 조회(spec · 업데이트 목록 · ports) 출력을 구조화한다 (services 는 ServicesReport). 입력은 RemoteCommands 의 스크립트 출력(정리된 줄).
 
 import Foundation
 
@@ -113,7 +113,7 @@ public enum RemoteInfo {
             return (deferredUpdates > 0 ? "\(total) · 보류 \(deferredUpdates)" : total, counts[1] > 0)
         case "UPTIME":
             guard let seconds = Double(value) else { return (value, false) }
-            return (ServicesFormat.duration(seconds), false)
+            return (DurationFormat.compact(seconds), false)
         case "CPU":
             return (value.replacingOccurrences(of: #"\((\d+) threads\)$"#, with: "($1스레드)", options: .regularExpression)
                          .replacingOccurrences(of: #"^(\d+) threads$"#, with: "$1스레드", options: .regularExpression), false)

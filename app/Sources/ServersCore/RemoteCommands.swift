@@ -108,6 +108,11 @@ public enum RemoteCommands {
 
     static func linuxScript(_ body: String) -> RemoteScript { RemoteScript(command: "sh -s", stdin: body + "\n") }
 
+    /// 출력의 마지막 비지 않은 줄 (앞뒤 공백을 뗀 것) — 배너·경고가 앞에 붙어도 답은 끝줄에 온다
+    private static func lastLine(_ output: String) -> String? {
+        output.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.last { !$0.isEmpty }
+    }
+
     /// 로그인 홈의 절대 경로 (ssh 는 홈에서 시작한다). 출력은 parseHome 으로.
     public static func homeCommand(type: ServerType) -> String {
         switch type {
@@ -118,7 +123,7 @@ public enum RemoteCommands {
 
     /// homeCommand 출력 → 탐색 창과 같은 SFTP 형식의 절대 경로 ("/home/me", Windows "C:\Users\me" → "/C:/Users/me"). 못 읽으면 nil.
     public static func parseHome(_ output: String, type: ServerType) -> String? {
-        guard let last = output.split(whereSeparator: \.isNewline).map({ $0.trimmingCharacters(in: .whitespaces) }).last(where: { !$0.isEmpty }) else { return nil }
+        guard let last = lastLine(output) else { return nil }
         switch type {
         case .linux, .openwrt:
             return last.hasPrefix("/") ? last : nil
@@ -193,14 +198,12 @@ public enum RemoteCommands {
 
     /// writableCommand 출력 → 결과. 못 읽으면 nil (모름 — 막지 않는다).
     public static func parseWriteAccess(_ output: String) -> WriteAccess? {
-        let last = output.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.last { !$0.isEmpty }
-        return last.flatMap(WriteAccess.init(rawValue:))
+        lastLine(output).flatMap(WriteAccess.init(rawValue:))
     }
 
     /// sizeCommand 출력 → 바이트. 0 이거나 못 읽으면 nil (전체 진행률 없이 파일별로 보인다).
     public static func parseSize(_ output: String) -> Int64? {
-        let last = output.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.last { !$0.isEmpty }
-        guard let last, let value = Int64(last), value > 0 else { return nil }
+        guard let last = lastLine(output), let value = Int64(last), value > 0 else { return nil }
         return value
     }
 
@@ -221,26 +224,26 @@ public enum RemoteCommands {
     }
 
     /// 서버 종류별 조회 명령. stdin 이 있으면 command(`bash -s` · `sh -s`)에 넘긴다. 지원하지 않으면 nil.
-    public static func query(_ query: Query, for type: ServerType) -> (command: String, stdin: String?)? {
+    public static func query(_ query: Query, for type: ServerType) -> RemoteScript? {
         switch (type, query) {
-        case (.linux, .spec): return ("bash -s", linuxSpec)
-        case (.linux, .services): return ("sh -s", ServicesScript.linux)   // 실패·실행 중·컨테이너 (ServicesReport)
-        case (.linux, .ports): return (linuxPorts, nil)
-        case (.linux, .live), (.openwrt, .live): return ("sh -s", LinuxLive.script)
-        case (.windows, .live): return (powerShellCommand(WindowsLive.script), nil)
-        case (.windows, .network): return (powerShellCommand(WindowsNetwork.script), nil)
-        case (.windows, .services): return (powerShellCommand(ServicesScript.windows), nil)
-        case (.windows, .ports): return (powerShellCommand(windowsPorts), nil)
-        case (.windows, .spec): return (powerShellCommand(windowsSpec), nil)
-        case (.openwrt, .spec): return ("sh -s", OpenWrt.specScript)
-        case (.openwrt, .network): return ("sh -s", OpenWrt.networkScript)
-        case (.openwrt, .firewall): return ("sh -s", OpenWrt.firewallScript)
-        case (.openwrt, .clients): return ("sh -s", OpenWrt.clientsScript)
-        case (.openwrt, .wireguard): return ("sh -s", OpenWrt.wireguardScript)
-        case (.openwrt, .services): return ("sh -s", OpenWrt.servicesScript)
-        case (.openwrt, .ports): return (OpenWrt.portsCommand, nil)
-        case (.linux, .network): return ("sh -s", LinuxInfoScripts.network)
-        case (.linux, .schedule): return ("sh -s", LinuxInfoScripts.schedule)
+        case (.linux, .spec): return RemoteScript(command: "bash -s", stdin: linuxSpec)
+        case (.linux, .services): return RemoteScript(command: "sh -s", stdin: ServicesScript.linux)   // 실패·실행 중·컨테이너 (ServicesReport)
+        case (.linux, .ports): return RemoteScript(command: linuxPorts, stdin: nil)
+        case (.linux, .live), (.openwrt, .live): return RemoteScript(command: "sh -s", stdin: LinuxLive.script)
+        case (.windows, .live): return RemoteScript(command: powerShellCommand(WindowsLive.script), stdin: nil)
+        case (.windows, .network): return RemoteScript(command: powerShellCommand(WindowsNetwork.script), stdin: nil)
+        case (.windows, .services): return RemoteScript(command: powerShellCommand(ServicesScript.windows), stdin: nil)
+        case (.windows, .ports): return RemoteScript(command: powerShellCommand(windowsPorts), stdin: nil)
+        case (.windows, .spec): return RemoteScript(command: powerShellCommand(windowsSpec), stdin: nil)
+        case (.openwrt, .spec): return RemoteScript(command: "sh -s", stdin: OpenWrt.specScript)
+        case (.openwrt, .network): return RemoteScript(command: "sh -s", stdin: OpenWrt.networkScript)
+        case (.openwrt, .firewall): return RemoteScript(command: "sh -s", stdin: OpenWrt.firewallScript)
+        case (.openwrt, .clients): return RemoteScript(command: "sh -s", stdin: OpenWrt.clientsScript)
+        case (.openwrt, .wireguard): return RemoteScript(command: "sh -s", stdin: OpenWrt.wireguardScript)
+        case (.openwrt, .services): return RemoteScript(command: "sh -s", stdin: OpenWrt.servicesScript)
+        case (.openwrt, .ports): return RemoteScript(command: OpenWrt.portsCommand, stdin: nil)
+        case (.linux, .network): return RemoteScript(command: "sh -s", stdin: LinuxInfoScripts.network)
+        case (.linux, .schedule): return RemoteScript(command: "sh -s", stdin: LinuxInfoScripts.schedule)
         // firewall · clients · wireguard 는 OpenWrt 만, schedule 은 linux 만
         case (.linux, .firewall), (.linux, .clients), (.linux, .wireguard),
              (.windows, .firewall), (.windows, .clients), (.windows, .wireguard), (.windows, .schedule), (.openwrt, .schedule): return nil
@@ -256,26 +259,5 @@ public enum RemoteCommands {
             if type == .windows, line.hasPrefix("#< CLIXML") || line.hasPrefix("<Objs ") { return nil }
             return line
         }
-    }
-}
-
-/// 원격 스크립트 출력의 구역: "@이름"(대문자·숫자) 줄부터 다음 머리줄까지, "@END" 에서 끝. Linux Live · OpenWrt 공용.
-public enum ScriptSections {
-    /// @END 가 없으면(출력이 중간에 끊김) nil. dropEmpty: 빈 줄을 뺀다 (OpenWrt 는 JSON 을 그대로 잇느라 남긴다).
-    public static func parse(_ text: String, dropEmpty: Bool) -> [String: [String]]? {
-        var result: [String: [String]] = [:]
-        var current: String?
-        for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let line = String(raw)
-            if line.count > 1, line.hasPrefix("@"), line.dropFirst().allSatisfy({ $0.isUppercase || $0.isNumber }) {
-                let name = String(line.dropFirst())
-                if name == "END" { return result }
-                current = name
-                result[name] = result[name] ?? []
-            } else if let current, !(dropEmpty && line.isEmpty) {
-                result[current, default: []].append(line)
-            }
-        }
-        return nil
     }
 }

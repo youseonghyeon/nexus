@@ -53,9 +53,8 @@ final class TransferTests: XCTestCase {
 
     /// 가짜 scp: 진행률을 \r 로 찍고 끝난다. 진행률 콜백 순서와 종료 코드, 취소 시 SIGTERM 을 확인한다.
     func testProcessReportsProgressAndExit() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("transfer-\(UUID().uuidString)")
+        let dir = tempPath("transfer")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
         let fake = dir.appendingPathComponent("scp").path
         try """
         #!/bin/sh

@@ -8,8 +8,7 @@ import XCTest
 final class StatusTextTests: XCTestCase {
     private func server(_ network: ServerNetwork, key: String = "s", type: ServerType = .linux,
                         check: CheckMethod = .ssh, vpn: String? = nil) -> Server {
-        Server(key: key, group: "g", network: network, type: type, ip: "192.168.8.10", user: "u", port: 22,
-               check: check, role: nil, env: nil, wolMac: nil, vpn: vpn)
+        Server.sample(key: key, network: network, type: type, ip: "192.168.8.10", check: check, vpn: vpn)
     }
 
     // MARK: Tailscale

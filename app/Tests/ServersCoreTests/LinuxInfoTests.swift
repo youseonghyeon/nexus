@@ -221,9 +221,8 @@ final class LinuxInfoTests: XCTestCase {
     /// 마지막 줄에 줄바꿈이 없는 resolv.conf: cat 으로 내면 "nameserver 9.9.9.9@END" 가 되어 @END 를 못 찾고 탭 전체가 원문으로 떨어졌다.
     /// 스크립트를 이 Mac 의 sh 로 돌려 본다 (경로만 임시 파일로 바꿈 — ip·resolvectl 은 없어도 구역 머리는 나온다)
     func testFileWithoutTrailingNewlineKeepsSections() throws {
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("nexus-resolv-\(UUID().uuidString)")
+        let file = tempPath("nexus-resolv")
         try Data("search corp.example\nnameserver 9.9.9.9".utf8).write(to: file)
-        defer { try? FileManager.default.removeItem(at: file) }
         XCTAssertTrue(LinuxInfoScripts.network.contains("/etc/resolv.conf"))
         let script = LinuxInfoScripts.network.replacingOccurrences(of: "/etc/resolv.conf", with: "'\(file.path)'")
         let p = Process(), out = Pipe()

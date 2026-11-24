@@ -89,7 +89,7 @@ public struct Server: Sendable, Identifiable, Hashable {
     }
     /// 터미널 탭 이름: 계정이 여럿일 때만 어느 계정인지 함께
     public var accountTitle: String { extraUsers.isEmpty ? key : "\(key) · \(user)" }
-    /// 태그 (env= 를 쉼표로 나눈 것). 배지·프롬프트에 이 순서로. 색은 ServerTags.
+    /// 태그 (env= 를 쉼표로 나눈 것). 배지에 이 순서로. 색은 ServerTags.
     public var tags: [String] { ServerTags.parse(env) }
     /// 운영 태그(PROD·PRD·LIVE…)가 하나라도 있다
     public var isProd: Bool { ServerTags.strongest(tags) == .production }
@@ -110,13 +110,11 @@ public struct WakeRoute: Sendable, Hashable {
     public static let ifacePattern = #"^[A-Za-z0-9._-]{1,15}$"#
 }
 
-/// tunnel_ports= 의 항목 하나: "Jenkins:9090" → 이름 Jenkins, 포트 9090. 이름이 없으면("9090") 버튼은 "Tunnel 9090".
+/// tunnel_ports= 의 항목 하나: "Jenkins:9090" → 이름 Jenkins, 포트 9090. 이름이 없으면("9090") name 은 nil.
 public struct QuickTunnel: Sendable, Hashable {
     public let name: String?
     public let port: Int
     public init(name: String?, port: Int) { self.name = name; self.port = port }
-    /// 버튼 문구
-    public var label: String { name.map { "\($0) Tunnel" } ?? "Tunnel \(port)" }
 }
 
 /// 내부망 서비스. 분할 라우팅 대역은 없다 — 시스템 경로를 넣지 않고, 이 앱이 lan 서버로 여는 연결만 그 서비스의 장치에 묶는다(BindInterface).

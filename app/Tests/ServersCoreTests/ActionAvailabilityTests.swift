@@ -9,8 +9,7 @@ final class ActionAvailabilityTests: XCTestCase {
     private let wireguardID = "11111111-1111-4111-8111-111111111111"
 
     private func server(_ key: String, _ network: ServerNetwork, type: ServerType = .linux, vpn: String? = nil) -> Server {
-        Server(key: key, group: "g", network: network, type: type, ip: "192.168.8.10", user: "u", port: 22,
-               check: .tcp, role: nil, env: nil, wolMac: nil, vpn: vpn)
+        Server.sample(key: key, network: network, type: type, ip: "192.168.8.10", check: .tcp, vpn: vpn)
     }
 
     private let remoteStates: [(name: String, state: RemoteState?)] = [

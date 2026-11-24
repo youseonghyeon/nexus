@@ -46,7 +46,7 @@ final class SessionCommandTests: XCTestCase {
         XCTAssertEqual(t.firstIndex(of: "-L").map { t[$0 + 1] }, "127.0.0.1:18080:127.0.0.1:8080", "\(t)")
         XCTAssertTrue(t.contains("tester@192.0.2.22"), "\(t)")
         XCTAssertFalse(t.contains("ControlMaster=auto"))
-        let db = SessionCommand.dbTunnelArguments(via: was, host: "db.example.test", port: 5432, localPort: 15432, banner: "x")
+        let db = SessionCommand.tunnelArguments(to: was, remotePort: 5432, remoteHost: "db.example.test", localPort: 15432, banner: "x")
         XCTAssertEqual(db.firstIndex(of: "-L").map { db[$0 + 1] }, "127.0.0.1:15432:db.example.test:5432", "\(db)")
         let banner = SessionCommand.dbBanner(server: was, host: "db.example.test", port: 5432, localPort: 15432, name: "testdb")
         XCTAssertTrue(banner.contains("jdbc:postgresql://localhost:15432/testdb"))
@@ -80,9 +80,7 @@ final class SessionCommandTests: XCTestCase {
         let wrapped = SessionCommand.holdOnFailure("'ssh' '-p' '22' 'u@h'")
         XCTAssertTrue(wrapped.hasPrefix("/bin/bash -c '"), wrapped)
         XCTAssertTrue(wrapped.contains("read -r -n 1"), wrapped)
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/bash"); p.arguments = ["-n", "-c", "exec " + wrapped]
-        try p.run(); p.waitUntilExit()
-        XCTAssertEqual(p.terminationStatus, 0)
+        XCTAssertEqual(try shellSyntaxStatus("/bin/bash", "exec " + wrapped), 0)
         // ssh 자체 실패(255)만 붙잡는다: 'exit 255' → 안내를 찍고 stdin(EOF)에서 read 가 끝난 뒤 0
         func runWrapped(_ cmd: String) throws -> (Int32, String) {
             let run = Process(); run.executableURL = URL(fileURLWithPath: "/bin/bash")

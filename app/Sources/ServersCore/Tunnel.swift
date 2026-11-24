@@ -79,7 +79,7 @@ public struct TunnelSpec: Sendable, Equatable {
         case let .port(remote, host):
             return SessionCommand.tunnelArguments(to: server, remotePort: remote, remoteHost: host, localPort: localPort, bindAddress: localBind, banner: banner, bindInterface: bindInterface)
         case let .db(host, port, _):
-            return SessionCommand.dbTunnelArguments(via: server, host: host, port: port, localPort: localPort, bindAddress: localBind, banner: banner, bindInterface: bindInterface)
+            return SessionCommand.tunnelArguments(to: server, remotePort: port, remoteHost: host, localPort: localPort, bindAddress: localBind, banner: banner, bindInterface: bindInterface)
         case .socks:
             return SessionCommand.socksArguments(via: server, localPort: localPort, bindAddress: localBind, banner: banner, bindInterface: bindInterface)
         }
@@ -228,7 +228,7 @@ public enum TunnelTarget {
         }
         let labels = text.split(separator: ".", omittingEmptySubsequences: false)
         if labels.allSatisfy({ !$0.isEmpty && $0.allSatisfy { $0.isASCII && $0.isNumber } }) {
-            guard labels.count == 4, labels.allSatisfy({ $0.count <= 3 && Int($0)! <= 255 }) else { return nil }
+            guard IPv4.isDotted(text) else { return nil }
             return text
         }
         guard text.count <= 253 else { return nil }

@@ -20,14 +20,11 @@ public enum LanStore {
     /// 파일이 없으면 nil. 있는데 못 읽으면 throw — 설정의 원천이라 조용히 비우지 않는다.
     public static func load(from url: URL = defaultURL) throws -> LanSettings? {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-        return try JSONDecoder().decode(LanSettings.self, from: Data(contentsOf: url))
+        return try AppSupport.readJSON(LanSettings.self, from: url)
     }
 
     public static func save(_ settings: LanSettings, to url: URL = defaultURL) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(settings).write(to: url, options: .atomic)
+        try AppSupport.writeJSON(settings, to: url)
     }
 
     /// 첫 실행: 파일이 없으면 servers.conf 값(service)으로 만들어 저장한다. 있으면 seed 는 무시한다.

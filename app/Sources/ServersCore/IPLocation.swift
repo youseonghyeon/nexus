@@ -40,8 +40,8 @@ public enum IPLocate {
 
     /// 공인 IPv4 인가 — 사설(10/8 · 172.16/12 · 192.168/16)·CGNAT(100.64/10)·루프백·링크 로컬·0/8·멀티캐스트 이상은 아니다
     public static func isPublic(_ ip: String) -> Bool {
-        // 형식 검사는 ipv4 하나로 — 칸을 걸러 낸 뒤 세면 "1.2.x.3.4" 가 네 칸으로 통과했다
-        guard let value = NetworkServiceDraft.ipv4(ip) else { return false }
+        // 형식 검사는 IPv4.parse 하나로 — 칸을 걸러 낸 뒤 세면 "1.2.x.3.4" 가 네 칸으로 통과했다
+        guard let value = IPv4.parse(ip) else { return false }
         let (a, b) = (UInt8(value >> 24), UInt8((value >> 16) & 0xFF))
         switch a {
         case 0, 10, 127: return false
@@ -85,7 +85,7 @@ public enum IPLocate {
             let countryCode: String?, regionName: String?, city: String?, isp: String?, org: String?, `as`: String?
         }
         guard let row = try? JSONDecoder().decode(Row.self, from: Data(json.utf8)), row.status == "success",
-              let ip = row.query, NetworkServiceDraft.ipv4(ip) != nil else { return nil }
+              let ip = row.query, IPv4.parse(ip) != nil else { return nil }
         return (ip, IPLocation(countryCode: row.countryCode, regionName: row.regionName, city: row.city, isp: row.isp, org: row.org, as: row.as))
     }
 

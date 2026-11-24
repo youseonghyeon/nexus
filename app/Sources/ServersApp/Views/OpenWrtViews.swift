@@ -130,7 +130,7 @@ struct OpenWrtNetworkView: View {
     /// 켜짐이면 가동 시간, 아니면 상태어 (no device · down · netifd 오류 코드)
     private func stateText(_ iface: OpenWrtInterface) -> String {
         switch iface.state {
-        case .up: return iface.uptime.map(ServicesFormat.duration) ?? ""
+        case .up: return iface.uptime.map(DurationFormat.compact) ?? ""
         case .unused: return "no device"
         case .down: return "down"
         case .failed: return iface.error ?? "down"
@@ -408,7 +408,7 @@ struct WireGuardView: View {
 
     /// 핸드셰이크는 약 2분마다 키를 새로 맞추는 시각이라 연결 시작 시간으로 읽히기 쉬워 행에 내지 않는다 (2026-11-06 사용자 지적). 연결 여부는 점으로
     private func help(_ peer: WireGuardPeer) -> String {
-        "마지막 핸드셰이크 \(peer.handshakeAgo.map { ServicesFormat.duration($0) + " 전" } ?? "없음")\n누르면 공개 키 복사"
+        "마지막 핸드셰이크 \(peer.handshakeAgo.map { DurationFormat.compact($0) + " 전" } ?? "없음")\n누르면 공개 키 복사"
     }
 }
 

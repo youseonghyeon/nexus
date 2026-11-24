@@ -31,15 +31,11 @@ public enum BookmarkStore {
 
     /// 없거나 깨졌으면 빈 상태 (즐겨찾기는 부가 기능이라 오류로 막지 않는다)
     public static func load(from url: URL = defaultURL) -> BookmarkState {
-        guard let data = try? Data(contentsOf: url) else { return BookmarkState() }
-        return (try? JSONDecoder().decode(BookmarkState.self, from: data)) ?? BookmarkState()
+        (try? AppSupport.readJSON(BookmarkState.self, from: url)) ?? BookmarkState()
     }
 
     public static func save(_ state: BookmarkState, to url: URL = defaultURL) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(state).write(to: url, options: .atomic)
+        try AppSupport.writeJSON(state, to: url)
     }
 
     /// 같은 주소로 보는 기준: 조각(#…)과 끝의 슬래시를 뗀 것. 스킴·호스트는 소문자로 (경로·질의는 그대로 — 대소문자가 다른 페이지일 수 있다)

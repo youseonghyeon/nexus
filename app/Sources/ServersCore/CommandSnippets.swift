@@ -69,7 +69,7 @@ public enum SnippetStore {
     public static func load(from url: URL = defaultURL) throws -> SnippetState {
         guard FileManager.default.fileExists(atPath: url.path) else { return SnippetState() }
         do {
-            var state = try JSONDecoder().decode(SnippetState.self, from: Data(contentsOf: url))
+            var state = try AppSupport.readJSON(SnippetState.self, from: url)
             // 손으로 고친 파일도 앱에서 저장한 것과 같게 (끝 줄바꿈이 남으면 입력만 해도 Enter 가 된다)
             state.snippets = state.snippets.map { normalized($0) ?? $0 }
             return state
@@ -81,10 +81,7 @@ public enum SnippetStore {
     }
 
     public static func save(_ state: SnippetState, to url: URL = defaultURL) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(state).write(to: url, options: .atomic)
+        try AppSupport.writeJSON(state, to: url)
     }
 
     /// 그 종류의 명령 (등록한 순서)

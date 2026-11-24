@@ -95,10 +95,9 @@ final class TransferMeterTests: XCTestCase {
 
     // Linux 명령을 이 Mac 의 sh 로 실제로 돌린다. BSD find 는 -printf 가 없어 du -skL×1024 쪽을, 가짜 GNU find 로 find 쪽을 탄다.
     func testLinuxSizeCommandRuns() throws {
-        let home = FileManager.default.temporaryDirectory.appendingPathComponent("size-\(UUID().uuidString)")
+        let home = tempPath("size")
         let dir = home.appendingPathComponent("a dir")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: home) }
         try Data(count: 10_000).write(to: dir.appendingPathComponent("x.bin"))
         try Data(count: 5_000).write(to: home.appendingPathComponent("it's.txt"))
         try Data(count: 3_000).write(to: home.appendingPathComponent("-dash.txt"))
@@ -145,10 +144,9 @@ final class TransferMeterTests: XCTestCase {
 
     // 업로드 전체 크기: 파일 크기 합, 폴더는 안의 파일만, 링크는 대상 크기
     func testLocalSize() throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("local-\(UUID().uuidString)")
+        let root = tempPath("local")
         let dir = root.appendingPathComponent("d/sub")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
         try Data(count: 1_000).write(to: dir.appendingPathComponent("a"))
         try Data(count: 2_000).write(to: root.appendingPathComponent("d/b"))
         try Data(count: 500).write(to: root.appendingPathComponent("single"))

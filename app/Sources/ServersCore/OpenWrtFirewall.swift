@@ -68,7 +68,7 @@ public struct OpenWrtFirewall: Sendable, Equatable {
     /// 방화벽 스크립트 출력. @END 가 없거나(끊김) 존·규칙이 하나도 없으면 nil — 화면은 원문을 보여준다.
     public static func parse(_ lines: [String]) -> OpenWrtFirewall? {
         guard let s = OpenWrt.sections(lines) else { return nil }
-        let sections = uciSectionsInOrder(s["UCI"] ?? [])
+        let sections = UCI.sections(s["UCI"] ?? [])
         let defaults = sections.first { $0.type == "defaults" }?.options ?? [:]
         var result = OpenWrtFirewall()
         for section in sections {
@@ -83,7 +83,7 @@ public struct OpenWrtFirewall: Sendable, Equatable {
             default: break
             }
         }
-        for section in uciSectionsInOrder(s["PORTFORWARD"] ?? []) where section.type == "redirect" {
+        for section in UCI.sections(s["PORTFORWARD"] ?? []) where section.type == "redirect" {
             result.portForwards.append(portForward(section, source: "GL"))
         }
         guard !(result.zones.isEmpty && result.rules.isEmpty && result.portForwards.isEmpty) else { return nil }
@@ -91,38 +91,7 @@ public struct OpenWrtFirewall: Sendable, Equatable {
         return result
     }
 
-    // MARK: uci
-
-    private struct UCISection {
-        let name: String
-        let type: String
-        var options: [String: [String]] = [:]
-
-        func first(_ key: String) -> String? { options[key]?.first }
-        /// enabled 는 없으면 켜짐
-        var isEnabled: Bool { !["0", "no", "off", "false"].contains(first("enabled") ?? "1") }
-        func joined(_ key: String) -> String? { options[key].map { $0.joined(separator: ",") } }
-    }
-
-    /// 나온 순서 그대로 — 방화벽은 위쪽 규칙이 먼저 적용된다 (OpenWrtClients.uciSections 는 이름순이라 @rule[10] 이 @rule[2] 앞에 온다)
-    private static func uciSectionsInOrder(_ lines: [String]) -> [UCISection] {
-        var result: [UCISection] = []
-        var index: [String: Int] = [:]
-        for line in lines {
-            guard let eq = line.firstIndex(of: "=") else { continue }
-            let path = line[..<eq].split(separator: ".").map(String.init)
-            let value = String(line[line.index(after: eq)...])
-            if path.count == 2 {
-                index[path[1]] = result.count
-                result.append(UCISection(name: path[1], type: value))
-            } else if path.count == 3, let i = index[path[1]] {
-                result[i].options[path[2]] = OpenWrtClients.uciValues(value)
-            }
-        }
-        return result
-    }
-
-    private static func zone(_ section: UCISection, defaults: [String: [String]]) -> Zone {
+    private static func zone(_ section: UCI.Section, defaults: [String: [String]]) -> Zone {
         func policy(_ key: String) -> String { (section.first(key) ?? defaults[key]?.first ?? "DROP").uppercased() }
         return Zone(id: section.name, name: section.first("name") ?? section.name, networks: section.options["network"] ?? [],
                     input: policy("input"), output: policy("output"), forward: policy("forward"),
@@ -130,11 +99,11 @@ public struct OpenWrtFirewall: Sendable, Equatable {
     }
 
     /// proto 를 안 적으면 방화벽은 tcp·udp 로 본다
-    private static func proto(_ section: UCISection) -> String {
+    private static func proto(_ section: UCI.Section) -> String {
         (section.options["proto"] ?? ["tcp", "udp"]).joined(separator: "/")
     }
 
-    private static func family(_ section: UCISection) -> String? {
+    private static func family(_ section: UCI.Section) -> String? {
         switch section.first("family") {
         case "ipv4": return "IPv4"
         case "ipv6": return "IPv6"
@@ -142,13 +111,13 @@ public struct OpenWrtFirewall: Sendable, Equatable {
         }
     }
 
-    private static func extras(_ section: UCISection, shown: Set<String>) -> String? {
+    private static func extras(_ section: UCI.Section, shown: Set<String>) -> String? {
         let rest = section.options.keys.filter { !shown.contains($0) }.sorted()
             .map { "\($0): \(section.options[$0]?.joined(separator: ", ") ?? "")" }
         return rest.isEmpty ? nil : rest.joined(separator: "\n")
     }
 
-    private static func rule(_ section: UCISection) -> Rule {
+    private static func rule(_ section: UCI.Section) -> Rule {
         // src·dest 가 없으면 장비 자신으로 들어오거나 나가는 규칙, "*" 는 모든 존
         func zone(_ value: String?) -> String { value.map { $0 == "*" ? "any" : $0 } ?? "this device" }
         let parts = [[proto(section), section.joined("dest_port")].compactMap { $0 }.joined(separator: " "),
@@ -164,14 +133,14 @@ public struct OpenWrtFirewall: Sendable, Equatable {
     }
 
     /// proto 를 안 적으면 tcp·udp 뿐이라 전체가 아니다. 모르는 옵션(limit·src_mac·extra …)이 있으면 조건으로 본다 — 칸을 잘못 뒤집느니 예외로 센다
-    private static func coversAllIPv4(_ section: UCISection) -> Bool {
+    private static func coversAllIPv4(_ section: UCI.Section) -> Bool {
         let unconditional: Set = ["name", "src", "dest", "proto", "family", "target", "enabled"]
         guard Set(section.options.keys).isSubset(of: unconditional), section.options["proto"]?.count == 1,
               ["all", "any", "*"].contains(section.first("proto")?.lowercased() ?? "") else { return false }
         return section.first("family")?.hasSuffix("6") != true
     }
 
-    private static func portForward(_ section: UCISection, source: String? = nil) -> Rule {
+    private static func portForward(_ section: UCI.Section, source: String? = nil) -> Rule {
         let from = [proto(section), section.joined("src_dport")].compactMap { $0 }.joined(separator: " ")
         // dest_port 를 안 적으면 들어온 포트 그대로, dest_ip 를 안 적으면 장비 자신
         let port = section.joined("dest_port") ?? section.joined("src_dport")

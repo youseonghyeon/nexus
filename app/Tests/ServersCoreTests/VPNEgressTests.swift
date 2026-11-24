@@ -3,11 +3,6 @@ import Foundation
 import XCTest
 
 final class VPNEgressTests: XCTestCase {
-    private func fixture(_ name: String) throws -> String {
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/\(name)")
-        return try String(contentsOf: url, encoding: .utf8)
-    }
-
     private let wireGuardAppex = "/Applications/WireGuard.app/Contents/PlugIns/WireGuardNetworkExtension.appex"
     private var ps: String {
         [
@@ -35,7 +30,7 @@ final class VPNEgressTests: XCTestCase {
 
     /// 이 Mac 실제 출력: udp4 소켓이 en11(Wired), udp6 은 장치 없음, tcp 는 머리줄만 → en11 (Ethernet) 하나
     func testRealNettopWireGuard() throws {
-        let text = try fixture("nettop-wireguard-udp.txt") + "\n" + fixture("nettop-wireguard-tcp.txt")
+        let text = try fixtureText("nettop-wireguard-udp") + "\n" + fixtureText("nettop-wireguard-tcp")
         let egress = VPNEgresses.parseNettop(text, excluding: "utun6")
         XCTAssertEqual(egress.map(\.interface), ["en11"])
         XCTAssertEqual(egress.first?.type, "Ethernet")
@@ -81,7 +76,7 @@ final class VPNEgressTests: XCTestCase {
 
     /// 전체 흐름: ps → nettop(udp·tcp) → route. 확장 프로세스가 없거나 ps 가 실패하면 nettop 을 부르지 않고 빈 목록
     func testFetch() async throws {
-        let udp = try fixture("nettop-wireguard-udp.txt"), tcp = try fixture("nettop-wireguard-tcp.txt"), psText = ps
+        let udp = try fixtureText("nettop-wireguard-udp"), tcp = try fixtureText("nettop-wireguard-tcp"), psText = ps
         final class Runner: CommandRunner, @unchecked Sendable {
             let outputs: [String: CommandResult]
             var calls: [String] = []

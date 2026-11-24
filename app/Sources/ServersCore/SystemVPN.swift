@@ -353,11 +353,5 @@ public enum SystemVPNs {
     }
 
     /// 연결된 시간: "25분 47초" · "3시간 2분" · "2일 4시간"
-    public static func duration(_ seconds: Int) -> String {
-        let d = seconds / 86_400, h = seconds % 86_400 / 3600, m = seconds % 3600 / 60, s = seconds % 60
-        if d > 0 { return "\(d)일 \(h)시간" }
-        if h > 0 { return "\(h)시간 \(m)분" }
-        if m > 0 { return "\(m)분 \(s)초" }
-        return "\(s)초"
-    }
+    public static func duration(_ seconds: Int) -> String { DurationFormat.withSeconds(seconds) }
 }

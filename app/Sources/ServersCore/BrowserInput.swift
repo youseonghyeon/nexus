@@ -58,7 +58,6 @@ public enum BrowserInput {
     }
 
     static func isIPv4(_ s: String) -> Bool {
-        let parts = s.split(separator: ".", omittingEmptySubsequences: false)
-        return parts.count == 4 && parts.allSatisfy { p in !p.isEmpty && p.count <= 3 && p.allSatisfy(\.isNumber) && (Int(p) ?? 999) <= 255 }
+        IPv4.isDotted(s)
     }
 }

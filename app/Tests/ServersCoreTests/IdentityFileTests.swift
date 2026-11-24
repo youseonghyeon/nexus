@@ -8,12 +8,8 @@ final class IdentityFileTests: XCTestCase {
     private var dir: URL!
 
     override func setUpWithError() throws {
-        dir = FileManager.default.temporaryDirectory.appendingPathComponent("identity-\(UUID().uuidString)")
+        dir = tempPath("identity")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-    }
-
-    override func tearDownWithError() throws {
-        try? FileManager.default.removeItem(at: dir)
     }
 
     private func file(_ name: String, _ text: String, mode: Int = 0o600) throws -> String {

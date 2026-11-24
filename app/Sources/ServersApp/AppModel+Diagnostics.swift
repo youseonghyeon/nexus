@@ -72,7 +72,7 @@ extension AppModel {
             diagnostics[screen]?.ping?.resolveFailed = ping.resolveFailed
             guard !ping.resolveFailed else { diagnostics[screen]?.running.remove(.ping); return }
             // ping 이 채운 ARP 캐시를 본다 (이름이면 ping 이 푼 주소를 모르니 IPv4 로 넣었을 때만)
-            if NetworkServiceDraft.ipv4(target) != nil { diagnostics[screen]?.ping?.arp = await Arp.lookup(target, device: device, runner: runner) }
+            if IPv4.parse(target) != nil { diagnostics[screen]?.ping?.arp = await Arp.lookup(target, device: device, runner: runner) }
             diagnostics[screen]?.running.remove(.ping)
             diagnostics[screen, default: DiagnosticState()].running.insert(.trace)
             let hops = await PingTest.trace(target, device: device, runner: runner)

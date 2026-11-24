@@ -14,3 +14,8 @@ enum TestPaths {
 func fixtureText(_ name: String) throws -> String {
     try String(contentsOf: TestPaths.testsDir.appendingPathComponent("Fixtures/\(name).txt"), encoding: .utf8)
 }
+
+/// Fixtures/<file> 의 바이트 (이름은 확장자까지 — .pcap · .bin)
+func fixtureBytes(_ file: String) throws -> [UInt8] {
+    [UInt8](try Data(contentsOf: TestPaths.testsDir.appendingPathComponent("Fixtures/\(file)")))
+}

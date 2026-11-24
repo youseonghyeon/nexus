@@ -1,5 +1,5 @@
 // 리눅스 서버의 "실시간" 탭: CPU·코어·메모리·스왑·부하·디스크 사용/입출력·온도·상위 프로세스.
-// ~/.tools/linux/stats.sh · disk.sh 와 같은 값·같은 계산 (출처는 줄 번호로 주석). 서버에는 아무것도 설치하지 않는다 —
+// ~/.tools/linux/stats.sh · disk.sh 와 같은 값·같은 계산 (출처는 스크립트 이름으로 주석). 서버에는 아무것도 설치하지 않는다 —
 // 그 탭을 보고 있을 때만 ssh 한 번(기존 공유 연결)으로 아래 스크립트를 돌려 /proc 원문을 받고, 계산은 여기서 한다.
 
 import Foundation
@@ -153,7 +153,7 @@ public struct LinuxDiskInfo: Sendable, Equatable {
     public var healthy: Bool? = nil
 }
 
-/// /proc/mdstat 의 배열 하나. disk.sh L1056-1080 은 구성원의 (F) 로만 손상을 보지만, 빠진 디스크가 [U_] 로만 보이는 경우도 손상으로 잡는다.
+/// /proc/mdstat 의 배열 하나. disk.sh 는 구성원의 (F) 로만 손상을 보지만, 빠진 디스크가 [U_] 로만 보이는 경우도 손상으로 잡는다.
 public struct LinuxRAID: Sendable, Equatable, Identifiable {
     public var id: String { name }
     public let name: String
@@ -251,21 +251,21 @@ public struct LinuxRaw: Sendable, Equatable {
     /// 통째 디스크의 모델·크기·회전(HDD) — /sys/block (disk.sh 는 lsblk, 같은 값)
     public var diskInfo: [String: LinuxDiskInfo] = [:]
     public var raids: [LinuxRAID] = []
-    /// 코어별 현재 클럭 kHz (stats.sh L871-881)
+    /// 코어별 현재 클럭 kHz (stats.sh)
     public var frequencies: [Double] = []
-    /// 부팅 뒤 열 스로틀 횟수 합 (x86 만, stats.sh L883-886)
+    /// 부팅 뒤 열 스로틀 횟수 합 (x86 만, stats.sh)
     public var throttleEvents: Int?
     /// /sys/class/net (net.sh 와 같은 출처). 스크립트가 물리 + VPN·본딩만 보낸다 (LinuxInterface.shown 과 같은 규칙)
     public var interfaces: [LinuxInterface] = []
     public init() {}
 
-    /// disk.sh: 통째 디스크만 — loop·ram·zram·fd·dm·md·nbd·sr 제외, /sys/block 에 있고 slaves 가 없는 것 (L1321-1361)
+    /// disk.sh: 통째 디스크만 — loop·ram·zram·fd·dm·md·nbd·sr 제외, /sys/block 에 있고 slaves 가 없는 것
     static let skippedDiskPrefixes = ["loop", "ram", "zram", "fd", "dm-", "md", "nbd", "sr"]
     /// eMMC 의 부트·보안 영역(mmcblk0boot0·mmcblk0boot1·mmcblk0rpmb)도 디스크로 치지 않는다 — OpenWrt 공유기에서 4 MB 짜리 줄이 둘 보였다
     static func isSkippedDisk(_ name: String) -> Bool {
         skippedDiskPrefixes.contains { name.hasPrefix($0) } || (name.hasPrefix("mmcblk") && (name.contains("boot") || name.hasSuffix("rpmb")))
     }
-    /// disk.sh L1107-1123: 숨기는 파일시스템 종류와 마운트 자리
+    /// disk.sh: 숨기는 파일시스템 종류와 마운트 자리
     static let hiddenFileSystems: Set<String> = ["tmpfs", "devtmpfs", "proc", "sysfs", "cgroup", "cgroup2", "squashfs", "devpts", "efivarfs",
         "securityfs", "pstore", "bpf", "hugetlbfs", "debugfs", "tracefs", "mqueue", "fusectl", "configfs", "binfmt_misc", "autofs", "ramfs",
         "rpc_pipefs", "selinuxfs", "fuse.portal", "fuse.gvfsd-fuse", "fuse.lxcfs", "fuse.snapfuse", "nsfs"]
@@ -353,7 +353,7 @@ public struct LinuxRaw: Sendable, Equatable {
 // MARK: 계산
 
 public struct LinuxCPUUsage: Sendable, Equatable {
-    /// 0~100. stats.sh L809-861: 바쁨 = user+nice+system+irq+softirq+steal, 대기 = idle+iowait
+    /// 0~100. stats.sh: 바쁨 = user+nice+system+irq+softirq+steal, 대기 = idle+iowait
     public let total, user, system, iowait, steal, idle: Double
     public let cores: [Double]
 
@@ -371,7 +371,7 @@ public struct LinuxCPUUsage: Sendable, Equatable {
     }
 }
 
-/// htop 방식 (stats.sh L938-968). 바이트.
+/// htop 방식 (stats.sh). 바이트.
 public struct LinuxMemory: Sendable, Equatable {
     public let total, used, shared, buffers, cache, free, available: UInt64
     public let swapTotal, swapUsed: UInt64
@@ -389,7 +389,7 @@ public struct LinuxMemory: Sendable, Equatable {
                            swapTotal: v("SwapTotal") * 1024, swapUsed: (v("SwapTotal") > v("SwapFree") ? v("SwapTotal") - v("SwapFree") : 0) * 1024)
     }
 
-    /// stats.sh L1012-1033: PSI full ≥ 10 또는 some ≥ 50 → 위험, some ≥ 10 → 경고. PSI 가 없으면 남은 메모리 5%/10% 미만.
+    /// stats.sh: PSI full ≥ 10 또는 some ≥ 50 → 위험, some ≥ 10 → 경고. PSI 가 없으면 남은 메모리 5%/10% 미만.
     public func pressure(psiSome: Double?, psiFull: Double?) -> MemoryPressure {
         if let some = psiSome {
             if (psiFull ?? 0) >= 10 || some >= 50 { return .critical }
@@ -481,7 +481,7 @@ public struct LinuxLiveSampler: Sendable {
         }
         snapshot.throttleEvents = raw.throttleEvents
         snapshot.processCount = raw.processes.count
-        // stats.sh L1232: 상태가 R 인 프로세스 수 (procs_running 은 실행 대기 스레드 수라 값이 다르다)
+        // stats.sh: 상태가 R 인 프로세스 수 (procs_running 은 실행 대기 스레드 수라 값이 다르다)
         snapshot.running = raw.processes.filter { $0.state == "R" }.count
         snapshot.threads = raw.processes.reduce(0) { $0 + $1.threads }
         if !raw.temperatures.isEmpty {
@@ -520,7 +520,7 @@ public struct LinuxLiveSampler: Sendable {
                 snapshot.networkTotal = LinuxTraffic(rx: totalRx, tx: totalTx)
             }
         }
-        // stats.sh L1215-1251: %CPU = Δticks × 코어 수 / Δ(전체 jiffies) × 100. pid 재사용은 starttime 으로 가른다.
+        // stats.sh: %CPU = Δticks × 코어 수 / Δ(전체 jiffies) × 100. pid 재사용은 starttime 으로 가른다.
         let cores = Double(max(1, raw.cores.count))
         snapshot.processes = raw.processes.map { p in
             var cpu = 0.0

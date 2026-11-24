@@ -15,8 +15,7 @@ private extension CaptureStore {
 
 final class PacketCaptureTests: XCTestCase {
     private func fixture() throws -> [UInt8] {
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/capture-lo0.pcap")
-        return [UInt8](try Data(contentsOf: url))
+        try fixtureBytes("capture-lo0.pcap")
     }
 
     private func store(_ bytes: [UInt8], chunk: Int? = nil, limit: Int = CaptureStore.defaultLimit) throws -> CaptureStore {
@@ -279,8 +278,7 @@ final class PacketCaptureTests: XCTestCase {
     /// Fixtures/tls-clienthello.bin: python ssl(OpenSSL 4.1, 2026-11-01)이 네트워크 없이 만든 실제 ClientHello — 1549 바이트, SNI 가 맨 끝.
     /// 한 조각(lo0·utun)이면 바로, 망 MSS(1448)로 두 조각이면 이어 붙여 SNI 를 찾는다
     func testTLSClientHelloSNIWholeAndSplit() throws {
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/tls-clienthello.bin")
-        let hello = [UInt8](try Data(contentsOf: url))
+        let hello = try fixtureBytes("tls-clienthello.bin")
         XCTAssertEqual(hello.count, 1549)
         let whole = ingest([
             (0.0, null(ipv4(client, server, proto: 6, tcp(50443, 443, seq: 1, flags: .syn)))),
@@ -466,8 +464,7 @@ final class PacketCaptureTests: XCTestCase {
 
     /// 조각을 놓쳐 seq 가 안 맞으면 붙이지 않는다 — 무관한 조각으로 엉뚱한 SNI 를 만들지 않게 (Fable 리뷰 #7)
     func testClientHelloJoinRequiresExpectedSeq() throws {
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/tls-clienthello.bin")
-        let hello = [UInt8](try Data(contentsOf: url))
+        let hello = try fixtureBytes("tls-clienthello.bin")
         let s = ingest([
             (0.0, null(ipv4(client, server, proto: 6, tcp(50445, 443, seq: 1, flags: .syn)))),
             (0.1, null(ipv4(client, server, proto: 6, tcp(50445, 443, seq: 2, flags: .ack, payload: Array(hello[..<1448]))))),
@@ -615,8 +612,7 @@ final class PacketCaptureTests: XCTestCase {
 
     /// ClientHello 세 조각 + 사이에 다른 흐름의 TCP·같은 흐름의 빈 ACK → 이어 붙여 SNI. 다른 흐름은 그대로
     func testClientHelloSNIAcrossThreeSegmentsWithInterleaving() throws {
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/tls-clienthello.bin")
-        let hello = [UInt8](try Data(contentsOf: url))
+        let hello = try fixtureBytes("tls-clienthello.bin")
         let other: [UInt8] = [10, 0, 0, 9]
         let s = ingest([
             (0.0, null(ipv4(client, server, proto: 6, tcp(50446, 443, seq: 1, flags: .syn)))),
@@ -668,8 +664,7 @@ final class PacketCaptureTests: XCTestCase {
         let question: [UInt8] = [7] + Array("example".utf8) + [3] + Array("com".utf8) + [0, 0, 1, 0, 1]
         let dns: [UInt8] = [0x12, 0x34, 0x81, 0x80, 0, 1, 0, 2, 0, 0, 0, 0] + question
             + [0xc0, 0x0c, 0, 5, 0, 1, 0, 0, 0, 60, 0, 2, 0xc0, 0x0c] + [0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 93, 184, 216, 34]
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/tls-clienthello.bin")
-        let hello = Array([UInt8](try Data(contentsOf: url)).prefix(400))
+        let hello = Array(try fixtureBytes("tls-clienthello.bin").prefix(400))
         let quoted = ipv4(client, server, proto: 17, udp(54824, 18053, [1, 2, 3, 4]))
         let macs: [UInt8] = [0x60, 0x15, 0x6f, 0x8d, 0xcb, 0xd9, 0x94, 0x83, 0xc4, 0xe0, 0x24, 0x64]
         let arp: [UInt8] = macs + [0x08, 0x06, 0, 1, 0x08, 0x00, 6, 4, 0, 2] + Array(macs[6..<12]) + [192, 168, 8, 1] + Array(macs[0..<6]) + [192, 168, 8, 101]
@@ -751,8 +746,7 @@ final class PacketCaptureTests: XCTestCase {
     func testPacketDetailsApplicationSections() throws {
         let question: [UInt8] = [7] + Array("example".utf8) + [3] + Array("com".utf8) + [0, 0, 1, 0, 1]
         let query: [UInt8] = [0x12, 0x34, 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 0] + question
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/tls-clienthello.bin")
-        let hello = [UInt8](try Data(contentsOf: url))
+        let hello = try fixtureBytes("tls-clienthello.bin")
         let cipher: [UInt8] = [0x9c, 0x0a, 0xe2, 0x80, 0x0d, 0xff, 0x0a, 0x41, 0xc3, 0x28, 0x0a, 0x99]
         let s = ingest([
             (0, null(ipv4(client, [10, 1, 0, 1], proto: 17, udp(53000, 53, query)))),
@@ -816,8 +810,7 @@ final class PacketCaptureTests: XCTestCase {
 
     /// ClientHello 다음 조각이 helloTimeout 넘게 늦으면 seq 가 맞아도 붙이지 않는다 (기다리는 조각이 끝없이 남지 않게)
     func testClientHelloJoinExpires() throws {
-        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/tls-clienthello.bin")
-        let hello = [UInt8](try Data(contentsOf: url))
+        let hello = try fixtureBytes("tls-clienthello.bin")
         func capture(gap: Double) -> CaptureStore {
             ingest([
                 (0.0, null(ipv4(client, server, proto: 6, tcp(50447, 443, seq: 1, flags: .syn)))),

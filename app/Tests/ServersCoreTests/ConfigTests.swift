@@ -40,7 +40,6 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(try ServerConfigParser.parse(base).server("a")?.tunnelPorts, [])
         let list = try ServerConfigParser.parse(base + "tunnel_ports=Jenkins:9090, 8080,9090\n").server("a")?.tunnelPorts
         XCTAssertEqual(list, [QuickTunnel(name: "Jenkins", port: 9090), QuickTunnel(name: nil, port: 8080)], "이름:포트 또는 포트만 · 공백 허용 · 중복 제거")
-        XCTAssertEqual(list?.map(\.label), ["Jenkins Tunnel", "Tunnel 8080"])
         XCTAssertThrowsError(try ServerConfigParser.parse(base + "tunnel_ports=9090,abc\n"))
         XCTAssertThrowsError(try ServerConfigParser.parse(base + "tunnel_ports=70000\n"))
         XCTAssertThrowsError(try ServerConfigParser.parse(base + "tunnel_ports=:9090\n"), "빈 이름")

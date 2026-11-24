@@ -40,7 +40,7 @@ public struct ContainerItem: Sendable, Equatable, Identifiable {
     /// 파드: 준비 "1/1" · 재시작 횟수
     public let ready: String?
     public let restarts: Int?
-    /// docker: 호스트로 내놓은 포트 (docker ps 의 Ports 원문 — 화면 꼴은 ServicesFormat.dockerPorts) · compose 프로젝트 (없으면 nil)
+    /// docker: 호스트로 내놓은 포트 (docker ps 의 Ports 원문 — 화면 꼴은 ServicesFormat.dockerPortList · dockerPortsShown) · compose 프로젝트 (없으면 nil)
     public let ports: String
     public let project: String?
 
@@ -385,14 +385,7 @@ public enum ServiceLog {
 
 public enum ServicesFormat {
     /// 큰 단위 둘까지: "220일" · "3일 1시간" · "1일 14시간" · "5분" · "10초"
-    public static func duration(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds))
-        let days = total / 86400, hours = total % 86400 / 3600, minutes = total % 3600 / 60
-        if days > 0 { return hours > 0 ? "\(days)일 \(hours)시간" : "\(days)일" }
-        if hours > 0 { return minutes > 0 ? "\(hours)시간 \(minutes)분" : "\(hours)시간" }
-        if minutes > 0 { return "\(minutes)분" }
-        return "\(total)초"
-    }
+    public static func duration(_ seconds: TimeInterval) -> String { DurationFormat.compact(seconds) }
 
     /// kubectl 나이 "3d1h" · "38h" · "220d" · "5m10s" · "2y45d" → 초. 못 읽으면 nil
     public static func kubeAge(_ text: String) -> TimeInterval? {
@@ -515,12 +508,6 @@ public enum ServicesFormat {
     public static func dockerPortsShown(_ raw: String, limit: Int = 3) -> (shown: [DockerPort], more: Int) {
         let all = dockerPortList(raw)
         return all.count > limit ? (Array(all.prefix(limit)), all.count - limit) : (all, 0)
-    }
-
-    /// 한 줄 글로: "80, 443, 8405 +2"
-    public static func dockerPorts(_ raw: String, limit: Int = 3) -> String {
-        let ports = dockerPortsShown(raw, limit: limit)
-        return ports.shown.map(\.text).joined(separator: ", ") + (ports.more > 0 ? " +\(ports.more)" : "")
     }
 
     /// 실패 줄 오른쪽: "exit-code · 3시간 4분 전" · 재시작을 되풀이하면 "재시작 반복 5회 · exit-code"

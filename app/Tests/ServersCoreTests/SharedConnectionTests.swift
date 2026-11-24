@@ -6,8 +6,7 @@ import XCTest
 
 final class SharedConnectionTests: XCTestCase {
     private func server(_ ip: String, _ user: String, port: Int = 22, extra: [String] = []) -> Server {
-        Server(key: "s", group: "g", network: .direct, type: .linux, ip: ip, user: user, port: port,
-               check: .ssh, role: nil, env: nil, wolMac: nil, extraUsers: extra)
+        Server.sample(network: .direct, type: .linux, ip: ip, user: user, port: port, check: .ssh, extraUsers: extra)
     }
 
     /// 기댓값은 이 Mac(hostname mac)에서 `ssh -G -p 22 -o ControlPath=~/.ssh/srv-%C <대상>` 이 계산한 값 (2026-11-09, OpenSSH 10.5)

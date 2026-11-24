@@ -11,15 +11,13 @@ final class LanCommandsTests: XCTestCase {
         XCTAssertTrue(script.contains("source '/x/lib/lan.zsh' || exit 1\n_lan_move_last 'acme 내부망'"), script)
         XCTAssertFalse(script.contains("setadditionalroutes") || script.contains("setnetworkserviceenabled"), "순서만 바꾼다")
         XCTAssertTrue(script.contains("env -u SUDO_ASKPASS sudo -v"), "Touch ID 시트를 먼저 시도한다")
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/zsh"); p.arguments = ["-n", "-c", script]
-        try p.run(); p.waitUntilExit()
-        XCTAssertEqual(p.terminationStatus, 0)
+        XCTAssertEqual(try shellSyntaxStatus("/bin/zsh", script), 0)
     }
 
     /// 인증이 먼저: askpass 없는 `sudo -v`(Touch ID 시트). 성공하면 같은 셸에서 sudo 는 모두 -n.
     /// 실패하면 macOS 승인 창(osascript … with administrator privileges)으로 본문을 root 로 실행하고, 취소(-128)면 authFailedExitCode.
     func testServiceEnableScriptAuthenticatesFirstThenRunsNonInteractively() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("lan-\(UUID().uuidString)").path
+        let dir = tempPath("lan").path
         let bin = dir + "/bin", lib = dir + "/lib", log = dir + "/calls.log"
         try FileManager.default.createDirectory(atPath: bin, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: lib, withIntermediateDirectories: true)

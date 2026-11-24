@@ -56,14 +56,12 @@ final class HostAliasTests: XCTestCase {
         XCTAssertTrue(script.contains("_hosts_alias '127.0.0.2'"), script)
         XCTAssertTrue(script.contains("_hosts_set 'db.acme' '127.0.0.2'"), script)
         XCTAssertTrue(script.contains("env -u SUDO_ASKPASS sudo -v"), "인트라넷과 같은 인증 경로")
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/zsh"); p.arguments = ["-n", "-c", script]
-        try p.run(); p.waitUntilExit()
-        XCTAssertEqual(p.terminationStatus, 0)
+        XCTAssertEqual(try shellSyntaxStatus("/bin/zsh", script), 0)
     }
 
     /// lib/hosts.zsh 를 임시 hosts 파일·가짜 ifconfig 로 실제 실행: 표식 줄만 바꾸고 다른 줄은 그대로.
     func testHostsScriptEditsOnlyMarkedLines() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("hosts-\(UUID().uuidString)")
+        let dir = tempPath("hosts")
         let bin = dir.appendingPathComponent("bin")
         try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
         let hosts = dir.appendingPathComponent("hosts")

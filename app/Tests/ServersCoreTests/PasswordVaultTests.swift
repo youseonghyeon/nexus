@@ -21,7 +21,7 @@ private final class MemoryKeyStore: VaultKeyStore {
 
 final class PasswordVaultTests: XCTestCase {
     private func tempURL() -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("vault-\(UUID().uuidString)/Servers/passwords.bin")
+        tempPath("vault").appendingPathComponent("Servers/passwords.bin")
     }
 
     func testRoundTripAndTamper() throws {
