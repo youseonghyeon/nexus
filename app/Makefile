@@ -9,6 +9,7 @@
 #                   공증 자격 증명  xcrun notarytool store-credentials nexus --apple-id <이메일> --team-id <팀 ID>
 #                   업데이트 서명 키 .build/artifacts/sparkle/Sparkle/bin/generate_keys  (로그인 키체인에 저장 — 공개 키는 Info.plist SUPublicEDKey)
 #   make test       ServersCore 단위 테스트 (모의 러너, 서버 접속 없음)
+#   make check-shortcuts  터미널에 포커스가 있을 때 앱 단축키가 닿는지 — 앱에 들어 있는 libghostty 에 직접 묻는다 (scripts/terminal-keys.c)
 #   make icon       Resources/icon/render-icon.swift 로 아이콘을 다시 그려 AppIcon.icns 생성
 #   make cert       로컬 서명 인증서 "Servers Local" 생성 (한 번). Developer ID 가 없을 때 이걸로 서명해 macOS 권한(위치 등)이 빌드 뒤에도 유지된다
 #   make clean
@@ -35,7 +36,7 @@ OUT      := build/$(APP).app
 CONTENTS := $(OUT)/Contents
 SPARKLE  := $(CONTENTS)/Frameworks/Sparkle.framework/Versions/B
 
-.PHONY: all build bundle run release install dist test clean icon cert
+.PHONY: all build bundle run release install dist test check-shortcuts clean icon cert
 
 all: bundle
 
@@ -81,6 +82,14 @@ run: bundle
 
 release:
 	$(MAKE) bundle CONFIG=release
+
+# 터미널이 가져가는 ⌘ 키와 앱 단축키가 겹치는지 (새 충돌이 있으면 종료 코드 1). 디버그 빌드가 만든 libghostty.a 를 쓴다
+check-shortcuts: build
+	@mkdir -p build
+	@clang -I $(BUILD)/include/libghostty -o build/terminal-keys scripts/terminal-keys.c $(BUILD)/libghostty.a -lc++ -lbz2 -lz \
+		-framework AppKit -framework Metal -framework CoreText -framework CoreGraphics -framework QuartzCore -framework IOSurface \
+		-framework Carbon -framework CoreVideo -framework UniformTypeIdentifiers -framework Foundation -framework IOKit -framework CoreServices
+	@build/terminal-keys scripts/terminal-keybinds.conf
 
 install: release
 	@rm -rf "/Applications/$(APP).app"

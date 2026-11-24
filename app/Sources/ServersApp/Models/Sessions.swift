@@ -52,7 +52,7 @@ final class TerminalTab: Identifiable, ObservableObject {
         self.title = title
         self.themed = theme
         // 글꼴·여백 등은 terminalConfiguration, 색은 theme 으로 나눈다 — 색만 나중에 바꿀 수 있게 (setTheme, 설정의 터미널 색)
-        let configuration = TerminalConfiguration.default
+        var configuration = TerminalConfiguration.default
             .fontSize(13)
             .windowPaddingX(TerminalScreen.paddingX)
             .windowPaddingY(TerminalScreen.paddingY)
@@ -61,6 +61,8 @@ final class TerminalTab: Identifiable, ObservableObject {
             .custom("term", "xterm-256color")
             // 드래그(두 번 클릭 단어 선택 포함)로 고르면 바로 클립보드로 — iTerm 처럼. ⌘C 는 그대로 된다.
             .custom("copy-on-select", "clipboard")
+        // 앱 메뉴의 단축키와 겹치는 Ghostty 기본 키를 푼다 — 안 풀면 터미널이 가져가 ⌘T · ⌘, · ⌘Q 가 눌러도 아무 일도 없다 (TerminalKeys)
+        for keybind in TerminalKeys.keybinds { configuration = configuration.custom("keybind", keybind) }
         let terminal = TerminalViewState(theme: Self.colorTheme(colorMode.palette(themed: theme)),
                                          terminalConfiguration: configuration)
         content = .terminal(terminal)
