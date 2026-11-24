@@ -1,0 +1,11 @@
+NOW|2026-11-24T07:49:29Z
+## STATUS
+P|Pending|
+PM|
+N|PodScheduled|Unschedulable
+NM|PodScheduled|0/1 nodes are available: 1 Insufficient memory. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.
+## EVENTS
+E|null|2026-11-24T07:45:54Z|Warning|FailedScheduling||0/1 nodes are available: 1 Insufficient memory. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.
+## PREVIOUS
+## LOG
+## END

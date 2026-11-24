@@ -1,0 +1,21 @@
+NOW|2026-11-24T07:49:29Z
+## STATUS
+P|Pending|
+PM|
+C|badimg|0|ImagePullBackOff|||||
+CM|badimg|Back-off pulling image "registry.invalid/team/none:1.0": ErrImagePull: failed to pull and unpack image "registry.invalid/team/none:1.0": failed to resolve reference "registry.invalid/team/none:1.0": failed to do request: Head "https://registry.invalid/v2/team/none/manifests/1.0": dial tcp: lookup registry.invalid: no such host
+N|Ready|ContainersNotReady
+NM|Ready|containers with unready status: [badimg]
+N|ContainersReady|ContainersNotReady
+NM|ContainersReady|containers with unready status: [badimg]
+## EVENTS
+E|null|2026-11-24T07:45:54Z|Normal|Scheduled||Successfully assigned app/badimg to 1de11a57cc88
+E|2026-11-24T07:48:50Z|2026-11-24T07:45:54Z|Normal|Pulling|5|Pulling image "registry.invalid/team/none:1.0"
+E|2026-11-24T07:48:50Z|2026-11-24T07:45:54Z|Warning|Failed|5|Failed to pull image "registry.invalid/team/none:1.0": failed to pull and unpack image "registry.invalid/team/none:1.0": failed to resolve reference "registry.invalid/team/none:1.0": failed to do request: Head "https://registry.invalid/v2/team/none/manifests/1.0": dial tcp: lookup registry.invalid: no such host
+E|2026-11-24T07:48:50Z|2026-11-24T07:45:54Z|Warning|Failed|5|Error: ErrImagePull
+E|2026-11-24T07:49:17Z|2026-11-24T07:45:55Z|Normal|BackOff|13|Back-off pulling image "registry.invalid/team/none:1.0"
+E|2026-11-24T07:49:17Z|2026-11-24T07:45:55Z|Warning|Failed|13|Error: ImagePullBackOff
+## PREVIOUS
+## LOG
+Error from server (BadRequest): container "badimg" in pod "badimg" is waiting to start: trying and failing to pull image
+## END

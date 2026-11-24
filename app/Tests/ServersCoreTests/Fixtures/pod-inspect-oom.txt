@@ -1,0 +1,27 @@
+NOW|2026-11-24T07:49:28Z
+## STATUS
+P|Running|
+PM|
+C|hog|5|CrashLoopBackOff|OOMKilled|137|2026-11-24T07:49:00Z||
+CM|hog|back-off 2m40s restarting failed container=hog pod=oom_app(32dfc6b1-e56d-47cd-ad5c-78267c7ebd3b)
+N|Ready|ContainersNotReady
+NM|Ready|containers with unready status: [hog]
+N|ContainersReady|ContainersNotReady
+NM|ContainersReady|containers with unready status: [hog]
+## EVENTS
+E|null|2026-11-24T07:45:54Z|Normal|Scheduled||Successfully assigned app/oom to 1de11a57cc88
+E|2026-11-24T07:48:59Z|2026-11-24T07:45:55Z|Normal|Pulling|6|Pulling image "busybox"
+E|2026-11-24T07:45:58Z|2026-11-24T07:45:58Z|Normal|Pulled|1|Successfully pulled image "busybox" in 3.649s (3.649s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:49:00Z|2026-11-24T07:45:58Z|Normal|Created|6|Created container: hog
+E|2026-11-24T07:49:00Z|2026-11-24T07:45:58Z|Normal|Started|6|Started container hog
+E|2026-11-24T07:46:00Z|2026-11-24T07:46:00Z|Normal|Pulled|1|Successfully pulled image "busybox" in 1.224s (1.224s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:49:15Z|2026-11-24T07:46:01Z|Warning|BackOff|16|Back-off restarting failed container hog in pod oom_app(32dfc6b1-e56d-47cd-ad5c-78267c7ebd3b)
+E|2026-11-24T07:46:15Z|2026-11-24T07:46:15Z|Normal|Pulled|1|Successfully pulled image "busybox" in 1.236s (1.236s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:46:43Z|2026-11-24T07:46:43Z|Normal|Pulled|1|Successfully pulled image "busybox" in 1.227s (1.227s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:47:30Z|2026-11-24T07:47:30Z|Normal|Pulled|1|Successfully pulled image "busybox" in 1.202s (1.202s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:49:00Z|2026-11-24T07:49:00Z|Normal|Pulled|1|Successfully pulled image "busybox" in 1.171s (1.171s including waiting). Image size: 1926012 bytes.
+## PREVIOUS
+[pod/oom/hog] allocating
+## LOG
+[pod/oom/hog] allocating
+## END

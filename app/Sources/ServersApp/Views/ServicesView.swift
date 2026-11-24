@@ -126,11 +126,14 @@ struct ServicesView: View {
         }
     }
 
-    /// 리눅스의 docker 컨테이너는 누르면 최근 로그(이름 복사는 우클릭 메뉴), 파드·Windows 는 누르면 이름 복사
+    /// 리눅스의 docker 컨테이너는 누르면 최근 로그, 파드는 누르면 상태(멈춘 이유) · 최근 로그 (이름 복사는 우클릭 메뉴). Windows 는 누르면 이름 복사
     private func containerRow(_ item: ContainerItem) -> some View {
-        let opensLog = item.kind == .docker && canOpenLog
-        return ContainerRow(item: item, opensLog: opensLog, copy: { model.copy(item.copyName) }) {
-            if opensLog { model.showContainerLog(server, container: item.name) } else { model.copy(item.copyName) }
+        ContainerRow(item: item, opensLog: canOpenLog, copy: { model.copy(item.copyName) }) {
+            guard canOpenLog else { return model.copy(item.copyName) }
+            switch item.kind {
+            case .docker: model.showContainerLog(server, container: item.name)
+            case .pod: model.showPodLog(server, name: item.name)
+            }
         }
     }
 
@@ -259,7 +262,7 @@ private struct LogHelp: ViewModifier {
 }
 
 /// 컨테이너·파드 한 줄: 점 · 이름(꼬리 해시는 흐리게) · 상태(Running 이 아닐 때만) · 준비 · 재시작 · 나이.
-/// docker 는 내놓은 포트(DockerPortsLabel) · 상태(healthy 는 점으로 충분해 적지 않는다) · 가동 시간 — 떠 있지 않으면 상태 글 그대로. 누르면 최근 로그(리눅스 docker) 또는 전체 이름 복사.
+/// docker 는 내놓은 포트(DockerPortsLabel) · 상태(healthy 는 점으로 충분해 적지 않는다) · 가동 시간 — 떠 있지 않으면 상태 글 그대로. 누르면 리눅스는 최근 로그(docker) · 상태와 최근 로그(파드 — PodInspect), 그 밖은 전체 이름 복사.
 private struct ContainerRow: View {
     let item: ContainerItem
     let opensLog: Bool
@@ -302,7 +305,7 @@ private struct ContainerRow: View {
         .onHover { hovering = $0 }
         .onTapGesture(perform: tap)
         .contextMenu { if opensLog { Button("이름 복사", action: copy) } }
-        .help(opensLog ? "누르면 최근 로그" : "누르면 이름 복사")
+        .help(opensLog ? (item.kind == .pod ? "누르면 상태 · 최근 로그" : "누르면 최근 로그") : "누르면 이름 복사")
     }
 
     private var color: Color {

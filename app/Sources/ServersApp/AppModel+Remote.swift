@@ -171,6 +171,27 @@ extension AppModel {
         }
     }
 
+    /// Services 탭에서 k3s 파드 줄을 누르면: 왜 그 상태인지(컨테이너 상태 · 직전 종료 · 배치 실패 · 최근 이벤트)와 최근 로그를 결과 창으로 (리눅스만 — PodInspect).
+    /// name 은 목록의 "네임스페이스/파드".
+    func showPodLog(_ server: Server, name: String) {
+        let parts = name.split(separator: "/", maxSplits: 1).map(String.init)
+        let key = "\(server.key)|pod|\(name)"
+        guard server.type == .linux, parts.count == 2, let command = PodInspect.command(namespace: parts[0], pod: parts[1]),
+              !serviceLogLoading.contains(key) else { return }
+        serviceLogLoading.insert(key)
+        statusMessage = "\(server.key) · \(parts[1]) 상태 · 로그를 가져옵니다…"
+        Task {
+            let result = await runRemote(server, command: command, allowPrompt: true)
+            serviceLogLoading.remove(key)
+            if statusMessage?.hasSuffix("로그를 가져옵니다…") == true { statusMessage = nil }
+            let lines = RemoteCommands.cleanOutput(ServiceLog.stripANSI(result.stdout), type: .linux)
+            let report = result.ok ? PodInspect.parse(lines) : nil
+            // 접속 실패 · 인증 취소면 구역이 없다 — "로그 없음" 이 아니라 실패로
+            let shown = report.map(PodInspect.displayLines) ?? ["상태 · 로그를 가져오지 못했습니다 (exit \(result.exitCode))"]
+            queryResult = QueryResult(title: "\(server.key) · \(parts[1])", lines: shown, failed: report == nil || report?.denied == true)
+        }
+    }
+
     /// 선택한 서버가 닿으면 Spec 을 한 번 자동으로 가져온다 (조용히, 팝업 없음).
     func autoFetchSpecIfNeeded() {
         guard let server = selectedServer, status.remote(server.key).isReachable, server.autoFetches(hasPassword: hasPassword(server)) else { return }

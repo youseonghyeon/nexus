@@ -1,0 +1,23 @@
+NOW|2026-11-24T07:49:29Z
+## STATUS
+P|Running|
+PM|
+C|sidecar|0||||||
+CM|sidecar|
+C|web|0||||||
+CM|web|
+## EVENTS
+E|null|2026-11-24T07:45:54Z|Normal|Scheduled||Successfully assigned app/duo to 1de11a57cc88
+E|2026-11-24T07:45:55Z|2026-11-24T07:45:55Z|Normal|Pulling|1|Pulling image "busybox"
+E|2026-11-24T07:45:58Z|2026-11-24T07:45:58Z|Normal|Pulled|1|Successfully pulled image "busybox" in 3.643s (3.643s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:45:58Z|2026-11-24T07:45:58Z|Normal|Created|1|Created container: web
+E|2026-11-24T07:45:58Z|2026-11-24T07:45:58Z|Normal|Started|1|Started container web
+E|2026-11-24T07:45:58Z|2026-11-24T07:45:58Z|Normal|Pulling|1|Pulling image "busybox"
+E|2026-11-24T07:45:59Z|2026-11-24T07:45:59Z|Normal|Pulled|1|Successfully pulled image "busybox" in 1.137s (1.137s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:45:59Z|2026-11-24T07:45:59Z|Normal|Created|1|Created container: sidecar
+E|2026-11-24T07:45:59Z|2026-11-24T07:45:59Z|Normal|Started|1|Started container sidecar
+## PREVIOUS
+## LOG
+[pod/duo/web] web ready
+[pod/duo/sidecar] sh: line 0: ready: not found
+## END

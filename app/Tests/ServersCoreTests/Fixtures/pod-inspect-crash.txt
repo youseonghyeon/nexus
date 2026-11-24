@@ -1,0 +1,29 @@
+NOW|2026-11-24T07:49:28Z
+## STATUS
+P|Running|
+PM|
+C|crash|5|CrashLoopBackOff|Error|3|2026-11-24T07:48:58Z||
+CM|crash|back-off 2m40s restarting failed container=crash pod=crash_app(6f967693-fd86-47c8-b7c4-6c43c41b7d72)
+N|Ready|ContainersNotReady
+NM|Ready|containers with unready status: [crash]
+N|ContainersReady|ContainersNotReady
+NM|ContainersReady|containers with unready status: [crash]
+## EVENTS
+E|null|2026-11-24T07:45:54Z|Normal|Scheduled||Successfully assigned app/crash to 1de11a57cc88
+E|2026-11-24T07:48:57Z|2026-11-24T07:45:54Z|Normal|Pulling|6|Pulling image "busybox"
+E|2026-11-24T07:45:58Z|2026-11-24T07:45:58Z|Normal|Pulled|1|Successfully pulled image "busybox" in 3.802s (3.802s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:48:58Z|2026-11-24T07:45:58Z|Normal|Created|6|Created container: crash
+E|2026-11-24T07:48:58Z|2026-11-24T07:45:58Z|Normal|Started|6|Started container crash
+E|2026-11-24T07:46:00Z|2026-11-24T07:46:00Z|Normal|Pulled|1|Successfully pulled image "busybox" in 1.213s (1.213s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:49:27Z|2026-11-24T07:46:01Z|Warning|BackOff|17|Back-off restarting failed container crash in pod crash_app(6f967693-fd86-47c8-b7c4-6c43c41b7d72)
+E|2026-11-24T07:46:18Z|2026-11-24T07:46:18Z|Normal|Pulled|1|Successfully pulled image "busybox" in 1.175s (1.175s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:46:47Z|2026-11-24T07:46:47Z|Normal|Pulled|1|Successfully pulled image "busybox" in 1.219s (1.219s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:47:29Z|2026-11-24T07:47:29Z|Normal|Pulled|1|Successfully pulled image "busybox" in 1.176s (1.176s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:48:58Z|2026-11-24T07:48:58Z|Normal|Pulled|1|Successfully pulled image "busybox" in 1.167s (1.167s including waiting). Image size: 1926012 bytes.
+## PREVIOUS
+[pod/crash/crash] starting up
+[pod/crash/crash] boom: cannot open config
+## LOG
+[pod/crash/crash] starting up
+[pod/crash/crash] boom: cannot open config
+## END

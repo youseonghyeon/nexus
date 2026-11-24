@@ -1,0 +1,24 @@
+NOW|2026-11-24T07:49:29Z
+## STATUS
+P|Running|
+PM|
+C|ok|0||||||
+CM|ok|
+## EVENTS
+E|null|2026-11-24T07:45:54Z|Normal|Scheduled||Successfully assigned app/ok to 1de11a57cc88
+E|2026-11-24T07:45:54Z|2026-11-24T07:45:54Z|Normal|Pulling|1|Pulling image "busybox"
+E|2026-11-24T07:45:58Z|2026-11-24T07:45:58Z|Normal|Pulled|1|Successfully pulled image "busybox" in 3.809s (3.809s including waiting). Image size: 1926012 bytes.
+E|2026-11-24T07:45:58Z|2026-11-24T07:45:58Z|Normal|Created|1|Created container: ok
+E|2026-11-24T07:45:58Z|2026-11-24T07:45:58Z|Normal|Started|1|Started container ok
+## PREVIOUS
+## LOG
+[pod/ok/ok] hello from ok
+[pod/ok/ok] tick
+[pod/ok/ok] tick
+[pod/ok/ok] tick
+[pod/ok/ok] tick
+[pod/ok/ok] tick
+[pod/ok/ok] tick
+[pod/ok/ok] tick
+[pod/ok/ok] tick
+## END
