@@ -41,12 +41,10 @@ extension AppModel {
     @discardableResult
     func openSSH(_ server: Server) -> TerminalTab? {
         guard let config, !vpnBindMissing(server) else { return nil }
-        let theme = config.settings(for: server.group)?.theme == true
         // 세션 비밀번호가 있으면 터미널 프롬프트 대신 헬퍼가 대입한다. 없으면 평소처럼 터미널에서 묻는다.
-        let mode = terminalColorMode
         let tab = TerminalTab(server: server, title: server.accountTitle,
-                              command: SessionCommand.ssh(to: server, config: config, bindInterface: bindInterface(for: server), palette: mode.promptPalette),
-                              theme: theme, colorMode: mode,
+                              command: SessionCommand.ssh(to: server, config: config, bindInterface: bindInterface(for: server)),
+                              palette: terminalTheme(for: server.key)?.palette,
                               envVars: askPassEnvironment(for: server, title: "\(server.key) · \(server.target)") ?? [:])
         add(tab)
         return tab
@@ -57,18 +55,26 @@ extension AppModel {
     func openLocalShell(command: String? = nil, title: String = "local") {
         let shell = ProcessInfo.processInfo.environment["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
         let wrapped = command.map { "\(shellQuote(shell)) -lic \(shellQuote($0))" }
-        add(TerminalTab(server: nil, title: title, command: wrapped, theme: false, colorMode: terminalColorMode))
+        add(TerminalTab(server: nil, title: title, command: wrapped, palette: nil))   // 로컬 셸은 터미널 기본색 (테마는 서버별)
     }
 
-    /// 설정의 터미널 색 (UserDefaults, 목록 밖이면 미적용)
-    var terminalColorMode: TerminalColorMode {
-        TerminalColorMode.resolve(UserDefaults.standard.string(forKey: TerminalColorMode.key))
+    // MARK: 서버별 터미널 테마 (ServerTerminalTheme)
+
+    /// 그 서버에서 고른 테마 (고르지 않았으면 nil — 터미널 기본색)
+    func terminalTheme(for serverKey: String) -> ServerTerminalTheme? {
+        ServerTerminalTheme.find(terminalThemes[serverKey])
     }
 
-    /// 설정 창에서 터미널 색을 바꿨을 때: 열린 터미널 탭 전부에 적용
-    func applyTerminalColorMode() {
-        let mode = terminalColorMode
-        for tab in tabs { tab.applyColorMode(mode) }
+    /// 테마를 고른다 (nil 이면 푼다). 그 서버의 열린 터미널 탭에도 바로.
+    func setTerminalTheme(_ id: String?, for server: Server) {
+        saveTerminalThemes(ServerTerminalTheme.setting(id, for: server.key, in: terminalThemes))
+        for tab in tabs where tab.server?.key == server.key { tab.applyPalette(terminalTheme(for: server.key)?.palette) }
+    }
+
+    func saveTerminalThemes(_ next: [String: String]) {
+        guard next != terminalThemes else { return }
+        terminalThemes = next
+        UserDefaults.standard.set(next, forKey: AppPreferences.terminalThemesKey)
     }
 
 

@@ -28,50 +28,19 @@ public enum AppPreferences {
 
     /// 시스템 화면 코어 막대가 값 사이를 이어 움직이는가 (기본 켬)
     public static let coreAnimationKey = "coreBarAnimation"
-    /// 원격 파일 탐색에서 숨김 파일 보기 — 탐색 창 체크박스와 같은 값 (기본 끔)
+    /// 원격 파일 탐색에서 숨김 파일 보기 — 탐색 창의 체크박스가 쓴다 (기본 끔). 설정 창의 같은 토글은 겹쳐서 2026-11-24 에 뺐다
     public static let remoteShowHiddenKey = "remoteBrowserShowHidden"
 
     /// 앱 안 브라우저의 쿠키 저장소 ID (서버별 — 로그인이 여기 남는다)
     public static func browserStoreKey(for server: String) -> String { "browserStore.\(server)" }
     /// 서버별로 고른 계정 ({서버 키: 계정}) — 서버 정보의 사용자 칸 (ServerConfig.applyingAccounts)
     public static let activeAccountsKey = "activeAccounts"
+    /// 서버별 터미널 테마 ({서버 키: 테마 id}) — 서버 정보의 테마 줄 (ServerTerminalTheme)
+    public static let terminalThemesKey = "terminalThemes"
     /// 서버별 깨우기 경로 (설정 창). 값은 wol_via 의 서버 키
     public static func wakeRouteKey(for server: String) -> String { "wakeRoute.\(server)" }
     /// 고른 경로가 목록에 있으면 그것, 없으면(처음·servers.conf 에서 빠짐) 첫 경로
     public static func wakeRoute(_ routes: [WakeRoute], stored: String?) -> WakeRoute? {
         routes.first { $0.via == stored } ?? routes.first
     }
-}
-
-/// 설정 창의 "터미널 색" — 이 앱의 터미널 탭에만 (Ghostty 앱·macOS 터미널 설정과 무관).
-/// 미적용: 지금처럼 — theme=on 그룹의 SSH 탭만 Rosé Pine, 나머지는 터미널 기본색. 밝음·어두움: 모든 탭을 그 팔레트로.
-public enum TerminalColorMode: String, CaseIterable, Sendable {
-    case none, light, dark
-
-    public static let key = "terminalColorMode"
-
-    public var title: String {
-        switch self {
-        case .none: return "미적용"
-        case .light: return "밝음"
-        case .dark: return "어두움"
-        }
-    }
-
-    /// 저장된 값이 목록 밖이면 미적용
-    public static func resolve(_ stored: String?) -> TerminalColorMode {
-        stored.flatMap(TerminalColorMode.init(rawValue:)) ?? .none
-    }
-
-    /// 탭 색. themed: theme=on 그룹의 SSH 탭. nil 이면 앱이 색을 정하지 않는다(터미널 기본색).
-    public func palette(themed: Bool) -> TerminalPalette? {
-        switch self {
-        case .none: return themed ? .rosePine : nil
-        case .light: return .rosePineDawn
-        case .dark: return .rosePine
-        }
-    }
-
-    /// theme=on 그룹에 주입하는 원격 프롬프트·vim 색 — 탭 바탕에 맞춘다
-    public var promptPalette: TerminalPalette { palette(themed: true) ?? .rosePine }
 }

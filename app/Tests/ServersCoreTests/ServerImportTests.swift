@@ -71,11 +71,11 @@ final class ServerImportTests: XCTestCase {
     }
 
     func testMergeKeepsMyGroupAndLan() throws {
-        let withSettings = mine + "\n\n[network:lan]\nservice=Mine\n\n[group:acme]\ntheme=off\n"
+        let withSettings = mine + "\n\n[network:lan]\nservice=Mine\n\n[group:acme]\ndb_name=mine\n"
         let merge = try ServerConfigEditor.merging(theirs, into: withSettings)
         let config = try ServerConfigParser.parse(merge.text)
         XCTAssertEqual(config.lan?.service, "Mine")
-        XCTAssertEqual(config.settings(for: "acme")?.theme, false)
+        XCTAssertEqual(config.settings(for: "acme")?.dbName, "mine")
         XCTAssertEqual(merge.text.components(separatedBy: "[group:acme]").count, 2, "그룹 블록이 둘이 되지 않는다")
     }
 

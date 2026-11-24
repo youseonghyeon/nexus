@@ -193,13 +193,9 @@ struct ConnectionCard: View {
                 }
             }
             InfoRow("셸", shellText)
-            // 그룹 테마를 켠 Linux 서버만: 터미널에 찍히는 프롬프트 미리 보기 (태그 색은 운영 빨강·스테이징 파랑만)
-            if let label = promptLabel {
-                GridRow {
-                    Text("프롬프트").font(.fieldLabel).foregroundStyle(.secondary)
-                    Text("\(Text(label).foregroundStyle(promptColor)) ~ ❯").font(.body.monospaced())
-                        .help("이 앱의 SSH 탭에서만 바꾸는 프롬프트 (서버의 셸 설정은 그대로)")
-                }
+            GridRow {
+                Text("테마").font(.fieldLabel).foregroundStyle(.secondary)
+                TerminalThemeRow(server: server)
             }
             InfoRow("네트워크", networkText)
             if let mac = server.wolMac, let route = model.wakeRoute(server) {
@@ -225,17 +221,6 @@ struct ConnectionCard: View {
         case .linux: return "bash"
         case .openwrt: return "ash"
         }
-    }
-
-    /// 프롬프트 태그 글자 — 그룹 테마(theme=on)를 켠 Linux 서버만, 아니면 nil (줄 없음)
-    private var promptLabel: String? {
-        guard server.type == .linux, model.config?.settings(for: server.group)?.theme == true else { return nil }
-        return SessionTheme.promptLabel(server.promptTag)
-    }
-
-    private var promptColor: Color {
-        let tone = ServerTags.strongest(ServerTags.parse(server.promptTag))
-        return tone == .plain ? .primary : tone.badgeColor
     }
 
     private var networkText: String {

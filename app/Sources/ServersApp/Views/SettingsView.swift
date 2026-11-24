@@ -1,4 +1,4 @@
-// 설정 창 (⌘,): 흩어져 있던 설정(화면 모드 · 숨김 파일)과 갱신 간격 · 코어 막대 애니메이션 · 비밀번호 키 · 부팅 경로 · 버전.
+// 설정 창 (⌘,): 화면 모드와 갱신 간격 · 코어 막대 애니메이션 · 비밀번호 키 · 부팅 경로 · 버전.
 // 값은 UserDefaults — 키·고를 수 있는 값·기본값은 ServersCore AppPreferences. 바꾸면 바로 반영된다 (다음 갱신부터).
 
 import AppKit
@@ -8,7 +8,6 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @AppStorage(AppearanceMode.defaultsKey) private var appearance = AppearanceMode.system
-    @AppStorage(AppPreferences.remoteShowHiddenKey) private var showHidden = false
     @AppStorage(AppPreferences.statusInterval.key) private var statusInterval = AppPreferences.statusInterval.defaultValue
     @AppStorage(AppPreferences.systemInterval.key) private var systemInterval = AppPreferences.systemInterval.defaultValue
     @AppStorage(AppPreferences.diskInterval.key) private var diskInterval = AppPreferences.diskInterval.defaultValue
@@ -16,22 +15,14 @@ struct SettingsView: View {
     @AppStorage(AppPreferences.serverLiveInterval.key) private var serverLiveInterval = AppPreferences.serverLiveInterval.defaultValue
     @AppStorage(AppPreferences.coreAnimationKey) private var coreAnimation = true
     @State private var confirmRotate = false
-    @AppStorage(TerminalColorMode.key) private var terminalColor = TerminalColorMode.none.rawValue
 
     var body: some View {
         Form {
             Section {
-                // 보기 ▸ 화면 모드 와 같은 값 (메뉴에도 그대로 있다)
-                Picker("화면 모드", selection: Binding(get: { appearance }, set: { appearance = $0; $0.apply() })) {
-                    ForEach(AppearanceMode.allCases, id: \.self) { Text($0.title) }
-                }
+                // 보기 ▸ 화면 모드 와 같은 값 (메뉴에는 이름만 있다). 작은 창 그림으로 미리 보고, 누르면 바로 건다
+                ScreenModePicker(selected: appearance) { appearance = $0; $0.apply() }
             } header: {
                 SectionHeader("화면")
-            }
-            Section {
-                Toggle("원격 파일 탐색에서 숨김 파일 보기", isOn: $showHidden)
-            } header: {
-                SectionHeader("파일")
             }
             Section {
                 intervalPicker("서버 상태 확인", AppPreferences.statusInterval, $statusInterval)
@@ -44,17 +35,6 @@ struct SettingsView: View {
                 SectionHeader("갱신 간격")
             } footer: {
                 Text("서버 켜짐·꺼짐 알림도 서버 상태 확인 간격으로 판정합니다. System·Disk·Bluetooth 화면과 서버 Live 탭은 보고 있을 때만 읽습니다.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section {
-                Picker("터미널 색", selection: Binding(get: { TerminalColorMode.resolve(terminalColor) },
-                                                      set: { terminalColor = $0.rawValue; model.applyTerminalColorMode() })) {
-                    ForEach(TerminalColorMode.allCases, id: \.self) { Text($0.title) }
-                }
-            } header: {
-                SectionHeader("터미널")
-            } footer: {
-                Text("이 앱의 터미널 탭에만 적용됩니다. 미적용은 테마 그룹 서버만 어두운 색, 나머지는 기본색입니다. 열린 탭에도 바로 적용되지만, 서버 프롬프트 색은 새로 접속할 때 바뀝니다.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {

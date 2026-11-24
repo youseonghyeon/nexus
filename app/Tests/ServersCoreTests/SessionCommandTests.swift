@@ -11,18 +11,17 @@ final class SessionCommandTests: XCTestCase {
         XCTAssertEqual(nexus, "'ssh' '-o' 'ConnectTimeout=3' '-o' 'ConnectionAttempts=1' '-p' '2222' '-o' 'ControlMaster=auto' '-o' 'ControlPath=/h/.ssh/srv-%C' '-o' 'ControlPersist=10m' 'tester@100.64.0.1'")
         let win = SessionCommand.sshCommandLine(to: config.server("win")!, config: config, home: "/h")
         XCTAssertTrue(win.hasSuffix("'-t' 'tester@100.64.0.2' 'powershell.exe' '-NoLogo'"), win)
+        // 리눅스는 일반 로그인 셸 — 원격 셸에 아무것도 주입하지 않는다 (예전 theme=on 그룹의 프롬프트·vim 주입은 뺐다. 설정에 theme=on 이 남아 있어도)
         let was = SessionCommand.sshCommandLine(to: config.server("was")!, config: config, home: "/h")
-        XCTAssertTrue(was.contains("'-t' 'tester@192.0.2.22' 'exec bash --rcfile <(printf '\\''%s'\\'' "), was)
-        XCTAssertTrue(was.contains("38;2;224;107;107m"), "PROD prompt color")
-        XCTAssertTrue(was.contains("PROD"), was)
+        XCTAssertTrue(was.hasSuffix("'-o' 'ControlPersist=10m' 'tester@192.0.2.22'"), was)
+        XCTAssertFalse(was.contains("bash") || was.contains("'-t'") || was.contains("PS1") || was.contains("vim"), was)
         // 내부망 서버는 그 서비스의 장치에 묶는다 (시스템 경로 없이 장치의 스코프 기본 경로로). 옵션은 서버 이름 앞에.
         let bound = SessionCommand.sshCommandLine(to: config.server("was")!, config: config, home: "/h", bindInterface: "en10")
-        XCTAssertTrue(bound.contains("'-o' 'BindInterface=en10' '-t' 'tester@192.0.2.22'"), bound)
+        XCTAssertTrue(bound.hasSuffix("'-o' 'BindInterface=en10' 'tester@192.0.2.22'"), bound)
         XCTAssertFalse(was.contains("BindInterface"), "장치를 모르면 붙이지 않는다")
-        // OpenWrt 는 테마 그룹(acme)이어도 bash 프롬프트를 넣지 않는다 — bash 가 없다 (일반 로그인 셸)
+        // OpenWrt 도 일반 로그인 셸 (ash)
         let router = Server(key: "gw", group: "acme", network: .lan, type: .openwrt, ip: "192.0.2.1", user: "root", port: 22,
                             check: .tcp, role: nil, env: nil, wolMac: nil)
-        XCTAssertEqual(config.settings(for: "acme")?.theme, true, "전제: 테마 그룹")
         let openwrt = SessionCommand.sshCommandLine(to: router, config: config, home: "/h")
         XCTAssertTrue(openwrt.hasSuffix("'-o' 'ControlPersist=10m' 'root@192.0.2.1'"), openwrt)
         XCTAssertFalse(openwrt.contains("bash") || openwrt.contains("'-t'"), openwrt)
@@ -36,33 +35,6 @@ final class SessionCommandTests: XCTestCase {
         XCTAssertEqual(ConnectPolicy.sharedArguments(port: 22, portFlag: "-P", bindInterface: nil, home: "/h").prefix(6),
                        ["-o", "ConnectTimeout=3", "-o", "ConnectionAttempts=1", "-P", "22"])
         XCTAssertEqual(ConnectPolicy.noControlOptions, ["-o", "ControlMaster=no", "-o", "ControlPath=none"])
-    }
-
-    /// 서버 정보의 프롬프트 미리 보기와 실제 PS1 이 같은 글자 — 따옴표·$( ) 는 빠지고 쉼표·공백은 남는다
-    func testPromptLabelMatchesPS1() {
-        XCTAssertEqual(SessionTheme.promptLabel("DEV,Docker"), "DEV,Docker")
-        XCTAssertEqual(SessionTheme.promptLabel("PROD,D'B$(x)"), "PROD,DBx")
-        XCTAssertEqual(SessionTheme.promptLabel("DEV,Forward Proxy"), "DEV,Forward Proxy")
-        XCTAssertTrue(SessionTheme.remoteRC(environment: "PROD,D'B$(x)").contains("m\\]PROD,DBx\\["))
-    }
-
-    func testRemoteRCIsValidBashInput() throws {
-        // 원격에서 실행될 rcfile 을 로컬 bash -n 으로 문법 검사한다 (실행하지 않는다).
-        let rc = SessionTheme.remoteRC(environment: "DEV")
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/bin/bash")
-        p.arguments = ["-n"]
-        let pipe = Pipe(); p.standardInput = pipe
-        try p.run()
-        pipe.fileHandleForWriting.write(rc.data(using: .utf8)!)
-        try pipe.fileHandleForWriting.close()
-        p.waitUntilExit()
-        XCTAssertEqual(p.terminationStatus, 0)
-        // 프로세스 치환 형태의 원격 명령 전체도 문법 검사
-        let full = SessionTheme.remoteShellCommand(environment: "PROD")
-        let q = Process(); q.executableURL = URL(fileURLWithPath: "/bin/bash"); q.arguments = ["-n", "-c", full]
-        try q.run(); q.waitUntilExit()
-        XCTAssertEqual(q.terminationStatus, 0)
     }
 
     func testTunnels() throws {
@@ -131,18 +103,4 @@ final class SessionCommandTests: XCTestCase {
         XCTAssertEqual(rc1, 1)
     }
 
-    /// 어두운 팔레트(기본)의 원격 rc 는 예전과 글자 하나 다르지 않다 — 밝은 팔레트만 프롬프트·vim 색이 바뀐다
-    func testRemoteRCPaletteColors() {
-        let dark = SessionTheme.remoteRC(environment: "PROD")
-        XCTAssertTrue(dark.contains(#"\[\e[38;2;224;107;107m\]PROD"#), dark)
-        XCTAssertTrue(dark.contains(#"\[\e[38;2;196;167;231m\]❯"#), dark)
-        XCTAssertTrue(dark.contains("guifg=#85809c | highlight NexusEnvKey term=NONE cterm=NONE ctermfg=13 gui=NONE guifg=#c4a7e7 | highlight NexusEnvValue term=NONE cterm=NONE ctermfg=14 gui=NONE guifg=#99bac0 | endif"), dark)
-        XCTAssertTrue(dark.contains(#"if expand("%:t") =~# "^\.env""#), dark)
-
-        let light = SessionTheme.remoteRC(environment: "PROD", palette: .rosePineDawn)
-        XCTAssertTrue(light.contains(#"\[\e[38;2;180;70;90m\]PROD"#), light)
-        XCTAssertTrue(light.contains(#"\[\e[38;2;144;122;169m\]❯"#), light)
-        XCTAssertTrue(light.contains("guifg=#286983 | endif"), light)
-        XCTAssertFalse(light.contains("224;107;107"))
-    }
 }

@@ -60,6 +60,7 @@ extension AppModel {
         remoteInfo[server.key] = nil
         saveBookmarks(BookmarkStore.removingServer(server.key, from: browserBookmarks))   // 같은 이름으로 다시 추가한 서버에 옛 즐겨찾기가 살아나지 않게
         writeNotes(NoteVault.removingServer(server.key, from: notes))   // 메모·로그인도
+        saveTerminalThemes(ServerTerminalTheme.removing(server.key, from: terminalThemes))   // 고른 터미널 테마도
         loadConfig()
         statusMessage = "\(server.key) 서버를 목록에서 지웠습니다."
     }
@@ -238,6 +239,7 @@ extension AppModel {
         remoteHomes = ServerConfigEditor.renamingCredentials(remoteHomes, from: old, to: new)
         lastUploadPath = ServerConfigEditor.renamingCredentials(lastUploadPath, from: old, to: new)
         if let account = activeAccounts.removeValue(forKey: old) { activeAccounts[new] = account; saveActiveAccounts() }
+        saveTerminalThemes(ServerTerminalTheme.renaming(from: old, to: new, in: terminalThemes))   // 고른 터미널 테마
         // 이름별 설정: 고른 깨우기 경로 · 앱 안 브라우저 쿠키 저장소(로그인). 옛 값이 없으면 새 이름에 남은 값(지운 서버의 것)도 지운다 — 다른 서버의 것이 살아나지 않게
         let defaults = UserDefaults.standard
         for name in [AppPreferences.wakeRouteKey(for:), AppPreferences.browserStoreKey(for:)] {

@@ -85,7 +85,6 @@ public enum ConfigLocation {
 #   wait_attempts= wait_interval=  쓰지 않는다 (예전 켜기의 IP 대기 값 — 남아 있어도 된다)
 #
 # [group:이름]   그룹 설정
-#   theme=on       접속 시 터미널 색·프롬프트·vim 설정 적용 (프롬프트에 태그 표시, 색은 가장 센 태그: 빨강·파랑·그 밖 주황)
 #   db_jump= db_host= db_port= db_local= db_name=   DB 터널 (jump 키의 메뉴에 "DB tunnel"로 표시, db_name 은 URL 안내용)
 #
 # 값 뒤에 " # 주석" 을 붙일 수 있다.

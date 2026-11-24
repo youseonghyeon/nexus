@@ -40,36 +40,7 @@ final class ServerTagsTests: XCTestCase {
         let live = try XCTUnwrap(ServerConfigParser.parse(base + "env=LIVE, DB\n").server("a"))
         XCTAssertEqual(live.tags, ["LIVE", "DB"])
         XCTAssertTrue(live.isProd, "PROD 가 아니어도 운영 태그면 운영 서버")
-        XCTAssertEqual(live.promptTag, "LIVE,DB")
         let bare = try XCTUnwrap(ServerConfigParser.parse(base).server("a"))
         XCTAssertFalse(bare.isProd)
-        XCTAssertEqual(bare.promptTag, "DEV", "태그가 없으면 프롬프트는 DEV")
-    }
-
-    func testPromptColorFollowsStrongestTag() {
-        XCTAssertTrue(SessionTheme.remoteRC(environment: "PROD,DB").contains(TerminalPalette.rosePine.prodColor))
-        XCTAssertTrue(SessionTheme.remoteRC(environment: "DB,stg").contains(TerminalPalette.rosePine.stagingColor))
-        XCTAssertTrue(SessionTheme.remoteRC(environment: "DEV").contains(TerminalPalette.rosePine.devColor))
-        XCTAssertTrue(SessionTheme.remoteRC(environment: "PROD,DB").contains("PROD,DB"), "프롬프트 글자는 태그 그대로")
-        XCTAssertTrue(SessionTheme.remoteRC(environment: "DEV,Forward Proxy").contains("DEV,Forward Proxy"), "공백 든 태그도 붙지 않게")
-        XCTAssertFalse(SessionTheme.remoteRC(environment: "a'b").contains("a'b"), "작은따옴표는 여전히 뺀다")
-    }
-
-    func testPromptLabelKeepsOnlySafeCharacters() throws {
-        let rc = SessionTheme.remoteRC(environment: "PROD,x'$(rm -rf y)`id`\\")
-        XCTAssertFalse(rc.contains("$(rm"), "명령 치환이 프롬프트에 들어가지 않는다")
-        XCTAssertTrue(rc.contains(TerminalPalette.rosePine.prodColor), "운영 색은 그대로")
-        // rcfile 자체가 bash 문법으로 깨지지 않는다 (' 가 PS1 작은따옴표를 닫지 않게)
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/bash"); p.arguments = ["-n"]
-        let pipe = Pipe(); p.standardInput = pipe
-        try p.run(); pipe.fileHandleForWriting.write(rc.data(using: .utf8)!); try pipe.fileHandleForWriting.close(); p.waitUntilExit()
-        XCTAssertEqual(p.terminationStatus, 0)
-    }
-
-    func testMultiTagPromptIsValidBash() throws {
-        let full = SessionTheme.remoteShellCommand(environment: "PROD,DB")
-        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/bash"); p.arguments = ["-n", "-c", full]
-        try p.run(); p.waitUntilExit()
-        XCTAssertEqual(p.terminationStatus, 0)
     }
 }

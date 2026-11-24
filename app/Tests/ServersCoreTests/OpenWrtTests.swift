@@ -44,7 +44,7 @@ final class OpenWrtTests: XCTestCase {
         XCTAssertEqual(router.check, .tcp, "direct 는 리눅스처럼 tcp 확인")
         let overTailscale = try ServerConfigParser.parse("[r]\ngroup=g\nnetwork=tailscale\ntype=openwrt\nip=100.64.0.9\nuser=root\nport=22\n")
         XCTAssertEqual(overTailscale.server("r")?.check, .tcp, "공유기는 보통 비밀번호 로그인 — Tailscale 이어도 ssh(BatchMode) 확인은 늘 실패한다")
-        // 테마 그룹이어도 bash 로 띄우지 않는다 (OpenWrt 에는 bash 가 없다)
+        // 일반 로그인 셸 (ash) — 예전 theme=on 이 적혀 있어도 bash 로 띄우지 않는다
         let ssh = SessionCommand.sshCommandLine(to: router, config: config, home: "/h")
         XCTAssertFalse(ssh.contains("bash"))
         XCTAssertTrue(ssh.hasSuffix("'root@192.168.8.1'"))

@@ -18,8 +18,6 @@ final class TerminalTab: Identifiable, ObservableObject {
     let server: Server?
     let title: String
     let content: TabContent
-    /// theme=on 그룹의 SSH 탭 — 터미널 색 "미적용"이어도 Rosé Pine (TerminalColorMode.palette)
-    let themed: Bool
     /// 터미널 탭이면 그 표면 상태, 브라우저 탭이면 nil
     var terminal: TerminalViewState? { if case let .terminal(t) = content { return t } else { return nil } }
     var browser: BrowserSession? { if case let .browser(b) = content { return b } else { return nil } }
@@ -43,15 +41,14 @@ final class TerminalTab: Identifiable, ObservableObject {
         self.server = server
         self.title = "\(server.key) web"
         self.content = .browser(browser)
-        self.themed = false
     }
 
     /// command 가 nil 이면 사용자의 기본 로그인 셸을 연다. envVars 는 그 프로세스에만 더해지는 환경변수 (SSH_ASKPASS 등).
-    init(server: Server?, title: String, command: String?, theme: Bool, colorMode: TerminalColorMode, envVars: [String: String] = [:]) {
+    /// palette: 탭 색 (서버에서 고른 테마 — ServerTerminalTheme). nil 이면 터미널 기본색.
+    init(server: Server?, title: String, command: String?, palette: TerminalPalette?, envVars: [String: String] = [:]) {
         self.server = server
         self.title = title
-        self.themed = theme
-        // 글꼴·여백 등은 terminalConfiguration, 색은 theme 으로 나눈다 — 색만 나중에 바꿀 수 있게 (setTheme, 설정의 터미널 색)
+        // 글꼴·여백 등은 terminalConfiguration, 색은 theme 으로 나눈다 — 색만 나중에 바꿀 수 있게 (setTheme, 서버의 테마)
         var configuration = TerminalConfiguration.default
             .fontSize(13)
             .windowPaddingX(TerminalScreen.paddingX)
@@ -63,7 +60,7 @@ final class TerminalTab: Identifiable, ObservableObject {
             .custom("copy-on-select", "clipboard")
         // 앱 메뉴의 단축키와 겹치는 Ghostty 기본 키를 푼다 — 안 풀면 터미널이 가져가 ⌘T · ⌘, · ⌘Q 가 눌러도 아무 일도 없다 (TerminalKeys)
         for keybind in TerminalKeys.keybinds { configuration = configuration.custom("keybind", keybind) }
-        let terminal = TerminalViewState(theme: Self.colorTheme(colorMode.palette(themed: theme)),
+        let terminal = TerminalViewState(theme: Self.colorTheme(palette),
                                          terminalConfiguration: configuration)
         content = .terminal(terminal)
         // 끌어 놓기(Finder 파일·스크린샷 썸네일의 file promise)를 받는 하위 클래스 뷰 — 받은 파일은 onDropFiles 로
@@ -107,9 +104,9 @@ extension TerminalTab {
         return TerminalTheme(light: colors, dark: colors)
     }
 
-    /// 설정의 터미널 색을 바꾸면 열린 탭에도 바로 (원격 프롬프트 색은 접속 때 정해져 그대로)
-    func applyColorMode(_ mode: TerminalColorMode) {
-        terminal?.setTheme(Self.colorTheme(mode.palette(themed: themed)))
+    /// 서버의 테마를 바꾸면 열린 탭에도 바로
+    func applyPalette(_ palette: TerminalPalette?) {
+        terminal?.setTheme(Self.colorTheme(palette))
     }
 }
 

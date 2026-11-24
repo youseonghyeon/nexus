@@ -18,7 +18,7 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(config.server("win")?.wolRoutes, [WakeRoute(via: "nexus")])
         XCTAssertEqual(config.lan, LanNetwork(service: "Test Ethernet"), "routes=·wait_*= 는 예전 키라 있어도 무시한다")
         let acme = try XCTUnwrap(config.settings(for: "acme"))
-        XCTAssertTrue(acme.theme)
+        // 픽스처의 theme=on 은 예전 키다 — 읽지 않는다 (적혀 있어도 오류가 아니다)
         XCTAssertEqual(acme.dbJump, "was"); XCTAssertEqual(acme.dbPort, 5432); XCTAssertEqual(acme.dbName, "testdb")
         XCTAssertTrue(config.server("was")!.isProd)
     }

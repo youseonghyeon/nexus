@@ -21,7 +21,7 @@ struct RemoteBrowserSheet: View {
     @State private var loading = false
     @State private var problem: String?
     /// "." 로 시작하는 파일·폴더 표시 여부 (Linux 의 숨김 관례, Windows 홈에도 .android 같은 게 많다). 마지막 선택을 기억.
-    @AppStorage(AppPreferences.remoteShowHiddenKey) private var showHidden = false   // 설정 창에도 같은 값
+    @AppStorage(AppPreferences.remoteShowHiddenKey) private var showHidden = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {

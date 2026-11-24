@@ -173,6 +173,8 @@ final class AppModel {
     var identities: [String: String] = IdentityStore.load()
     /// 서버별로 고른 계정 ({서버 키: 계정}, extra_users 서버 · 기본 계정은 적지 않는다). 다시 켜도 유지 (UserDefaults). 탭·터널은 연 계정 그대로 — 새로 여는 것만 따른다.
     var activeAccounts: [String: String] = UserDefaults.standard.dictionary(forKey: AppPreferences.activeAccountsKey) as? [String: String] ?? [:]
+    /// 서버별로 고른 터미널 테마 ({서버 키: 테마 id}, 고르지 않은 서버는 적지 않는다 — ServerTerminalTheme). 다시 켜도 유지 (UserDefaults). 바꾸면 열린 탭에도 바로.
+    var terminalThemes: [String: String] = UserDefaults.standard.dictionary(forKey: AppPreferences.terminalThemesKey) as? [String: String] ?? [:]
     /// 등록한 키 파일의 문제 (없으면 키 없음 = 쓸 수 있음). 파일 I/O 라 그리기마다 읽지 않고 refreshIdentityProblems 가 채운다 —
     /// 시작·키 등록/지우기·목록 다시 읽기·화면 선택 바뀜·앱 활성화 때.
     private(set) var identityProblems: [String: IdentityFile.Problem] = [:]

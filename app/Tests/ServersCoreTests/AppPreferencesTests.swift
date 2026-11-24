@@ -41,19 +41,4 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertNil(AppPreferences.wakeRoute([], stored: "nexus"))
         XCTAssertEqual(AppPreferences.wakeRouteKey(for: "win"), "wakeRoute.win")
     }
-
-    /// 터미널 색: 미적용은 지금 그대로(테마 그룹만 Rosé Pine), 밝음·어두움은 모든 탭. 목록 밖 값은 미적용
-    func testTerminalColorMode() {
-        XCTAssertEqual(TerminalColorMode.allCases.map(\.title), ["미적용", "밝음", "어두움"])
-        XCTAssertEqual(TerminalColorMode.resolve(nil), .none)
-        XCTAssertEqual(TerminalColorMode.resolve("sepia"), .none)
-        XCTAssertEqual(TerminalColorMode.resolve("light"), .light)
-        XCTAssertNil(TerminalColorMode.none.palette(themed: false), "미적용 + 일반 탭 = 터미널 기본색")
-        XCTAssertEqual(TerminalColorMode.none.palette(themed: true), .rosePine)
-        XCTAssertEqual(TerminalColorMode.light.palette(themed: false), .rosePineDawn)
-        XCTAssertEqual(TerminalColorMode.dark.palette(themed: false), .rosePine)
-        XCTAssertEqual(TerminalColorMode.light.promptPalette, .rosePineDawn)
-        XCTAssertEqual(TerminalColorMode.none.promptPalette, .rosePine)
-        XCTAssertEqual(TerminalPalette.rosePineDawn.colors.count, 16)
-    }
 }

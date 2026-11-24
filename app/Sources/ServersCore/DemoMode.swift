@@ -29,9 +29,6 @@ public enum DemoMode {
     [network:lan]
     service=\(lanService)
 
-    [group:work]
-    theme=on
-
     [web]
     group=work
     network=lan

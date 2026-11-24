@@ -1,85 +1,17 @@
-// 터미널 탭에서 실행할 명령 조립. theme=on 그룹이면 원격 bash 에 이 세션용 프롬프트·vim 설정을 주입한다.
+// 터미널 탭에서 실행할 명령 조립. 원격 셸에는 아무것도 주입하지 않는다 — 그룹 theme=on 의 프롬프트·vim 주입은 2026-11-24 에 뺐다 (색은 서버별 테마로 — ServerTerminalTheme).
 // 실제 실행은 GhosttyTerminal 의 .exec 백엔드(PTY)가 맡고, 여기서는 문자열만 만든다.
 
 import Foundation
 
-/// 터미널 색 한 벌: 바탕·글자·커서·16색 + 원격 프롬프트(태그 색·❯)·.env vim 하이라이트 색.
-/// 프롬프트·vim 색은 접속할 때 원격에 보내는 글자라, 열린 뒤 바탕을 바꿔도 따라가지 않는다 — 그래서 바탕마다 한 벌씩.
+/// 터미널 색 한 벌: 바탕·글자·커서·16색. 쓰는 곳은 서버별 테마(ServerTerminalTheme) — 예전 Rosé Pine 두 벌(그룹 테마 · 설정의 터미널 색)은 2026-11-24 에 뺐다.
 public struct TerminalPalette: Sendable, Equatable {
     public let background: String
     public let foreground: String
     public let cursor: String
     public let colors: [String]
-    /// "r;g;b" — 프롬프트 태그 색 (운영 · 스테이징 · 그 밖) · ❯
-    let prodColor: String
-    let stagingColor: String
-    let devColor: String
-    let arrowColor: String
-    /// .env vim 하이라이트 (주석 · 키 · 값)
-    let vimComment: String
-    let vimKey: String
-    let vimValue: String
 
-    /// Rosé Pine 바탕의 차분한 변형 — theme=on 그룹의 원래 색
-    public static let rosePine = TerminalPalette(
-        background: "#191724", foreground: "#ebdbb2", cursor: "#c4a7e7",
-        colors: ["#1f1d2e", "#bd788e", "#7f9f98", "#b99c72",
-                 "#7f9fb2", "#9f8ab5", "#8eafb5", "#ebdbb2",
-                 "#85809c", "#c98299", "#8ca9a2", "#c5a779",
-                 "#8aa9bc", "#c4a7e7", "#99bac0", "#ebdbb2"],
-        prodColor: "224;107;107", stagingColor: "108;158;224", devColor: "230;161;92", arrowColor: "196;167;231",
-        vimComment: "#85809c", vimKey: "#c4a7e7", vimValue: "#99bac0")
-
-    /// Rosé Pine Dawn — 밝은 짝. 프롬프트 색은 밝은 바탕에서 읽히게 한 단계 진하게
-    public static let rosePineDawn = TerminalPalette(
-        background: "#faf4ed", foreground: "#575279", cursor: "#907aa9",
-        colors: ["#f2e9e1", "#b4637a", "#286983", "#ea9d34",
-                 "#56949f", "#907aa9", "#d7827e", "#575279",
-                 "#9893a5", "#b4637a", "#286983", "#ea9d34",
-                 "#56949f", "#907aa9", "#d7827e", "#575279"],
-        prodColor: "180;70;90", stagingColor: "40;105;131", devColor: "184;110;30", arrowColor: "144;122;169",
-        vimComment: "#9893a5", vimKey: "#907aa9", vimValue: "#286983")
-}
-
-public enum SessionTheme {
-    static func vimInit(_ p: TerminalPalette) -> String {
-        #"set nocursorline nospell termguicolors | syntax off | if expand("%:t") =~# "^\.env" | syntax on | syntax clear | syntax match NexusEnvValue /=\zs.*$/ | syntax match NexusEnvKey /^\s*\zs[A-Za-z_][A-Za-z0-9_]*\ze\s*=/ | syntax match NexusEnvComment /^\s*#.*$/ | highlight NexusEnvComment term=NONE cterm=NONE ctermfg=8 gui=NONE guifg="# + p.vimComment
-            + #" | highlight NexusEnvKey term=NONE cterm=NONE ctermfg=13 gui=NONE guifg="# + p.vimKey
-            + #" | highlight NexusEnvValue term=NONE cterm=NONE ctermfg=14 gui=NONE guifg="# + p.vimValue + #" | endif"#
-    }
-
-    /// 원격 bash 에 이 세션에서만 적용할 rcfile 내용. 원격 파일은 건드리지 않는다.
-    /// environment 는 프롬프트에 찍을 태그 글자("PROD,DB"). 색은 가장 센 태그 — 운영 빨강 · 스테이징 파랑 · 그 밖 주황.
-    /// palette: 탭 바탕에 맞춘 프롬프트·vim 색 (TerminalColorMode.promptPalette)
-    public static func remoteRC(environment: String, palette: TerminalPalette = .rosePine) -> String {
-        let color: String
-        switch ServerTags.strongest(ServerTags.parse(environment)) {
-        case .production: color = palette.prodColor
-        case .staging: color = palette.stagingColor
-        case .plain: color = palette.devColor
-        }
-        let label = promptLabel(environment)
-        let ps1 = #"\n\[\e[0m\]\u@\h\n\[\e[38;2;"# + color + #"m\]"# + label + #"\[\e[0m\] \w \[\e[38;2;"# + palette.arrowColor + #"m\]❯\[\e[0m\] "#
-        return """
-        source ~/.bashrc
-        unset PROMPT_COMMAND
-        PS1='\(ps1)'
-        vim() {
-          command vim -c '\(vimInit(palette))' "$@"
-        }
-        """
-    }
-
-    /// 프롬프트에 찍히는 태그 글자 (서버 정보의 프롬프트 미리 보기도 이것).
-    /// PS1 은 작은따옴표 안이라 ' 가 있으면 rcfile 이 깨지고(운영 빨간 프롬프트가 조용히 빠진다) $( ) 는 원격에서 실행된다 — 글자만 남긴다
-    /// 공백은 따옴표 안이라 괜찮다 — "DEV,Forward Proxy" 태그가 붙어 버리지 않게 둔다
-    public static func promptLabel(_ environment: String) -> String {
-        String(environment.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) || "_.,- ".unicodeScalars.contains($0) })
-    }
-
-    /// ssh 원격 명령: rcfile 을 프로세스 치환으로 넘겨 대화형 bash 를 연다.
-    public static func remoteShellCommand(environment: String, palette: TerminalPalette = .rosePine) -> String {
-        "exec bash --rcfile <(printf '%s' \(shellQuote(remoteRC(environment: environment, palette: palette)))) -i"
+    public init(background: String, foreground: String, cursor: String, colors: [String]) {
+        self.background = background; self.foreground = foreground; self.cursor = cursor; self.colors = colors
     }
 }
 
@@ -112,28 +44,20 @@ public enum SessionCommand {
         return "/bin/bash -c " + shellQuote(script)
     }
 
-    /// 서버 SSH 탭 명령. Windows 는 PowerShell, 테마 그룹은 프롬프트 주입, 그 외는 일반 로그인 셸.
+    /// 서버 SSH 탭 명령. Windows 는 PowerShell, 그 외는 일반 로그인 셸.
     /// bindInterface: 내부망 서버면 그 서비스의 장치 (ConnectPolicy.bindOptions).
-    public static func ssh(to server: Server, config: ServerConfig, home: String = NSHomeDirectory(), bindInterface: String? = nil,
-                           palette: TerminalPalette = .rosePine) -> String {
-        holdOnFailure(sshCommandLine(to: server, config: config, home: home, bindInterface: bindInterface, palette: palette))
+    public static func ssh(to server: Server, config: ServerConfig, home: String = NSHomeDirectory(), bindInterface: String? = nil) -> String {
+        holdOnFailure(sshCommandLine(to: server, config: config, home: home, bindInterface: bindInterface))
     }
 
     /// 래퍼 없이 ssh 명령줄만
-    public static func sshCommandLine(to server: Server, config: ServerConfig, home: String = NSHomeDirectory(), bindInterface: String? = nil,
-                                      palette: TerminalPalette = .rosePine) -> String {
+    public static func sshCommandLine(to server: Server, config: ServerConfig, home: String = NSHomeDirectory(), bindInterface: String? = nil) -> String {
         var args = ["ssh"] + ConnectPolicy.sharedArguments(port: server.port, bindInterface: bindInterface, home: home, identity: server.identityFile)
         switch server.type {
         case .windows:
             args += ["-t", server.target, "powershell.exe", "-NoLogo"]
-        case .linux:
-            if config.settings(for: server.group)?.theme == true {
-                args += ["-t", server.target, SessionTheme.remoteShellCommand(environment: server.promptTag, palette: palette)]
-            } else {
-                args += [server.target]
-            }
-        case .openwrt:
-            args += [server.target]   // 테마 프롬프트는 bash 로 띄우는데 OpenWrt 에는 bash 가 없다 — 일반 로그인 셸(ash)
+        case .linux, .openwrt:
+            args += [server.target]   // 일반 로그인 셸 (리눅스 bash · OpenWrt ash)
         }
         return args.map(shellQuote).joined(separator: " ")
     }

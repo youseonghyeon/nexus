@@ -1,6 +1,7 @@
-// 화면의 뼈대: 상태 색(StatusTone) · 이 앱만의 라이트·다크(AppearanceMode) · 바탕 팔레트(Palette) · 치수(Metrics) · 글자 단계(Font) ·
+// 화면의 뼈대: 상태 색(StatusTone) · 화면 모드 적용(ScreenMode.apply) · 바탕 팔레트(Palette) · 치수(Metrics) · 글자 단계(Font) ·
 // 카드 면(cardSurface) · 상태 점·알약(StatusDot·StatusPill).
 
+import ServersCore
 import SwiftUI
 
 enum StatusTone {
@@ -21,26 +22,25 @@ enum StatusTone {
     }
 }
 
-/// 이 앱만의 라이트·다크 (보기 ▸ 화면 모드). system 이면 macOS 설정을 따른다. 팔레트(Palette)는 dynamic 색이라 저절로 따라간다.
-enum AppearanceMode: String, CaseIterable {
-    case system, light, dark
+/// 화면 모드 (설정 창 · 보기 ▸ 화면 모드): 목록 · 계열 · 면 색의 기운은 ServersCore ScreenMode, 여기는 적용만.
+typealias AppearanceMode = ScreenMode
 
-    static let defaultsKey = "appearance"
-    static var stored: AppearanceMode { UserDefaults.standard.string(forKey: defaultsKey).flatMap(Self.init) ?? .system }
+extension ScreenMode {
+    static var stored: ScreenMode { resolve(UserDefaults.standard.string(forKey: defaultsKey)) }
 
-    var title: String {
-        switch self {
-        case .system: return "System"
-        case .light: return "Light"
-        case .dark: return "Dark"
-        }
-    }
-
+    /// 계열(라이트 · 다크)은 앱의 모양(NSApp.appearance)으로, 기운은 팔레트(Palette.shift)로 건다.
+    /// 같은 계열 안에서 기운만 바뀌면 macOS 가 모양이 그대로라고 보고 색을 다시 풀지 않는다 — 한 번 같은 계열의 다른 모양(vibrant)을 거쳤다 돌아온다.
+    /// 한 차례 안에 왕복하면 소용없고(SwiftUI 가 중간을 못 본다) 화면이 한 번 그려질 틈이 있어야 한다 (2026-11-24 화면 밖 창으로 실험: 0.02초면 됐다).
     @MainActor func apply() {
-        switch self {
-        case .system: NSApp.appearance = nil
-        case .light: NSApp.appearance = NSAppearance(named: .aqua)
-        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        let target: NSAppearance? = family == .system ? nil : NSAppearance(named: family == .dark ? .darkAqua : .aqua)
+        guard Palette.shift != shift else { NSApp.appearance = target; return }   // 기운이 그대로면(시작 때 · Light ↔ Dark) 모양만
+        Palette.shift = shift
+        if family == .system { NSApp.appearance = nil }   // macOS 설정이 어느 쪽인지 보려고
+        let dark = family == .dark || (family == .system && NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
+        NSApp.appearance = NSAppearance(named: dark ? .vibrantDark : .vibrantLight)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            // 그 사이 다른 모드를 골랐으면 그쪽의 적용에 맡긴다
+            if ScreenMode.stored == self { NSApp.appearance = target }
         }
     }
 }
@@ -49,14 +49,24 @@ enum AppearanceMode: String, CaseIterable {
 /// 카드·조작부 가장자리는 머리카락 선(hairline)으로 한 번 더 가른다. 순회색 대신 아주 약하게 차가운 회색(파랑 +2)이라 초록·노랑 상태 색이 또렷하다.
 /// 라이트는 같은 명암 관계. 시스템 재질 대신 이 색으로 칠한다.
 enum Palette {
-    static let sidebarNS = dynamic(dark: 0x0F1012, light: 0xEAEAE8)
-    static let contentNS = dynamic(dark: 0x141517, light: 0xF4F4F2)
+    /// 화면 모드가 면 색에 더하는 기운 (ScreenMode.shift — Dusk · Midnight · Paper · Mist). 색을 풀 때마다 읽는다; 바꾸는 곳은 ScreenMode.apply 뿐.
+    /// 시작 때는 저장된 모드의 값으로 — 창이 처음 그려질 때부터 그 색이게.
+    nonisolated(unsafe) static var shift: ScreenMode.Shift = ScreenMode.stored.shift
+
+    /// 면 네 단계의 기준 색 (Dark · Light). 화면 모드 미리 보기(ScreenModeThumbnail)도 이 값에 기운을 더해 그린다
+    static let sidebarHex: (dark: UInt32, light: UInt32) = (0x0F1012, 0xEAEAE8)
+    static let contentHex: (dark: UInt32, light: UInt32) = (0x141517, 0xF4F4F2)
+    static let cardHex: (dark: UInt32, light: UInt32) = (0x1B1C1F, 0xFFFFFF)
+    static let controlHex: (dark: UInt32, light: UInt32) = (0x27282C, 0xECECEA)
+
+    static let sidebarNS = dynamic(dark: sidebarHex.dark, light: sidebarHex.light)
+    static let contentNS = dynamic(dark: contentHex.dark, light: contentHex.light)
     static let sidebar = Color(nsColor: sidebarNS)
     static let content = Color(nsColor: contentNS)
     /// 카드 · 검색칸
-    static let card = Color(nsColor: dynamic(dark: 0x1B1C1F, light: 0xFFFFFF))
+    static let card = Color(nsColor: dynamic(dark: cardHex.dark, light: cardHex.light))
     /// 보조 버튼
-    static let control = Color(nsColor: dynamic(dark: 0x27282C, light: 0xECECEA))
+    static let control = Color(nsColor: dynamic(dark: controlHex.dark, light: controlHex.light))
     /// 보조 버튼에 마우스를 올렸을 때
     static let controlHover = Color(nsColor: dynamic(dark: 0x303136, light: 0xE3E3E1))
     /// 카드 안 입력칸·탭 바탕 (카드보다 한 단계 깊게)
@@ -90,9 +100,10 @@ enum Palette {
     static let plainBadgeLight = Color(nsColor: dynamic(dark: 0x3A3A3A, light: 0xDDDDDC))
     static let plainBadgeTextLight = Color(nsColor: dynamic(dark: 0xE6E6E6, light: 0x4A4A49))
 
+    /// 라이트 · 다크에 따라 고르고, 화면 모드의 기운을 더한 면 색
     static func dynamic(dark: UInt32, light: UInt32) -> NSColor {
         NSColor(name: nil) { appearance in
-            let hex = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+            let hex = ScreenMode.shifted(appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light, by: shift)
             return NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
                            blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
         }

@@ -2,7 +2,7 @@
 //
 //   [키]             서버. group/type/ip/user/port 필수, network(없으면 direct)/vpn/extra_users/check/role/env/wol_mac/wol_via/proxy_port/tunnel_ports/notify 선택
 //   [network:lan]    service (wait_attempts/wait_interval 은 예전 키 — 남아 있어도 읽지 않는다)
-//   [group:이름]     theme/db_jump/db_host/db_port/db_local/db_name
+//   [group:이름]     db_jump/db_host/db_port/db_local/db_name  (예전 theme= 은 읽지 않는다 — 적혀 있어도 무시)
 //   값 뒤 " # 주석" 허용.
 
 import Foundation
@@ -93,8 +93,6 @@ public struct Server: Sendable, Identifiable, Hashable {
     public var tags: [String] { ServerTags.parse(env) }
     /// 운영 태그(PROD·PRD·LIVE…)가 하나라도 있다
     public var isProd: Bool { ServerTags.strongest(tags) == .production }
-    /// 접속 프롬프트에 찍는 태그 글자 (없으면 DEV)
-    public var promptTag: String { tags.isEmpty ? "DEV" : tags.joined(separator: ",") }
 }
 
 /// wol_via= 의 항목 하나: "brume3:br-lan" → brume3 에서 etherwake -i br-lan, "nexus" → nexus 에서 wakeonlan.
@@ -137,7 +135,6 @@ public struct LanNetwork: Sendable, Hashable {
 }
 
 public struct GroupSettings: Sendable, Hashable {
-    public let theme: Bool
     public let dbJump: String?
     public let dbHost: String?
     public let dbPort: Int?
@@ -422,7 +419,7 @@ public enum ServerConfigParser {
             if let jump = s["db_jump"], !jump.isEmpty, !serverKeys.contains(jump) {
                 throw die("[group:\(group)] db_jump='\(jump)'는 등록되지 않은 서버 키입니다.", "db_jump= 에 이 파일의 서버 키를 적으세요.")
             }
-            groupSettings[group] = GroupSettings(theme: s["theme"] == "on", dbJump: s["db_jump"], dbHost: s["db_host"],
+            groupSettings[group] = GroupSettings(dbJump: s["db_jump"], dbHost: s["db_host"],
                                                  dbPort: s["db_port"].flatMap(port), dbLocal: s["db_local"].flatMap(port),
                                                  dbName: s["db_name"])
         }
