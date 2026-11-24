@@ -220,16 +220,28 @@ final class ServicesReportTests: XCTestCase {
 
     func testLogCommandOnlyForSafeNames() {
         XCTAssertEqual(ServiceLog.command(unit: "nginx"),
-                       "sudo -n journalctl -u 'nginx.service' -n 50 --no-pager -o short-iso 2>/dev/null || journalctl -u 'nginx.service' -n 50 --no-pager -o short-iso 2>&1")
+                       "journalctl -u 'nginx.service' -n 50 --no-pager -o short-iso 2>&1")
         XCTAssertNotNil(ServiceLog.command(unit: "getty@tty1"))
         XCTAssertNotNil(ServiceLog.command(unit: #"systemd-fsck@dev-disk-by\x2duuid-1234"#))
         XCTAssertNil(ServiceLog.command(unit: "x'; rm -rf / #"), "따옴표·공백·; 는 거부")
         XCTAssertNil(ServiceLog.command(unit: ""))
     }
 
+    /// Services 탭이 서버로 보내는 명령은 그 계정의 권한으로만 — sudo 를 쓰지 않는다 (2026-11-24 사용자)
+    func testServicesCommandsDoNotUseSudo() {
+        let sent = [ServicesScript.linux, ServicesScript.windows,
+                    ServiceLog.command(unit: "nginx"), ServiceLog.dockerCommand(container: "web"),
+                    PodInspect.script(namespace: "default", pod: "web-0")]
+        for script in sent {
+            let text = script ?? ""
+            XCTAssertFalse(text.isEmpty)
+            XCTAssertFalse(text.contains("sudo"), text)
+        }
+    }
+
     func testDockerLogCommandOnlyForSafeNames() {
         let command = ServiceLog.dockerCommand(container: "acme-api_1.web")
-        XCTAssertEqual(command, #"T=""; command -v timeout >/dev/null 2>&1 && T="timeout 8"; out=$($T docker logs --tail 50 'acme-api_1.web' 2>&1) || { first=$out; out=$($T sudo -n docker logs --tail 50 'acme-api_1.web' 2>&1) || { printf '%s\n' "$first"; exit 1; }; }; printf '%s\n' "$out""#)
+        XCTAssertEqual(command, #"T=""; command -v timeout >/dev/null 2>&1 && T="timeout 8"; $T docker logs --tail 50 'acme-api_1.web' 2>&1"#)
         XCTAssertNil(ServiceLog.dockerCommand(container: "x'; rm -rf / #"), "따옴표·공백·; 는 거부")
         XCTAssertNil(ServiceLog.dockerCommand(container: "-f"), "옵션으로 읽힐 이름은 거부")
         XCTAssertNil(ServiceLog.dockerCommand(container: "app/calapp"), "파드 이름(네임스페이스/이름)은 docker 가 아니다")

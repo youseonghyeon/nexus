@@ -128,7 +128,7 @@ extension AppModel {
         }
     }
 
-    /// Services 탭에서 서비스 줄을 누르면: 최근 로그 50줄을 결과 시트로 (리눅스 journalctl — sudo -n → 안 되면 그냥, ServiceLog · OpenWrt logread)
+    /// Services 탭에서 서비스 줄을 누르면: 최근 로그 50줄을 결과 시트로 (리눅스 journalctl, ServiceLog · OpenWrt logread)
     func showServiceLog(_ server: Server, unit: String) {
         let key = "\(server.key)|\(unit)"
         let command: String?
@@ -178,19 +178,20 @@ extension AppModel {
     func showPodLog(_ server: Server, name: String) {
         let parts = name.split(separator: "/", maxSplits: 1).map(String.init)
         let key = "\(server.key)|pod|\(name)"
-        guard server.type == .linux, parts.count == 2, let command = PodInspect.command(namespace: parts[0], pod: parts[1]),
+        guard server.type == .linux, parts.count == 2, let script = PodInspect.script(namespace: parts[0], pod: parts[1]),
               !serviceLogLoading.contains(key) else { return }
         serviceLogLoading.insert(key)
         statusMessage = "\(server.key) · \(parts[1]) 상태 · 로그를 가져옵니다…"
         Task {
-            let result = await runRemote(server, command: command, allowPrompt: true)
+            // sh 의 stdin 으로 — 서버의 로그인 셸(zsh 등)에 그대로 넘기면 스크립트가 깨진다 (PodInspect 머리 주석)
+            let result = await runRemote(server, command: "sh -s", stdin: script, allowPrompt: true)
             serviceLogLoading.remove(key)
             if statusMessage?.hasSuffix("로그를 가져옵니다…") == true { statusMessage = nil }
             let lines = RemoteCommands.cleanOutput(ServiceLog.stripANSI(result.stdout), type: .linux)
             let report = result.ok ? PodInspect.parse(lines) : nil
             // 접속 실패 · 인증 취소면 구역이 없다 — "로그 없음" 이 아니라 실패로
             let shown = report.map(PodInspect.displayLines) ?? ["상태 · 로그를 가져오지 못했습니다 (exit \(result.exitCode))"]
-            queryResult = QueryResult(title: "\(server.key) · \(parts[1])", lines: shown, failed: report == nil || report?.denied == true)
+            queryResult = QueryResult(title: "\(server.key) · \(parts[1])", lines: shown, failed: report == nil || report?.failure != nil)
         }
     }
 

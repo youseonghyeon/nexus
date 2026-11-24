@@ -1,9 +1,12 @@
 // k3s 파드 줄을 눌렀을 때: 왜 그 상태인지(컨테이너 상태 · 직전 종료 · 배치 실패 · 최근 이벤트)와 최근 로그를 한 번에 읽는다.
 // 죽은 직후 바로 확인하는 용도다 — 이벤트는 쿠버네티스가 한 시간쯤 뒤 지우므로 오래전 일은 서버에서 따로 본다 (2026-11-24 사용자).
-// 읽기만 한다: kubectl get pod · get events · logs. 목록(ServicesScript)과 같이 그냥 → 안 되면 sudo -n(암호 없이 될 때만).
+// 읽기만 한다: kubectl get pod · get events · logs. 그 계정의 권한으로만 — sudo 는 쓰지 않는다. 안 되면 kubectl 의 오류 글을 그대로 보인다.
+// 스크립트는 `sh -s` 의 stdin 으로 보낸다 — 로그인 셸에 그대로 넘기면 zsh 에서는 "$T $K" 가 낱말로 갈리지 않아 명령을 못 찾는다
+// (2026-11-24: 그래서 "kubectl 을 실행하지 못했습니다"만 떴다 — 이유도 버리고 있었다. 이제 kubectl 이 낸 오류 글을 그대로 보인다).
 // 출력은 "## 구역" 머리 + 줄 (탭은 cleanOutput 이 공백으로 바꾸므로 "|" 로 가른다 — 글(메시지)은 늘 맨 뒤 칸이라 "|" 가 들어 있어도 된다):
 //   NOW|<서버 시각 UTC>                         경과("3분 전")는 서버 시각으로 잰다 (이 Mac 과 시계가 달라도)
-//   ## STATUS   P|단계|이유            PM|메시지
+//   ## STATUS   KUBECTL=failed + ERR|kubectl 이 낸 오류 줄 (못 읽었을 때 — 파드가 없어졌거나 권한이 없거나)
+//               P|단계|이유            PM|메시지
 //               C|컨테이너|재시작|대기 이유|직전 종료 이유|직전 종료 코드|직전 종료 시각|종료 이유|종료 코드       CM|컨테이너|대기 메시지
 //               N|조건|이유            NM|조건|메시지          (False 인 조건만 — PodScheduled 실패 등)
 //   ## EVENTS   E|마지막 시각|처음 시각|종류|이유|횟수|메시지      (kubectl 은 처음 생긴 순서로 준다 — 마지막으로 일어난 순서로 다시 세우고 최근 8개만: parse)
@@ -50,8 +53,10 @@ public struct PodReport: Sendable, Equatable {
     public var events: [Event] = []
     public var previousLog: [String] = []
     public var log: [String] = []
-    /// kubectl 을 쓸 수 없었다 (권한 없음 · k3s 없음)
-    public var denied = false
+    /// 파드 상태를 읽지 못했을 때 kubectl 이 낸 오류 줄들 (읽었으면 nil). 파드가 없어졌으면 "… not found", 권한이 없으면 설정 파일 오류 글
+    public var failure: [String]?
+    /// 그 오류가 "파드가 없다"인가 — 목록을 읽은 뒤 파드가 다시 떠 이름이 바뀐 경우
+    public var notFound: Bool { failure?.contains { $0.contains("NotFound") || $0.lowercased().contains("not found") } ?? false }
 }
 
 public enum PodInspect {
@@ -67,8 +72,8 @@ public enum PodInspect {
     public static let logLines = 50
     public static let previousLines = 30
 
-    /// 파드 하나를 읽는 원격 명령. 이름이 허용 글자를 벗어나면 nil. 멈춘 k3s 가 붙잡지 않게 명령마다 8초.
-    public static func command(namespace: String, pod: String) -> String? {
+    /// 파드 하나를 읽는 스크립트 (`sh -s` 의 stdin 으로). 이름이 허용 글자를 벗어나면 nil. 멈춘 k3s 가 붙잡지 않게 명령마다 8초.
+    public static func script(namespace: String, pod: String) -> String? {
         guard isValidName(namespace), isValidName(pod) else { return nil }
         let target = "-n '\(namespace)' '\(pod)'"
         let status = #"{.status.phase}{"|"}{.status.reason}{"\n"}PM|{.status.message}{"\n"}"#
@@ -78,10 +83,20 @@ public enum PodInspect {
         let events = #"{range .items[*]}E|{.lastTimestamp}|{.metadata.creationTimestamp}|{.type}|{.reason}|{.count}|{.message}{"\n"}{end}"#
         return [
             ###"T=""; command -v timeout >/dev/null 2>&1 && T="timeout 8""###,
-            ###"K="k3s kubectl"; $T $K get pod \###(target) >/dev/null 2>&1 || K="sudo -n k3s kubectl""###,
+            ###"K="k3s kubectl""###,
             ###"echo "NOW|$(date -u +%Y-%m-%dT%H:%M:%SZ)""###,
             ###"echo "## STATUS""###,
-            ###"S=$($T $K get pod \###(target) -o jsonpath='P|\###(status)' 2>/dev/null) || { echo "KUBECTL=denied"; echo "## END"; exit 0; }"###,
+            // kubectl 을 그냥 실행하고, 안 되면 kubectl 이 낸 오류 글을 그대로 보인다. sudo 는 쓰지 않는다 (2026-11-24 사용자 — 되는지 보고 안 되면 오류만).
+            // 하나만 더 본다: k3s 의 기본 설정 파일을 못 읽는 계정이면(permission denied) 그 계정의 ~/.kube/config 로 한 번 —
+            // 터미널에서는 KUBECONFIG 가 걸려 되는데 ssh 로 보낸 스크립트에는 그 환경이 없어서다. 이것도 그 계정의 권한으로 읽는 것이다.
+            ###"fail() { echo "KUBECTL=failed"; printf '%s\n' "$1" | tail -n 3 | sed 's/^/ERR|/'; echo "## END"; exit 0; }"###,
+            ###"if ! S=$($T $K get pod \###(target) -o jsonpath='P|\###(status)' 2>/dev/null); then"###,
+            ###"  E=$($T $K get pod \###(target) 2>&1 >/dev/null)"###,
+            ###"  if printf '%s' "$E" | grep -qi "permission denied" && [ -r "$HOME/.kube/config" ]; then"###,
+            ###"    export KUBECONFIG="$HOME/.kube/config""###,
+            ###"    S=$($T $K get pod \###(target) -o jsonpath='P|\###(status)' 2>/dev/null) || fail "$($T $K get pod \###(target) 2>&1 >/dev/null)""###,
+            ###"  else fail "$E"; fi"###,
+            ###"fi"###,
             ###"printf '%s\n' "$S""###,
             ###"echo "## EVENTS""###,
             ###"$T $K get events -n '\###(namespace)' --field-selector involvedObject.name='\###(pod)' --sort-by=.metadata.creationTimestamp -o jsonpath='\###(events)' 2>/dev/null | tail -n 60"###,
@@ -91,7 +106,7 @@ public enum PodInspect {
             ###"echo "## LOG""###,
             ###"$T $K logs \###(target) --all-containers --prefix --tail=\###(logLines) 2>&1"###,
             ###"echo "## END""###,
-        ].joined(separator: "; ")
+        ].joined(separator: "\n") + "\n"
     }
 
     /// 스크립트 출력 → 보고서. 구역 머리가 없으면 nil
@@ -111,7 +126,8 @@ public enum PodInspect {
             if section == "LOG" { report.log.append(raw); continue }
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.hasPrefix("NOW|") { now = timestamp(String(line.dropFirst(4))); continue }
-            if line == "KUBECTL=denied" { report.denied = true; continue }
+            if line == "KUBECTL=failed" { report.failure = report.failure ?? []; continue }
+            if section == "STATUS", line.hasPrefix("ERR|") { report.failure = (report.failure ?? []) + [String(line.dropFirst(4))]; continue }
             func columns(_ count: Int) -> [String] {
                 var parts = line.split(separator: "|", maxSplits: count - 1, omittingEmptySubsequences: false).map { String($0).trimmingCharacters(in: .whitespaces) }
                 while parts.count < count { parts.append("") }
@@ -176,7 +192,11 @@ public enum PodInspect {
 
     /// 창에 보일 줄: 상태(문제가 있을 때만) → 최근 이벤트 → 직전 실행 로그 → 로그. 문구는 쿠버네티스가 쓴 영어 그대로 (검색할 수 있게).
     public static func displayLines(_ report: PodReport) -> [String] {
-        if report.denied { return ["kubectl 을 실행하지 못했습니다 (권한이 없거나 응답이 없음)"] }
+        if let failure = report.failure {
+            let reason = failure.filter { !$0.isEmpty }
+            if report.notFound { return ["파드를 찾지 못했습니다 — 목록을 읽은 뒤 다시 떠 이름이 바뀌었을 수 있습니다. Services 를 새로 고치세요."] + reason }
+            return ["파드 상태를 읽지 못했습니다" + (reason.isEmpty ? " (kubectl 이 응답하지 않음)" : " — kubectl 의 오류:")] + reason
+        }
         var out: [String] = []
         func header(_ title: String) { if !out.isEmpty { out.append("") }; out.append("── \(title) ──") }
         func when(_ seconds: TimeInterval?) -> String { seconds.map { " · " + ServicesFormat.ago($0) } ?? "" }

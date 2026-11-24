@@ -3,6 +3,7 @@
 //   crash  echo 뒤 exit 3 을 되풀이 (CrashLoopBackOff)        oom   메모리 20Mi 제한에서 계속 할당 (OOMKilled)
 //   badimg 없는 레지스트리의 이미지 (ImagePullBackOff)         big   메모리 900Gi 요청 (배치 실패 — Pending)
 //   duo    컨테이너 둘 (정상)                                   ok    정상
+//   missing 없는 파드 이름으로 물음 (목록을 읽은 뒤 이름이 바뀐 경우)   nosudo 설정 파일을 못 읽는 일반 사용자 (권한 없음 — 파일 이름은 예전 그대로)
 
 import Foundation
 import XCTest
@@ -79,27 +80,62 @@ final class PodInspectTests: XCTestCase {
     }
 
     func testCommandAndNames() {
-        let command = PodInspect.command(namespace: "app", pod: "calapp-server-f6cdff6d5-mt2v2")
+        let command = PodInspect.script(namespace: "app", pod: "calapp-server-f6cdff6d5-mt2v2")
         XCTAssertNotNil(command)
         XCTAssertTrue(command?.contains("get pod -n 'app' 'calapp-server-f6cdff6d5-mt2v2'") == true)
         XCTAssertTrue(command?.contains("logs -n 'app' 'calapp-server-f6cdff6d5-mt2v2' --all-containers --prefix --tail=50") == true)
         XCTAssertTrue(command?.contains("--previous --tail=30") == true)
-        XCTAssertTrue(command?.contains(#"K="sudo -n k3s kubectl""#) == true, "그냥 안 되면 암호 없이 되는 sudo 로")
+        XCTAssertFalse(command?.contains("sudo") == true, "sudo 는 쓰지 않는다")
         XCTAssertTrue(command?.contains("timeout 8") == true)
         for verb in ["delete", "exec ", "apply", "edit", "patch", "scale", "rollout"] { XCTAssertFalse(command?.contains(verb) == true, "읽기만 (\(verb))") }
         // 이름은 쿠버네티스가 허용하는 글자만 — 따옴표 · 세미콜론 · 대문자 · 밑줄은 명령을 만들지 않는다
         for bad in ["a;rm -rf x", "a'b", "Pod", "a_b", "", "-a", "a-", "a b", "$(id)"] {
-            XCTAssertNil(PodInspect.command(namespace: "app", pod: bad), bad)
-            XCTAssertNil(PodInspect.command(namespace: bad, pod: "ok"), bad)
+            XCTAssertNil(PodInspect.script(namespace: "app", pod: bad), bad)
+            XCTAssertNil(PodInspect.script(namespace: bad, pod: "ok"), bad)
         }
         XCTAssertTrue(PodInspect.isValidName("kube-system") && PodInspect.isValidName("a.b-1"))
     }
 
+    /// 못 읽었을 때: 이유를 버리지 않고 kubectl 이 낸 글을 그대로 보인다 — 예전엔 "kubectl 을 실행하지 못했습니다" 한 줄뿐이라 원인을 알 수 없었다 (2026-11-24)
+    func testFailureShowsKubectlsOwnError() throws {
+        let missing = try report("missing")
+        XCTAssertTrue(missing.notFound)
+        XCTAssertEqual(PodInspect.displayLines(missing), ["파드를 찾지 못했습니다 — 목록을 읽은 뒤 다시 떠 이름이 바뀌었을 수 있습니다. Services 를 새로 고치세요.",
+                                                         #"Error from server (NotFound): pods "nosuch" not found"#])
+        let nosudo = try report("nosudo")
+        XCTAssertFalse(nosudo.notFound, "권한 문제는 '파드 없음'으로 읽지 않는다")
+        let lines = PodInspect.displayLines(nosudo)
+        XCTAssertEqual(lines.first, "파드 상태를 읽지 못했습니다 — kubectl 의 오류:")
+        XCTAssertTrue(lines.dropFirst().contains { $0.lowercased().contains("permission denied") }, "kubectl 이 낸 글 그대로 (\(lines))")
+        XCTAssertFalse(lines.contains { $0.contains("sudo") })
+        // 읽은 파드에는 failure 가 없다
+        XCTAssertNil(try report("ok").failure)
+    }
+
+    /// 스크립트는 sh 의 stdin 으로 보낸다 — 줄마다 한 명령, 로그인 셸(zsh · fish)의 낱말 나누기에 기대지 않는다
+    func testScriptIsPlainShAndProbesKubectlWithoutThePod() throws {
+        let script = try XCTUnwrap(PodInspect.script(namespace: "app", pod: "web-1"))
+        XCTAssertTrue(script.hasSuffix("\n") && script.contains("\n"))
+        // sudo 는 쓰지 않는다 — 그 계정의 권한으로 kubectl 을 실행하고, 안 되면 오류 글만 (2026-11-24: sudo 로 넘어가 "sudo: a password is required" 가 진짜 이유를 가렸다)
+        XCTAssertFalse(script.contains("sudo"))
+        let lines = script.split(separator: "\n").map(String.init)
+        XCTAssertTrue(lines.contains { $0.contains(#"else fail "$E"; fi"#) }, "실패하면 그냥 실행의 오류 글을 그대로")
+        // 기본 설정 파일을 못 읽는 계정이면 그 계정의 ~/.kube/config 로 한 번 (터미널의 KUBECONFIG 가 ssh 스크립트에는 없다), 그 뒤 조회도 같은 설정으로
+        XCTAssertTrue(lines.contains { $0.contains(#"grep -qi "permission denied" && [ -r "$HOME/.kube/config" ]"#) })
+        XCTAssertTrue(lines.contains { $0.contains(#"export KUBECONFIG="$HOME/.kube/config""#) })
+        // 문법 검사만 (실행하지 않는다)
+        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = ["-n"]
+        let pipe = Pipe(); p.standardInput = pipe
+        try p.run(); pipe.fileHandleForWriting.write(Data(script.utf8)); try pipe.fileHandleForWriting.close(); p.waitUntilExit()
+        XCTAssertEqual(p.terminationStatus, 0)
+    }
+
     func testParseEdges() {
         XCTAssertNil(PodInspect.parse(["garbage"]), "구역 머리가 없으면 nil")
-        let denied = PodInspect.parse(["NOW|2026-11-24T07:49:30Z", "## STATUS", "KUBECTL=denied", "## END"])
-        XCTAssertEqual(denied?.denied, true)
-        XCTAssertEqual(denied.map(PodInspect.displayLines), ["kubectl 을 실행하지 못했습니다 (권한이 없거나 응답이 없음)"])
+        // 오류 글 없이 실패만 온 경우 (kubectl 이 시간 안에 답하지 않음)
+        let silent = PodInspect.parse(["NOW|2026-11-24T07:49:30Z", "## STATUS", "KUBECTL=failed", "## END"])
+        XCTAssertEqual(silent?.failure, [])
+        XCTAssertEqual(silent.map(PodInspect.displayLines), ["파드 상태를 읽지 못했습니다 (kubectl 이 응답하지 않음)"])
         // 메시지 안의 "|" · 로그 줄의 "## " 꼴이 아닌 "|" 는 그대로, 시각이 없으면 경과를 적지 않는다
         let r = PodInspect.parse(["## STATUS", "P|Running|", "PM|", "C|web|2||Error|1|||", "CM|web|", "N|Ready|Custom", "NM|Ready|gate a|b not passed",
                                   "## EVENTS", "E|null|null|Warning|Unhealthy|3|Readiness probe failed: HTTP probe failed with statuscode: 503 | retry",

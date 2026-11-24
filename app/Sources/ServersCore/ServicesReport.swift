@@ -130,7 +130,7 @@ public enum PodName {
 public struct ServicesReport: Sendable, Equatable {
     public enum ContainerSource: Sendable, Equatable {
         case ok
-        /// 권한이 없어 못 읽음 (docker 그룹·sudo 없음)
+        /// 권한이 없어 못 읽음 (docker 그룹 아님 · kubeconfig 못 읽음 — sudo 는 쓰지 않는다)
         case denied
         /// 명령은 있는데 데몬이 꺼져 있음 (Windows Docker Desktop)
         case off
@@ -172,7 +172,7 @@ public struct ContainerGroup: Sendable, Equatable, Identifiable {
 
 public enum ServicesScript {
     /// 리눅스 (`sh -s` 로 stdin). 시각은 부팅 후 µs(…Monotonic)로 받아 /proc/uptime 과 빼서 경과로 — systemd 버전마다 시각 글꼴이 달라서.
-    /// docker·k3s 는 그냥 → 안 되면 sudo -n(암호 없이 될 때만) → 그래도 안 되면 denied.
+    /// docker·k3s 는 그 계정의 권한으로만 — 권한 거부면 denied. sudo 는 쓰지 않는다 (2026-11-24).
     public static let linux = #"""
     export LC_ALL=C
     echo "UPTIME=$(cut -d' ' -f1 /proc/uptime 2>/dev/null)"
@@ -186,15 +186,14 @@ public enum ServicesScript {
       echo "SYSTEMD=off"
     fi
     echo "## CONTAINERS"
-    # 그냥 → 권한 거부면 sudo -n(암호 없이 될 때만) → 그래도 안 되면 denied. 권한 말고 다른 실패(데몬 꺼짐·설정 없음)는 off.
+    # 그 계정의 권한으로만 — 권한 거부면 denied. 권한 말고 다른 실패(데몬 꺼짐·설정 없음)는 off.
     # 오류 문구는 mktemp 파일로 받는다 (/tmp 의 짐작되는 이름은 다른 사용자가 미리 만들어 둘 수 있다). mktemp 가 없으면 버리고 off 로 본다.
     E=$(mktemp 2>/dev/null) || E=""
     if command -v docker >/dev/null 2>&1; then
       # 포트·compose 프로젝트는 뒤에 붙인다 (없으면 빈 칸) — 이름|상태|이미지|포트|프로젝트
       fmt='{{.Names}}|{{.Status}}|{{.Image}}|{{.Ports}}|{{.Label "com.docker.compose.project"}}'
       if out=$($T docker ps -a --format "$fmt" 2>"${E:-/dev/null}"); then state=ok
-      elif [ -n "$E" ] && grep -qi "permission denied" "$E" 2>/dev/null; then
-        if out=$($T sudo -n docker ps -a --format "$fmt" 2>/dev/null); then state=ok; else state=denied; fi
+      elif [ -n "$E" ] && grep -qi "permission denied" "$E" 2>/dev/null; then state=denied
       else state=off; fi
       echo "SOURCE|docker|$state"
       if [ "$state" = ok ] && [ -n "$out" ]; then
@@ -205,7 +204,10 @@ public enum ServicesScript {
     if command -v k3s >/dev/null 2>&1; then
       if out=$($T k3s kubectl get pods -A --no-headers --request-timeout=5s 2>"${E:-/dev/null}"); then state=ok
       elif [ -n "$E" ] && grep -qi "permission denied" "$E" 2>/dev/null; then
-        if out=$($T sudo -n k3s kubectl get pods -A --no-headers --request-timeout=5s 2>/dev/null); then state=ok; else state=denied; fi
+        # 기본 설정 파일을 못 읽는 계정이면 그 계정의 ~/.kube/config 로 한 번 (파드 줄 PodInspect 와 같은 길) —
+        # 터미널의 KUBECONFIG 는 ~/.zshrc · ~/.bashrc 에 있어 ssh 로 보낸 스크립트에는 없다
+        if [ -r "$HOME/.kube/config" ] && out=$(KUBECONFIG="$HOME/.kube/config" $T k3s kubectl get pods -A --no-headers --request-timeout=5s 2>/dev/null); then state=ok
+        else state=denied; fi
       else state=off; fi
       echo "SOURCE|k3s|$state"
       if [ "$state" = ok ] && [ -n "$out" ]; then
@@ -353,12 +355,12 @@ public enum ServiceLog {
         !name.isEmpty && name.count <= 256 && name.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "@._:-\\".contains($0)) }
     }
 
-    /// 최근 로그 50줄. sudo -n(암호 없이 될 때만) → 안 되면 그냥 (adm·systemd-journal 그룹이면 보인다).
+    /// 최근 로그 50줄. 그 계정의 권한으로만 (adm·systemd-journal 그룹이면 보인다) — sudo 는 쓰지 않는다.
     public static func command(unit: String) -> String? {
         guard isValidUnit(unit) else { return nil }
         let u = unit.hasSuffix(".service") ? unit : unit + ".service"
         let args = "-u '\(u)' -n 50 --no-pager -o short-iso"
-        return "sudo -n journalctl \(args) 2>/dev/null || journalctl \(args) 2>&1"
+        return "journalctl \(args) 2>&1"
     }
 
     /// docker 컨테이너 이름: 영숫자로 시작, 영숫자·_·.·- 만 (docker 가 허용하는 글자 — 명령에 그대로 넣으므로)
@@ -367,14 +369,12 @@ public enum ServiceLog {
         return name.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "_.-".contains($0)) }
     }
 
-    /// docker 컨테이너의 최근 로그 50줄 (stdout·stderr 를 섞어 시간 순서대로). 목록(ServicesScript)과 같이 그냥 → 안 되면 sudo -n.
-    /// 둘 다 안 되면 처음 오류(권한 없음 등)를 보인다. 멈춘 docker 가 붙잡지 않게 8초.
+    /// docker 컨테이너의 최근 로그 50줄 (stdout·stderr 를 섞어 시간 순서대로). 그 계정의 권한으로만 — sudo 는 쓰지 않는다.
+    /// 안 되면 docker 의 오류 글(권한 없음 등)을 그대로 보인다. 멈춘 docker 가 붙잡지 않게 8초.
     public static func dockerCommand(container: String) -> String? {
         guard isValidContainer(container) else { return nil }
-        let logs = "docker logs --tail 50 '\(container)' 2>&1"
         return #"T=""; command -v timeout >/dev/null 2>&1 && T="timeout 8"; "#
-            + "out=$($T \(logs)) || { first=$out; out=$($T sudo -n \(logs)) || { printf '%s\\n' \"$first\"; exit 1; }; }; "
-            + #"printf '%s\n' "$out""#
+            + "$T docker logs --tail 50 '\(container)' 2>&1"
     }
 
     /// 터미널 색·커서 제어 글(ESC [ … 글자)을 뺀다 — 컨테이너 로그는 색을 넣는 것이 많다

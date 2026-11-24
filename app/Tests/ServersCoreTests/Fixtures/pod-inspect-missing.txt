@@ -1,0 +1,5 @@
+NOW|2026-11-24T11:31:09Z
+## STATUS
+KUBECTL=failed
+ERR|Error from server (NotFound): pods "nosuch" not found
+## END

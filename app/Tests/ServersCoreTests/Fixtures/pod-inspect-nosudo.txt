@@ -1,0 +1,6 @@
+NOW|2026-11-24T11:40:04Z
+## STATUS
+KUBECTL=failed
+ERR|time="2026-11-24T11:40:05Z" level=warning msg="Unable to read /etc/rancher/k3s/k3s.yaml, please start server with --write-kubeconfig-mode or --write-kubeconfig-group to modify kube config permissions"
+ERR|error: error loading config file "/etc/rancher/k3s/k3s.yaml": open /etc/rancher/k3s/k3s.yaml: permission denied
+## END
