@@ -79,17 +79,159 @@ final class WebProbeTests: XCTestCase {
         defer { relay.stop() }
 
         let found = await WebProbe.probeAll([(webPort, "localhost"), (plainPort, "127.0.0.1"), (binaryPort, "localhost")], proxyPort: relayPort, timeout: 2)
-        XCTAssertEqual(found[webPort], WebProbeResult(scheme: "http", title: "Grafana", status: 200))
-        XCTAssertEqual(found[plainPort], WebProbeResult(scheme: "http", title: nil, status: 200), "HTTP 로 답했으면 제목이 없어도 웹")
+        XCTAssertEqual(found[webPort], WebProbeResult(scheme: "http", title: "Grafana", status: 200, html: true))
+        XCTAssertEqual(found[plainPort], WebProbeResult(scheme: "http", title: nil, status: 200, html: true), "HTTP 로 답했으면 제목이 없어도 웹")
         XCTAssertNil(found[binaryPort], "HTTP 가 아닌 답")
         let denied = await WebProbe.probe(host: "127.0.0.1", port: lockedPort, proxyPort: relayPort, timeout: 2)
-        XCTAssertEqual(denied, WebProbeResult(scheme: "http", title: nil, status: 401), "2xx 가 아니어도 HTTP 로 답했으면 웹 — 상태는 싣고, 오류 응답의 제목은 쓰지 않는다")
+        XCTAssertEqual(denied, WebProbeResult(scheme: "http", title: "Sign in", status: 401, html: true), "401·403 의 제목은 로그인 화면의 것이라 쓴다 — 상태는 그대로 싣는다")
         // 중계가 꺼져 있으면 전부 답 없음 (매달리지 않는다)
         relay.stop()
         let started = Date()
         let none = await WebProbe.probeAll([(webPort, "localhost")], proxyPort: relayPort, timeout: 2)
         XCTAssertTrue(none.isEmpty)
         XCTAssertLessThan(Date().timeIntervalSince(started), 6)
+    }
+
+    // MARK: HTML · 제목
+
+    func testHTMLAndUsableTitleTable() {
+        XCTAssertTrue(WebProbe.isHTML(contentType: "text/html; charset=utf-8", body: ""))
+        XCTAssertTrue(WebProbe.isHTML(contentType: "application/xhtml+xml", body: ""))
+        XCTAssertFalse(WebProbe.isHTML(contentType: "application/json", body: "<html>"), "적어 준 종류가 먼저")
+        XCTAssertFalse(WebProbe.isHTML(contentType: "text/plain", body: "ok"))
+        XCTAssertTrue(WebProbe.isHTML(contentType: nil, body: "\n<!DOCTYPE html><html>"), "종류를 안 적는 서버는 본문 머리로")
+        XCTAssertFalse(WebProbe.isHTML(contentType: nil, body: "{\"ok\":true}"))
+        XCTAssertFalse(WebProbe.isHTML(contentType: nil, body: ""))
+
+        func title(_ status: Int, _ text: String) -> String? { WebProbe.usableTitle(status: status, html: "<title>\(text)</title>") }
+        XCTAssertEqual(title(200, "Grafana"), "Grafana")
+        XCTAssertEqual(title(403, "OpenWrt - LuCI"), "OpenWrt - LuCI", "403 으로 오는 로그인 화면")
+        XCTAssertEqual(title(401, "Sign in"), "Sign in")
+        XCTAssertNil(title(403, "403 Forbidden"), "오류 문구는 이름이 아니다")
+        XCTAssertNil(title(401, "401 Authorization Required"))
+        XCTAssertNil(title(403, "Forbidden"))
+        XCTAssertNil(title(404, "My App"), "401·403 말고는 오류 응답의 제목을 쓰지 않는다")
+        XCTAssertNil(title(502, "Bad Gateway"))
+        XCTAssertNil(WebProbe.usableTitle(status: 200, html: "no title"))
+    }
+
+    func testMetaRefreshTable() {
+        let page = URL(string: "http://localhost:8080/")!
+        func target(_ html: String) -> String? { WebProbe.metaRefresh(inHTML: html, page: page)?.absoluteString }
+        XCTAssertEqual(target("<meta http-equiv=\"refresh\" content=\"0; URL=cgi-bin/luci/\" />"), "http://localhost:8080/cgi-bin/luci/", "LuCI 의 /")
+        XCTAssertEqual(target("<META HTTP-EQUIV='Refresh' CONTENT='3;url=/login?a=1&amp;b=2'>"), "http://localhost:8080/login?a=1&b=2")
+        XCTAssertEqual(target("<meta content=\"0;URL='https://sso.example.com/x'\" http-equiv=refresh>"), "https://sso.example.com/x", "속성 순서 · 따옴표 안의 따옴표")
+        XCTAssertNil(target("<meta http-equiv=\"refresh\" content=\"30\">"), "주소 없는 새로 고침")
+        XCTAssertNil(target("<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"url=x\">"))
+        XCTAssertNil(target("plain"))
+    }
+
+    /// 제목 없는 HTML 이 <meta refresh> 로 넘기고 그 로그인 화면이 403 으로 온다 (LuCI) → 화면이고, 이름은 넘겨진 곳의 제목. JSON 은 화면이 아니다
+    func testProbeNamesMetaRefreshPageAndTellsHTMLFromJSON() async throws {
+        @Sendable func reply(_ body: String, type: String, status: String = "200 OK") -> Data {
+            Data("HTTP/1.1 \(status)\r\nContent-Type: \(type)\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)".utf8)
+        }
+        final class Seen: @unchecked Sendable { let lock = NSLock(); var items: [String] = []
+            func add(_ item: String) { lock.withLock { items.append(item) } } }
+        let seen = Seen()
+        let (luci, luciPort) = try await server { request in
+            seen.add(String(request.split(separator: " ").dropFirst().first ?? ""))
+            if request.hasPrefix("GET /cgi-bin/luci/ ") { return reply("<html><head><title>OpenWrt - LuCI</title></head></html>", type: "text/html", status: "403 Forbidden") }
+            if request.hasPrefix("GET / ") { return reply("<html><head><meta http-equiv=\"refresh\" content=\"0; URL=cgi-bin/luci/\" /></head><body></body></html>", type: "text/html") }
+            return reply("", type: "text/plain", status: "404 Not Found")
+        }
+        let (api, apiPort) = try await server { _ in reply("{\"status\":\"ok\"}", type: "application/json") }
+        let (untitled, untitledPort) = try await server { _ in reply("<html><body>hi</body></html>", type: "text/html") }
+        let (forbidden, forbiddenPort) = try await server { _ in reply("<html><title>403 Forbidden</title></html>", type: "text/html", status: "403 Forbidden") }
+        defer { [luci, api, untitled, forbidden].forEach { $0.cancel() } }
+
+        let upstream = SocksRelay(upstreamPort: nil) { host, port in host == "127.0.0.1" ? .direct(host: host, port: port) : .deny }
+        let upstreamPort = try await upstream.start()
+        defer { upstream.stop() }
+        let relay = SocksRelay(upstreamPort: upstreamPort) { host, port in BrowserPolicy.route(host: host, port: port) }
+        let relayPort = try await relay.start()
+        defer { relay.stop() }
+
+        let found = await WebProbe.probeAll([(luciPort, "localhost"), (apiPort, "localhost"), (untitledPort, "localhost"), (forbiddenPort, "localhost")],
+                                            proxyPort: relayPort, timeout: 2)
+        XCTAssertEqual(found[luciPort], WebProbeResult(scheme: "http", title: "OpenWrt - LuCI", status: 200, html: true), "상태는 처음 답(200)의 것 — 403 표시를 달지 않는다")
+        XCTAssertEqual(Array(seen.items.prefix(2)), ["/", "/cgi-bin/luci/"])
+        XCTAssertEqual(found[apiPort], WebProbeResult(scheme: "http", title: nil, status: 200, html: false))
+        XCTAssertEqual(found[untitledPort], WebProbeResult(scheme: "http", title: nil, status: 200, html: true), "제목이 없어도 화면")
+        XCTAssertEqual(found[forbiddenPort], WebProbeResult(scheme: "http", title: nil, status: 403, html: true), "오류 문구 제목은 쓰지 않는다")
+    }
+
+
+    // MARK: 이동 (3xx)
+
+    func testRedirectFollowAndTextTable() {
+        func url(_ s: String) -> URL { URL(string: s)! }
+        let page = BrowserPolicy.proxied(url("http://localhost:8080/"))   // 실제로 묻는 주소는 별칭
+        // 따라갈 곳: 같은 서버(루프백끼리 · 같은 호스트)의 http·https 만
+        XCTAssertEqual(WebProbe.followTarget(url("https://localhost:8443/login"), from: page), BrowserPolicy.proxied(url("https://localhost:8443/login")))
+        XCTAssertEqual(WebProbe.followTarget(url("http://127.0.0.1:9000/"), from: page), BrowserPolicy.proxied(url("http://127.0.0.1:9000/")), "localhost 와 127.0.0.1 은 같은 서버")
+        XCTAssertNotNil(WebProbe.followTarget(BrowserPolicy.proxied(url("http://localhost:9000/x")), from: page), "서버가 별칭 이름(Host 헤더)으로 적어 보낸 것")
+        XCTAssertNotNil(WebProbe.followTarget(url("https://10.0.0.5:8443/"), from: url("http://10.0.0.5:80/")))
+        XCTAssertNil(WebProbe.followTarget(url("https://sso.example.com/login"), from: page), "다른 호스트로는 묻지 않는다")
+        XCTAssertNil(WebProbe.followTarget(url("https://10.0.0.6/"), from: url("http://10.0.0.5/")))
+        XCTAssertNil(WebProbe.followTarget(url("ftp://localhost/x"), from: page))
+        // 화면에 적을 꼴
+        XCTAssertEqual(WebProbe.redirectText(url("https://localhost:8443/login?next=%2F#top"), from: page), ":8443/login", "같은 서버: 포트부터, 질의·조각은 뺀다")
+        XCTAssertEqual(WebProbe.redirectText(BrowserPolicy.proxied(url("http://localhost:8080/login")), from: page), "/login", "같은 포트면 경로만")
+        XCTAssertEqual(WebProbe.redirectText(url("https://localhost/"), from: page), ":443/")
+        XCTAssertEqual(WebProbe.redirectText(url("https://sso.example.com/realms/a/login?client=x"), from: page), "sso.example.com/realms/a/login")
+        XCTAssertEqual(WebProbe.redirectText(url("https://sso.example.com:8443/"), from: page), "sso.example.com:8443")
+        XCTAssertEqual(WebProbe.redirectText(url("https://sso.example.com/" + String(repeating: "a", count: 80)), from: page).count, 61, "길면 자른다")
+    }
+
+    /// 같은 서버의 다른 포트로 보내면 한 번 더 물어 그 제목을, 다른 호스트로 보내면 묻지 않고 가리키는 곳만
+    func testProbeFollowsRedirectWithinServerOnly() async throws {
+        final class Seen: @unchecked Sendable { let lock = NSLock(); var items: [String] = []
+            func add(_ item: String) { lock.withLock { items.append(item) } } }
+        @Sendable func moved(_ location: String, status: String = "302 Found") -> Data {
+            Data("HTTP/1.1 \(status)\r\nLocation: \(location)\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8)
+        }
+        let loginPage = Data(http("<html><title>Sign in · Grafana</title></html>").utf8)
+        let seenLogin = Seen()
+        let (login, loginPort) = try await server { request in
+            seenLogin.add(String(request.split(separator: " ").dropFirst().first ?? ""))
+            return loginPage
+        }
+        let (blank, blankPort) = try await server(replying: http("{}"))
+        let (again, againPort) = try await server { _ in moved("http://127.0.0.1:\(loginPort)/login") }
+        // 1) 같은 서버의 다른 포트(이름은 localhost 로 적어 보냄) → 그 페이지의 제목
+        let (front, frontPort) = try await server { _ in moved("http://localhost:\(loginPort)/login?next=%2F") }
+        // 2) 다른 호스트(SSO) → 묻지 않는다
+        let (sso, ssoPort) = try await server { _ in moved("https://sso.example.com/realms/a/login?client=x", status: "303 See Other") }
+        // 3) 같은 서버로 보냈지만 거기에 제목이 없다 → 3xx 그대로, 가리키는 곳
+        let (dull, dullPort) = try await server { _ in moved("http://127.0.0.1:\(blankPort)/api") }
+        // 4) 두 번 넘긴다 → 한 번만 따라가고 멈춘다
+        let (twice, twicePort) = try await server { _ in moved("http://127.0.0.1:\(againPort)/hop") }
+        // 5) Location 없는 3xx
+        let (bare, barePort) = try await server(replying: "HTTP/1.1 302 Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        defer { [login, blank, again, front, sso, dull, twice, bare].forEach { $0.cancel() } }
+
+        let asked = Seen()
+        let upstream = SocksRelay(upstreamPort: nil) { host, port in
+            asked.add(host)
+            return host == "127.0.0.1" ? .direct(host: host, port: port) : .deny
+        }
+        let upstreamPort = try await upstream.start()
+        defer { upstream.stop() }
+        let relay = SocksRelay(upstreamPort: upstreamPort) { host, port in BrowserPolicy.route(host: host, port: port) }
+        let relayPort = try await relay.start()
+        defer { relay.stop() }
+
+        let found = await WebProbe.probeAll([(frontPort, "127.0.0.1"), (ssoPort, "localhost"), (dullPort, "localhost"), (twicePort, "localhost"), (barePort, "localhost")],
+                                            proxyPort: relayPort, timeout: 2)
+        XCTAssertEqual(found[frontPort], WebProbeResult(scheme: "http", title: "Sign in · Grafana", status: 302, redirect: ":\(loginPort)/login", redirectPort: loginPort, html: true),
+                       "넘겨진 곳의 제목 — 여는 주소·상태는 처음 포트 그대로")
+        XCTAssertEqual(seenLogin.items.first, "/login?next=%2F")
+        XCTAssertEqual(found[ssoPort], WebProbeResult(scheme: "http", title: nil, status: 303, redirect: "sso.example.com/realms/a/login"))
+        XCTAssertEqual(found[dullPort], WebProbeResult(scheme: "http", title: nil, status: 302, redirect: ":\(blankPort)/api", redirectPort: blankPort))
+        XCTAssertEqual(found[twicePort], WebProbeResult(scheme: "http", title: nil, status: 302, redirect: ":\(againPort)/hop", redirectPort: againPort), "두 번째 이동은 따라가지 않는다")
+        XCTAssertEqual(found[barePort], WebProbeResult(scheme: "http", title: nil, status: 302))
+        XCTAssertEqual(Set(asked.items), ["127.0.0.1"], "다른 호스트(SSO)로는 연결조차 하지 않는다")
     }
 
     // MARK: 아이콘
@@ -166,11 +308,11 @@ final class WebProbeTests: XCTestCase {
         defer { relay.stop() }
 
         let found = await WebProbe.probeAll([(linkedPort, "localhost"), (brokenPort, "127.0.0.1"), (failingPort, "127.0.0.1")], proxyPort: relayPort, timeout: 2)
-        XCTAssertEqual(found[linkedPort], WebProbeResult(scheme: "http", title: "Grafana", status: 200, icon: "data:image/png;base64,\(png.base64EncodedString())"))
+        XCTAssertEqual(found[linkedPort], WebProbeResult(scheme: "http", title: "Grafana", status: 200, icon: "data:image/png;base64,\(png.base64EncodedString())", html: true))
         XCTAssertEqual(seenLinked.paths, ["/", "/static/fav.png"])
-        XCTAssertEqual(found[brokenPort], WebProbeResult(scheme: "http", title: "App", status: 200, icon: nil), "그림이 아닌 답은 아이콘으로 쓰지 않는다")
+        XCTAssertEqual(found[brokenPort], WebProbeResult(scheme: "http", title: "App", status: 200, icon: nil, html: true), "그림이 아닌 답은 아이콘으로 쓰지 않는다")
         XCTAssertEqual(seenBroken.paths, ["/", "/favicon.ico"])
-        XCTAssertEqual(found[failingPort], WebProbeResult(scheme: "http", title: nil, status: 404, icon: nil))
+        XCTAssertEqual(found[failingPort], WebProbeResult(scheme: "http", title: nil, status: 404, icon: nil, html: true))
         XCTAssertEqual(seenError.paths, ["/"], "제목 없는 응답에는 아이콘 요청을 보내지 않는다")
     }
 }

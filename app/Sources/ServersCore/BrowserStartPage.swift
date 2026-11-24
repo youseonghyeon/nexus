@@ -1,5 +1,5 @@
-// 앱 안 브라우저 탭의 시작 페이지 (2026-11-17 시안 D → 2026-11-19 시안 A): 대표 카드(서버·태그·상태 · 주소칸 · 아래 띠에 웹/제목 없는 응답/그 밖 수)
-// + 카드로 묶은 즐겨찾기 타일(BookmarkStore) · 웹 타일 · 제목 없는 응답 칩 | 그 밖 표. 다크 모드에서 배경 그림을 주면 그 위에 반투명 카드 (background).
+// 앱 안 브라우저 탭의 시작 페이지 (2026-11-17 시안 D → 2026-11-19 시안 A): 대표 카드(서버·태그·상태 · 주소칸 · 아래 띠에 웹/API · 기타 응답/그 밖 수)
+// + 카드로 묶은 즐겨찾기 타일(BookmarkStore) · 웹 타일 · API · 기타 응답 칩 | 그 밖 표. 다크 모드에서 배경 그림을 주면 그 위에 반투명 카드 (background).
 // 서버에 띄우는 것이 아니라 앱이 그려 탭에 넣는다. 타일을 누르면 그 탭에서 서버 쪽 주소(localhost:<포트>)로 연다 — 탭은 그 서버에서 켠 브라우저처럼 동작한다 (BrowserPolicy).
 // 포트 목록은 서버 화면 Ports 탭과 같은 값(PortItem). "웹" 타일은 화면이 있는 것 — 제목이 있는 응답(WebProbe).
 // HTTP 로 답했지만 제목이 없는 포트(API·리다이렉트·오류)는 칩 한 줄, 답이 없는 포트는 "그 밖".
@@ -40,18 +40,22 @@ public enum BrowserStartPage {
         public var icon: String? = nil
         /// 특정 주소에만 묶인 포트의 그 주소 (localhost·127.0.0.1 이면 빈 문자열 — 적지 않는다)
         public var address: String = ""
+        /// 다른 곳으로 보내는 답(3xx)이 가리키는 곳 (WebProbe.redirectText). 없으면 빈 문자열
+        public var redirect: String = ""
 
         public var badge: (text: String, warn: Bool)? { BrowserStartPage.badge(status) }
         public var isHTTPS: Bool { url.hasPrefix("https://") }
     }
 
-    /// HTTP 로 답했지만 제목이 없는 포트 (또는 아직 묻는 중인 포트) — 칩 한 줄
+    /// HTTP 로 답했지만 화면(HTML)이 아닌 포트 · 목록의 다른 포트로 넘기기만 하는 포트 · 아직 묻는 중인 포트 — 칩 한 줄
     public struct Chip: Sendable, Equatable {
         public let port: Int
         /// 알려진 서비스 이름 (http · https-alt …), 없으면 빈 문자열
         public let label: String
         public let url: String
         public var status: Int? = nil
+        /// 목록의 다른 포트로 넘기기만 하는 포트가 가리키는 곳 (":443/"). 없으면 빈 문자열
+        public var redirect: String = ""
 
         public var badge: (text: String, warn: Bool)? { BrowserStartPage.badge(status) }
         public var isHTTPS: Bool { url.hasPrefix("https://") }
@@ -69,19 +73,29 @@ public enum BrowserStartPage {
         public let addresses: String
     }
 
-    /// 웹 타일 · 제목 없는 응답 칩 · 그 밖 목록으로 나눈다.
-    ///   물어볼 포트(WebProbe.isCandidate): 제목과 함께 답했으면 타일, 제목 없이 답했거나 아직 묻는 중이면 칩, 다 물었는데 답이 없으면 그 밖.
-    ///   번호로 아는 비웹 포트와 서버 자신도 닿지 못하는 대기는 그 밖.
+    /// 웹 타일 · API · 기타 응답 칩 · 그 밖 목록으로 나눈다. 물어볼 포트(WebProbe.isCandidate)가 답했으면:
+    ///   타일 — 화면(HTML)을 주거나, 이름으로 쓸 제목을 얻었거나, 다른 곳으로 보내는 답(3xx — 사람이 볼 페이지로 가는 길).
+    ///          제목은 이름일 뿐이라 가르는 데 쓰지 않는다: 없으면 프로세스 이름, 그것도 없으면 :포트.
+    ///   칩 — 화면이 아닌 답(JSON · 글 · 빈 본문 · 오류), 그리고 목록에 있는 다른 포트로 넘기기만 하는 포트(80 → 443 — 그 포트가 자기 타일을 갖는다).
+    ///   아직 묻는 중이면 칩, 다 물었는데 답이 없으면 그 밖. 번호로 아는 비웹 포트와 서버 자신도 닿지 못하는 대기는 그 밖.
     public static func sections(ports: [PortItem], probes: [Int: WebProbeResult], probed: Bool) -> (web: [Tile], bare: [Chip], other: [Other]) {
         var seen: Set<Int> = []
         var web: [Tile] = [], bare: [Chip] = [], other: [Other] = []
+        let listed = Set(ports.map(\.port))
         func host(_ item: PortItem?) -> String { item.flatMap(host(for:)) ?? "localhost" }
         func url(_ port: Int, _ item: PortItem?) -> String { "\(probes[port]?.scheme ?? "http")://\(host(item)):\(port)/" }
         func address(_ item: PortItem?) -> String { ["localhost", "127.0.0.1"].contains(host(item)) ? "" : host(item) }
         for item in ports.sorted(by: { $0.port < $1.port }) where seen.insert(item.port).inserted {
             if WebProbe.isCandidate(item), let result = probes[item.port] {
-                if let title = result.title {
-                    web.append(Tile(port: item.port, title: title, url: url(item.port, item), status: result.status, icon: result.icon, address: address(item)))
+                let moved = result.status.map { (300..<400).contains($0) } ?? false
+                let page = result.html && (result.status.map { $0 < 400 } ?? false)
+                if let target = result.redirectPort, target != item.port, listed.contains(target) {
+                    bare.append(Chip(port: item.port, label: item.label ?? "", url: url(item.port, item), status: result.status,
+                                     redirect: result.redirect ?? ":\(target)"))
+                } else if result.title != nil || page || moved {
+                    let name = result.title ?? item.process.flatMap { $0.isEmpty ? nil : $0 } ?? ":\(item.port)"
+                    web.append(Tile(port: item.port, title: name, url: url(item.port, item), status: result.status, icon: result.icon, address: address(item),
+                                    redirect: result.redirect ?? ""))
                 } else {
                     bare.append(Chip(port: item.port, label: item.label ?? "", url: url(item.port, item), status: result.status))
                 }
@@ -123,11 +137,12 @@ public enum BrowserStartPage {
         func metric(_ label: String, _ count: Int) -> String {
             "<div class=\"m\"><div class=\"l\">\(label)</div><div class=\"v\">\(counted ? String(count) : "—")</div></div>"
         }
-        var out = "<div class=\"band\">" + metric("웹", web.count) + metric(probed ? "제목 없는 응답" : "확인 중", bare.count) + metric("그 밖", other.count) + "</div>"
+        var out = "<div class=\"band\">" + metric("웹", web.count) + metric(probed ? "API · 기타 응답" : "확인 중", bare.count) + metric("그 밖", other.count) + "</div>"
         if !web.isEmpty {
             out += "<section class=\"card sec\"><h2>웹</h2><div class=\"grid\">" + web.map { tile in
                 let icon = tile.icon.map { "<img class=\"i\" src=\"\(escape($0))\" alt=\"\">" } ?? placeholderIcon
-                let extra = tile.address.isEmpty ? "" : "<span class=\"e\">\(escape(tile.address))</span>"
+                let extra = (tile.address.isEmpty ? "" : "<span class=\"e\">\(escape(tile.address))</span>")
+                    + (tile.redirect.isEmpty ? "" : "<span class=\"e\">→ \(escape(tile.redirect))</span>")
                 return "<a class=\"tile\" href=\"\(escape(tile.url))\">\(icon)<div class=\"x\"><div class=\"t\">\(escape(tile.title))</div>"
                     + "<div class=\"b\"><span class=\"n\">\(tile.port)</span>\(extra)\(marks(https: tile.isHTTPS, badge: tile.badge))</div></div></a>"
             }.joined() + "</div></section>"
@@ -135,9 +150,10 @@ public enum BrowserStartPage {
         var lower: [String] = []
         if !bare.isEmpty {
             // 다 묻기 전에는 아직 어느 쪽인지 모른다 — 답이 오면 타일·칩·그 밖으로 갈린다
-            lower.append("<section class=\"card sec\"><h2>\(probed ? "제목 없는 응답" : "확인 중…")</h2><div class=\"chips\">" + bare.map { chip in
+            lower.append("<section class=\"card sec\"><h2>\(probed ? "API · 기타 응답" : "확인 중…")</h2><div class=\"chips\">" + bare.map { chip in
                 "<a class=\"chip\" href=\"\(escape(chip.url))\"><span class=\"n\">\(chip.port)</span>"
-                    + (chip.label.isEmpty ? "" : "<em>\(escape(chip.label))</em>") + marks(https: chip.isHTTPS, badge: chip.badge) + "</a>"
+                    + (chip.label.isEmpty ? "" : "<em>\(escape(chip.label))</em>")
+                    + (chip.redirect.isEmpty ? "" : "<em>→ \(escape(chip.redirect))</em>") + marks(https: chip.isHTTPS, badge: chip.badge) + "</a>"
             }.joined() + "</div></section>")
         }
         if !other.isEmpty {

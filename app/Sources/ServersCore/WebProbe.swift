@@ -6,6 +6,10 @@
 // 테스트 실행기에는 ATS 가 없어 이 차이가 테스트에 안 잡힌다 (2026-11-17 설치 뒤 전부 "그 밖"으로 나와 발견).
 // 제목이 있는 페이지(시작 페이지의 타일이 되는 것)는 아이콘도 받는다: <link rel="icon"> → 없으면 /favicon.ico, 같은 호스트·포트의 것만, 64KB 미만의 그림만.
 // 받은 그림은 data: 주소로 시작 페이지에 심는다 — 페이지가 직접 받게 하면 루프백 주소는 이 Mac 으로 간다 (BrowserPolicy).
+// 이동(3xx): 같은 호스트·포트·스킴 안은 세션이 따라간다. 같은 서버의 다른 포트·스킴으로 보내면(http→https · 80→8443 로그인) 한 번만 더 물어 그 제목을 쓴다.
+// 다른 호스트(SSO)로는 묻지 않는다 — 가리키는 곳만 싣는다(redirect). 2026-11-23: 로그인으로 넘기는 포트가 "제목 없는 응답"에 섞여 있었다.
+// 웹인지는 제목이 아니라 HTML 을 주는가로 가른다(html) — 제목은 잘 빠진다: LuCI 의 / 는 제목 없는 HTML 이 <meta refresh> 로 넘기고, 그 로그인 화면은 403 으로 온다.
+// 제목은 이름으로만 쓰고 되는 만큼 얻는다: 제목 없는 HTML 의 <meta refresh> 도 한 번 따라가고, 401·403 의 제목은 오류 문구가 아니면 쓴다(로그인 화면).
 
 import Foundation
 import Network
@@ -14,12 +18,19 @@ public struct WebProbeResult: Sendable, Equatable {
     /// 응답한 스킴 ("http" · "https") — 타일을 누르면 이 스킴으로 연다
     public let scheme: String
     public let title: String?
-    /// 마지막 응답의 상태 코드 (같은 호스트·포트 안의 리다이렉트는 따라간 뒤). 응답은 못 받았지만 웹으로 본 경우(TLS 포트 추정)는 nil.
+    /// 그 포트가 준 상태 코드 (같은 호스트·포트 안의 리다이렉트는 따라간 뒤 — 다른 포트로 한 번 더 물은 곳의 코드는 아니다). 응답은 못 받았지만 웹으로 본 경우(TLS 포트 추정)는 nil.
     public let status: Int?
     /// 페이지 아이콘 (data: 주소). 제목이 있는 페이지에서만 받는다. 없으면 nil.
     public let icon: String?
-    public init(scheme: String, title: String?, status: Int? = nil, icon: String? = nil) {
+    /// 다른 곳으로 보내는 답(3xx)이 가리키는 곳 — 화면에 적을 꼴 (WebProbe.redirectText). 그 밖에는 nil.
+    public let redirect: String?
+    /// 그 3xx 가 같은 서버의 다른 포트를 가리키면 그 포트 — 목록에 있는 포트면 이 포트는 넘기기만 하는 것이라 타일로 올리지 않는다 (BrowserStartPage.sections)
+    public let redirectPort: Int?
+    /// HTML 을 주는가 (한 번 따라간 곳 포함) — 웹 타일인지를 가른다. 제목은 이름일 뿐이라 가르는 데 쓰지 않는다 (2026-11-23)
+    public let html: Bool
+    public init(scheme: String, title: String?, status: Int? = nil, icon: String? = nil, redirect: String? = nil, redirectPort: Int? = nil, html: Bool = false) {
         self.scheme = scheme; self.title = title; self.status = status; self.icon = icon
+        self.redirect = redirect; self.redirectPort = redirectPort; self.html = html
     }
 }
 
@@ -62,13 +73,26 @@ public enum WebProbe {
         for scheme in schemes(for: port) {
             guard let url = URL(string: "\(scheme)://\(host):\(port)/") else { continue }
             let page = BrowserPolicy.proxied(url)
-            guard let answer = await fetch(page, proxyPort: proxyPort, timeout: timeout) else { continue }
+            guard let first = await fetch(page, proxyPort: proxyPort, timeout: timeout) else { continue }
             // http 로 물었는데 "TLS 포트"라는 답이면 https 를 마저 본다 (https 도 안 되면 이 답을 쓴다)
-            if scheme == "http", isPlainToTLS(status: answer.status, body: answer.body) { fallback = WebProbeResult(scheme: "https", title: nil); continue }
-            // 오류 응답(4xx·5xx)의 제목은 서비스 이름이 아니라 오류 문구("404 Not Found")라 쓰지 않는다 — 상태 코드가 말한다
-            let title = answer.status < 400 ? title(inHTML: answer.body) : nil
+            if scheme == "http", isPlainToTLS(status: first.status, body: first.body) { fallback = WebProbeResult(scheme: "https", title: nil); continue }
+            // 다른 곳으로 보내는 답(3xx · 제목 없는 HTML 의 <meta refresh>): 같은 서버 안이면 한 번만 더 물어, 쓸 제목이 있을 때 그 답의 제목·아이콘을 쓴다
+            let from = first.url ?? page
+            var answer = first
+            var redirect: String?, redirectPort: Int?, next: URL?
+            if (300..<400).contains(first.status), let location = first.location {
+                redirect = redirectText(location, from: from)
+                if sameServer(location, from), portNumber(location) != portNumber(from) { redirectPort = portNumber(location) }
+                next = followTarget(location, from: from)
+            } else if first.status < 400, isHTML(first), title(inHTML: first.body) == nil, let target = metaRefresh(inHTML: first.body, page: from) {
+                next = followTarget(target, from: from)
+            }
+            if let next, let landed = await fetch(next, proxyPort: proxyPort, timeout: timeout), usableTitle(landed) != nil { answer = landed }
+            let title = usableTitle(answer)
             let icon = title == nil ? nil : await icon(inHTML: answer.body, page: answer.url ?? page, proxyPort: proxyPort, timeout: timeout)
-            return WebProbeResult(scheme: scheme, title: title, status: answer.status, icon: icon)
+            // 열 주소(스킴·포트)와 상태 코드는 처음 물은 것 그대로 — 브라우저 탭이 같은 이동을 스스로 따라간다
+            return WebProbeResult(scheme: scheme, title: title, status: first.status, icon: icon, redirect: redirect, redirectPort: redirectPort,
+                                  html: isHTML(answer))
         }
         return fallback
     }
@@ -83,6 +107,78 @@ public enum WebProbe {
             for await (port, result) in group { if let result { out[port] = result } }
             return out
         }
+    }
+
+    // MARK: HTML · 제목
+
+    /// HTML 을 준 답인가: Content-Type 이 html 이면. 적지 않은 서버는 본문 머리로 본다
+    static func isHTML(contentType: String?, body: String) -> Bool {
+        if let type = contentType?.lowercased(), !type.isEmpty { return type.contains("html") }
+        let head = body.prefix(512).lowercased()
+        return head.contains("<!doctype html") || head.contains("<html")
+    }
+
+    static func isHTML(_ answer: Answer) -> Bool { isHTML(contentType: answer.contentType, body: answer.body) }
+
+    /// 이름으로 쓸 제목: 오류 응답(4xx·5xx)의 제목은 서비스 이름이 아니라 오류 문구("404 Not Found")라 쓰지 않는다.
+    /// 401·403 만은 로그인 화면이 이 코드로 오는 일이 흔해(LuCI) 쓴다 — 상태 코드로 시작하거나 오류 낱말뿐인 제목은 빼고
+    static func usableTitle(status: Int, html: String) -> String? {
+        guard status < 400 || status == 401 || status == 403, let title = title(inHTML: html) else { return nil }
+        if status >= 400 {
+            let lower = title.lowercased()
+            if lower.hasPrefix(String(status)) || ["forbidden", "unauthorized", "access denied", "error"].contains(lower) { return nil }
+        }
+        return title
+    }
+
+    static func usableTitle(_ answer: Answer) -> String? { usableTitle(status: answer.status, html: answer.body) }
+
+    /// <meta http-equiv="refresh" content="0; URL=…"> 가 가리키는 주소 (그 페이지 기준). 없거나 주소가 없으면(새로 고침만) nil.
+    static func metaRefresh(inHTML html: String, page: URL) -> URL? {
+        guard let tags = try? NSRegularExpression(pattern: "<meta\\b[^>]*>", options: .caseInsensitive),
+              let content = try? NSRegularExpression(pattern: "content\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", options: .caseInsensitive) else { return nil }
+        let text = html as NSString
+        for tag in tags.matches(in: html, range: NSRange(location: 0, length: text.length)) {
+            let inner = text.substring(with: tag.range)
+            guard inner.range(of: "http-equiv\\s*=\\s*[\"']?refresh", options: [.regularExpression, .caseInsensitive]) != nil,
+                  let match = content.firstMatch(in: inner, range: NSRange(location: 0, length: (inner as NSString).length)) else { continue }
+            let value = (1...3).map { match.range(at: $0) }.first { $0.location != NSNotFound }.map { (inner as NSString).substring(with: $0) } ?? ""
+            guard let mark = value.range(of: "url=", options: .caseInsensitive) else { continue }
+            let target = value[mark.upperBound...].trimmingCharacters(in: CharacterSet(charactersIn: " \"'")).replacingOccurrences(of: "&amp;", with: "&")
+            guard !target.isEmpty, let url = URL(string: target, relativeTo: page)?.absoluteURL else { continue }
+            return url
+        }
+        return nil
+    }
+
+    // MARK: 이동 (3xx)
+
+    static func portNumber(_ url: URL) -> Int { url.port ?? (url.scheme?.lowercased() == "https" ? 443 : 80) }
+
+    /// 같은 서버인가: 호스트가 같거나 둘 다 루프백 (localhost · 127.0.0.1 · 별칭은 모두 그 서버 자신)
+    static func sameServer(_ a: URL, _ b: URL) -> Bool {
+        guard let x = BrowserPolicy.displayed(a).host?.lowercased(), let y = BrowserPolicy.displayed(b).host?.lowercased() else { return false }
+        return x == y || (BrowserPolicy.isLoopback(x) && BrowserPolicy.isLoopback(y))
+    }
+
+    /// 3xx 의 Location 을 한 번 더 물을 주소: 같은 서버의 http·https 일 때만 (루프백은 별칭으로). 다른 호스트면 nil — 바깥으로는 묻지 않는다.
+    static func followTarget(_ location: URL, from page: URL) -> URL? {
+        guard BrowserPolicy.isWeb(location), sameServer(location, page) else { return nil }
+        return BrowserPolicy.proxied(location)
+    }
+
+    /// 화면에 적을 "가리키는 곳": 같은 서버면 경로(포트가 다르면 :포트 부터), 다른 호스트면 호스트(+포트)+경로. 질의·조각은 뺀다, 길면 자른다.
+    static func redirectText(_ location: URL, from page: URL) -> String {
+        let shown = BrowserPolicy.displayed(location)
+        let path = shown.path.isEmpty ? "/" : shown.path
+        var text: String
+        if sameServer(location, page) {
+            text = (portNumber(location) == portNumber(page) ? "" : ":\(portNumber(location))") + path
+        } else {
+            text = (shown.host ?? "") + (shown.port.map { ":\($0)" } ?? "") + (path == "/" ? "" : path)
+        }
+        if text.isEmpty { text = shown.absoluteString }
+        return text.count > 60 ? String(text.prefix(60)) + "…" : text
     }
 
     // MARK: 아이콘
@@ -157,6 +253,9 @@ public enum WebProbe {
         let data: Data
         /// 리다이렉트를 따라간 뒤의 주소
         let url: URL?
+        /// 3xx 가 가리키는 곳 (Location — 세션이 따라가지 않은 이동). 그 밖에는 nil
+        var location: URL? = nil
+        var contentType: String? = nil
         var body: String { String(decoding: data, as: UTF8.self) }
     }
 
@@ -179,13 +278,15 @@ public enum WebProbe {
                 data.append(byte)
                 if data.count >= readLimit { break }
             }
-            return Answer(status: http.statusCode, data: data, url: http.url)
+            let location = (300..<400).contains(http.statusCode)
+                ? http.value(forHTTPHeaderField: "Location").flatMap { URL(string: $0, relativeTo: http.url)?.absoluteURL } : nil
+            return Answer(status: http.statusCode, data: data, url: http.url, location: location, contentType: http.value(forHTTPHeaderField: "Content-Type"))
         } catch {
             return nil
         }
     }
 
-    /// 제목만 읽는 요청이라: 인증서는 따지지 않고(내부 서버는 사설 인증서가 흔하다), 다른 호스트·포트로의 리다이렉트는 따라가지 않는다
+    /// 제목만 읽는 요청이라: 인증서는 따지지 않고(내부 서버는 사설 인증서가 흔하다), 다른 호스트·포트로의 리다이렉트는 따라가지 않는다 (같은 서버의 다른 포트는 probe 가 한 번만 따로 묻는다)
     private final class ProbeDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
         func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
             if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust {

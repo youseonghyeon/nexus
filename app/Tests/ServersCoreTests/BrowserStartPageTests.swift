@@ -128,26 +128,64 @@ final class BrowserStartPageTests: XCTestCase {
     func testTileAndChipHTML() {
         let list = [item(3000), item(7002, ["10.0.0.5"], tunnel: "10.0.0.5"), item(8080)]
         let probes = [3000: WebProbeResult(scheme: "http", title: "Grafana", status: 200, icon: "data:image/png;base64,AAAA"),
-                      7002: WebProbeResult(scheme: "http", title: "Bound", status: 200), 8080: WebProbeResult(scheme: "http", title: nil, status: 301)]
+                      7002: WebProbeResult(scheme: "http", title: "Bound", status: 200), 8080: WebProbeResult(scheme: "http", title: nil, status: 404)]
         let html = BrowserStartPage.portsHTML(state: .loaded(list), probes: probes, probed: true)
         XCTAssertTrue(html.contains("<img class=\"i\" src=\"data:image/png;base64,AAAA\" alt=\"\"><div class=\"x\"><div class=\"t\">Grafana</div>"))
         XCTAssertEqual(html.components(separatedBy: "class=\"i ph\"").count - 1, 1, "아이콘이 없는 타일(7002)은 자리 그림")
         XCTAssertTrue(html.contains("<span class=\"n\">7002</span><span class=\"e\">10.0.0.5</span>"))
-        XCTAssertTrue(html.contains("<h2>제목 없는 응답</h2><div class=\"chips\"><a class=\"chip\" href=\"http://localhost:8080/\"><span class=\"n\">8080</span><em>http-alt</em><span class=\"s\">301</span></a>"))
+        XCTAssertTrue(html.contains("<h2>API · 기타 응답</h2><div class=\"chips\"><a class=\"chip\" href=\"http://localhost:8080/\"><span class=\"n\">8080</span><em>http-alt</em><span class=\"s\">404</span></a>"))
         // 묻는 중: 칩 줄 제목이 다르고 상태는 없다
         let probing = BrowserStartPage.portsHTML(state: .loaded(list), probes: [:], probed: false)
         XCTAssertTrue(probing.contains("<h2>확인 중…</h2>"))
         XCTAssertFalse(probing.contains("<h2>웹</h2>") || probing.contains("class=\"s\""))
     }
 
+    /// 가르는 것은 제목이 아니라 화면(HTML)인가 — 제목은 이름일 뿐. 다른 곳으로 보내는 답(3xx)은 타일, 목록의 다른 포트로 넘기기만 하면 칩
+    func testClassifiesByHTMLNotTitle() {
+        let list = [item(80), item(443), item(7000), item(7001, ["10.0.0.5"], tunnel: "10.0.0.5"), item(7002), item(7003), item(8080, process: "uhttpd"),
+                    item(8081), item(9090), item(9091), item(9092)]
+        let probes = [
+            80: WebProbeResult(scheme: "http", title: "Admin Panel", status: 301, redirect: ":443/", redirectPort: 443, html: true),   // 443 의 제목을 빌려 왔지만 넘기기만 하는 포트
+            443: WebProbeResult(scheme: "https", title: "Admin Panel", status: 200, html: true),
+            7000: WebProbeResult(scheme: "http", title: nil, status: 302, redirect: "sso.example.com/login"),          // 다른 호스트로 — 묻지 않았다
+            7001: WebProbeResult(scheme: "http", title: nil, status: 307, redirect: ":8443/a<b", redirectPort: 8443),  // 목록에 없는 포트로
+            7002: WebProbeResult(scheme: "http", title: "Sign in", status: 302, redirect: ":9999/login", redirectPort: 9999, html: true),   // 목록에 없는 포트의 제목을 빌림
+            7003: WebProbeResult(scheme: "http", title: nil, status: 301),                                              // Location 없는 3xx
+            8080: WebProbeResult(scheme: "http", title: nil, status: 200, html: true),                                  // 제목 없는 HTML (LuCI 의 /)
+            8081: WebProbeResult(scheme: "http", title: nil, status: 200, html: true),                                  // 같은데 프로세스 이름도 모름
+            9090: WebProbeResult(scheme: "http", title: nil, status: 200),                                              // JSON · 글
+            9091: WebProbeResult(scheme: "http", title: nil, status: 404, html: true),                                  // HTML 오류 페이지
+            9092: WebProbeResult(scheme: "http", title: "OpenWrt - LuCI", status: 403, html: true)]                     // 403 으로 오는 로그인 화면 (쓸 제목이 있다)
+        let (web, bare, other) = BrowserStartPage.sections(ports: list, probes: probes, probed: true)
+        XCTAssertEqual(web.map(\.port), [443, 7000, 7001, 7002, 7003, 8080, 8081, 9092])
+        XCTAssertEqual(web.map(\.title), ["Admin Panel", ":7000", ":7001", "Sign in", ":7003", "uhttpd", ":8081", "OpenWrt - LuCI"],
+                       "이름: 제목 → 프로세스 이름 → :포트")
+        XCTAssertEqual(web[1], .init(port: 7000, title: ":7000", url: "http://localhost:7000/", status: 302, redirect: "sso.example.com/login"))
+        XCTAssertEqual(web[3].redirect, ":9999/login", "제목을 빌려 온 타일도 어디로 넘기는지는 적는다")
+        XCTAssertEqual(bare.map(\.port), [80, 9090, 9091])
+        XCTAssertEqual(bare[0], .init(port: 80, label: "http", url: "http://localhost:80/", status: 301, redirect: ":443/"), "목록에 있는 443 으로 넘기기만 — 타일이 둘이 되지 않게")
+        XCTAssertTrue(other.isEmpty)
+        // 넘기는 포트가 목록에서 빠지면(443 이 안 열림) 80 은 다시 타일
+        let alone = BrowserStartPage.sections(ports: [item(80)], probes: probes, probed: true)
+        XCTAssertEqual(alone.web.map(\.port), [80])
+        XCTAssertTrue(alone.bare.isEmpty)
+
+        let html = BrowserStartPage.portsHTML(state: .loaded(list), probes: probes, probed: true)
+        XCTAssertTrue(html.contains("<div class=\"t\">:7000</div><div class=\"b\"><span class=\"n\">7000</span><span class=\"e\">→ sso.example.com/login</span><span class=\"s\">302</span>"))
+        XCTAssertTrue(html.contains("<span class=\"n\">7003</span><span class=\"s\">301</span>"), "가리키는 곳이 없으면 그 칸도 없다")
+        XCTAssertTrue(html.contains("<span class=\"e\">10.0.0.5</span><span class=\"e\">→ :8443/a&lt;b</span>"), "묶인 주소 다음에 · 바깥 글자는 이스케이프")
+        XCTAssertTrue(html.contains("<a class=\"chip\" href=\"http://localhost:80/\"><span class=\"n\">80</span><em>http</em><em>→ :443/</em><span class=\"s\">301</span></a>"))
+        XCTAssertTrue(html.contains("<div class=\"l\">웹</div><div class=\"v\">8</div></div><div class=\"m\"><div class=\"l\">API · 기타 응답</div><div class=\"v\">3</div>"), "띠의 수도 따라간다")
+    }
+
     /// 대표 카드 아래 띠의 수: 포트 부분이 들고 오고(페이지 스크립트가 #band 로 옮긴다), 다 읽기 전에는 "—"
     func testBandCounts() {
         let list = [item(22), item(80), item(3000), item(9090)]
-        let probes = [80: WebProbeResult(scheme: "http", title: nil, status: 301), 3000: WebProbeResult(scheme: "http", title: "Grafana"),
+        let probes = [80: WebProbeResult(scheme: "http", title: nil, status: 404), 3000: WebProbeResult(scheme: "http", title: "Grafana"),
                       9090: WebProbeResult(scheme: "http", title: "CI")]
         let loaded = BrowserStartPage.portsHTML(state: .loaded(list), probes: probes, probed: true)
         XCTAssertTrue(loaded.hasPrefix("<div class=\"band\"><div class=\"m\"><div class=\"l\">웹</div><div class=\"v\">2</div></div>"
-            + "<div class=\"m\"><div class=\"l\">제목 없는 응답</div><div class=\"v\">1</div></div><div class=\"m\"><div class=\"l\">그 밖</div><div class=\"v\">1</div></div></div>"))
+            + "<div class=\"m\"><div class=\"l\">API · 기타 응답</div><div class=\"v\">1</div></div><div class=\"m\"><div class=\"l\">그 밖</div><div class=\"v\">1</div></div></div>"))
         XCTAssertTrue(BrowserStartPage.portsHTML(state: .loading, probes: [:], probed: false).contains("<div class=\"l\">확인 중</div><div class=\"v\">—</div>"))
         XCTAssertTrue(BrowserStartPage.portsHTML(state: .failed, probes: [:], probed: true).contains("<div class=\"v\">—</div>"), "못 읽었으면 0 이 아니라 모름")
         XCTAssertTrue(BrowserStartPage.portsHTML(state: .loaded([]), probes: [:], probed: true).contains("<div class=\"l\">웹</div><div class=\"v\">0</div>"), "빈 목록은 0")
@@ -158,9 +196,9 @@ final class BrowserStartPageTests: XCTestCase {
 
     /// 섹션은 카드로 묶고, 칩과 그 밖이 둘 다 있을 때만 나란히
     func testSectionCardsAndPair() {
-        let probes = [80: WebProbeResult(scheme: "http", title: nil, status: 301)]
+        let probes = [80: WebProbeResult(scheme: "http", title: nil, status: 404)]
         let both = BrowserStartPage.portsHTML(state: .loaded([item(22), item(80)]), probes: probes, probed: true)
-        XCTAssertTrue(both.contains("<div class=\"pair\"><section class=\"card sec\"><h2>제목 없는 응답</h2>"))
+        XCTAssertTrue(both.contains("<div class=\"pair\"><section class=\"card sec\"><h2>API · 기타 응답</h2>"))
         XCTAssertTrue(both.contains("<div class=\"o hd\"><span class=\"n\">Port</span><span>Service</span><span class=\"a\">Address</span></div>"), "그 밖은 머리 줄 있는 표")
         let onlyOther = BrowserStartPage.portsHTML(state: .loaded([item(22)]), probes: [:], probed: true)
         XCTAssertFalse(onlyOther.contains("class=\"pair\""), "하나뿐이면 폭 전체")
