@@ -15,7 +15,6 @@ final class SystemMonitor: ObservableObject {
     let info = SystemProbe.staticInfo()
     @Published private(set) var snapshot: SystemSnapshot?
     @Published private(set) var cpuHistory: [Double] = []
-    @Published private(set) var memoryHistory: [Double] = []
     @Published private(set) var gpu: GPUStats?
     @Published private(set) var gpuHistory: [Double] = []
     @Published private(set) var temperatures: TemperatureSummary?
@@ -62,7 +61,6 @@ final class SystemMonitor: ObservableObject {
         let next = publishSnapshot(at: Date())
         // 그래프는 화면 표본(3초)만 — 사이드바 요약(5초)이 섞이면 가로축 간격이 고르지 않다
         if let cpu = next.cpu { append(&cpuHistory, cpu.total) }
-        if let memory = next.memory { append(&memoryHistory, memory.usedFraction * 100) }
         gpu = SystemProbe.gpu()
         if let device = gpu?.device { append(&gpuHistory, device) }
         if slowRound {

@@ -25,7 +25,7 @@ struct BrowserPane: View {
                     .font(.callout.monospaced())
                     .padding(.horizontal, 8)
                     .frame(height: 26)
-                    .background(Palette.card, in: RoundedRectangle(cornerRadius: 8))   // 테두리 대신 옅은 면 (사이드바 검색칸과 같게)
+                    .background(Palette.card, in: RoundedRectangle(cornerRadius: Metrics.controlRadius))   // 테두리 대신 옅은 면 (사이드바 검색칸과 같게)
                     .focused($addressFocused)
                     .onSubmit { browser.load(address); addressFocused = false }
                     .onChange(of: browser.url) { _, url in if !addressFocused { address = url?.absoluteString ?? "" } }

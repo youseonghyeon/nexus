@@ -107,7 +107,7 @@ struct VPNDashboardView: View {
 
     private func statusRows(_ vpn: SystemVPN, _ detail: SystemVPNDetail?) -> some View {
         // 켜기·끄기는 이름 카드와 대표 카드의 목록에 있다
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+            Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
                 InfoRow("이름", "\(vpn.name) · \(vpn.kind)")
                 InfoRow("인터페이스", detail?.interface ?? "–")   // Wi-Fi·Ethernet·Intranet 화면과 같은 이름
                 // 암호화한 패킷이 실제로 나가는 물리 장치 — 라우팅 테이블엔 안 보여 확장 프로세스 소켓(nettop)으로 읽는다
@@ -120,7 +120,7 @@ struct VPNDashboardView: View {
     }
 
     private func addressRows(_ vpn: SystemVPN, _ detail: SystemVPNDetail?) -> some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+        Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
             // 이 VPN 으로 나가면 바깥에서 보이는 주소와 위치 — 지정한 경로만 가는 VPN 이면 못 가져온다
             VPNPublicIPRow(vpn: vpn, device: detail?.interface)
             InfoRow("IPv4", detail?.ipv4.joined(separator: ", ").nonEmpty ?? "–")

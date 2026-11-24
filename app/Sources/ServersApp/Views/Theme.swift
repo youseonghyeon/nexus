@@ -168,11 +168,20 @@ extension View {
 struct StatusDot: View {
     let tone: StatusTone
     var size: CGFloat = 8
+    /// 점 둘레에 잡는 자리 (한쪽)
+    var margin: CGFloat = 3
+    /// 꺼짐(muted) 점의 농도
+    var mutedOpacity: Double = 0.45
 
     var body: some View {
-        Circle().fill(tone == .muted ? Color.secondary.opacity(0.45) : tone.color)
+        Circle().fill(tone == .muted ? Color.secondary.opacity(mutedOpacity) : tone.color)
             .frame(width: size, height: size)
-            .frame(width: size + 6, height: size + 6)
+            .frame(width: size + margin * 2, height: size + margin * 2)
+    }
+
+    /// 원격 정보 표 행의 점: 둘레 자리 없이 8, 꺼짐은 회색 그대로 — 손으로 그리던 점과 같은 크기 · 자리 (열 들여쓰기가 여기에 맞춰져 있다)
+    static func tableRow(_ tone: StatusTone) -> StatusDot {
+        StatusDot(tone: tone, margin: 0, mutedOpacity: 1)
     }
 }
 

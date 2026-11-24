@@ -142,8 +142,8 @@ struct CompactButtonStyle: ButtonStyle {
                 .font(.system(size: 11.5, weight: .medium))
                 .padding(.horizontal, 9).padding(.vertical, 3)
                 .background(hovering && isEnabled ? Palette.controlHover : Palette.control,
-                            in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Palette.hairline))
+                            in: RoundedRectangle(cornerRadius: Metrics.smallRadius, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Metrics.smallRadius, style: .continuous).strokeBorder(Palette.hairline))
                 .opacity(configuration.isPressed ? 0.7 : 1)
                 .opacity(isEnabled ? 1 : 0.4)
                 .onHover { hovering = $0 }
@@ -256,8 +256,8 @@ struct PlainSegmented<Item: Hashable>: View {
         }
         .animation(.snappy(duration: 0.2), value: selection)
         .padding(3)   // 여백은 정수로 — 2.5 는 1x 화면에서 위 2·아래 3 으로 갈려 선택 면이 위로 붙어 보였다 (2026-11-10 사용자 지적)
-        .background(Palette.well, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Palette.hairline))
+        .background(Palette.well, in: RoundedRectangle(cornerRadius: Metrics.smallRadius + 3, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Metrics.smallRadius + 3, style: .continuous).strokeBorder(Palette.hairline))
         .opacity(isEnabled ? 1 : 0.45)
     }
 }

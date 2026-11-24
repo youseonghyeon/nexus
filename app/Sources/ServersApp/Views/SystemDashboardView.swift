@@ -196,7 +196,7 @@ struct SystemDashboardView: View {
                         memoryRow("Free", memory.free, of: memory.total, shade: 0)
                     }
                     Divider().opacity(0.5)
-                    Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
+                    Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 5) {
                         InfoRow("Pressure", [pressureText, snapshot?.freeLevel.map { "커널 여유 수준 \($0)%" }].compactMap { $0 }.joined(separator: " · "))
                         InfoRow("Swap", swapText)
                         InfoRow("Paging", pagingText)
@@ -281,7 +281,7 @@ struct SystemDashboardView: View {
 
     private var powerCard: some View {
         InfoCard(title: "전원 · 열") {
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+            Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
                 InfoRow("전원", powerText)
                 if let health = monitor.batteryHealth { InfoRow("배터리 건강", batteryHealthText(health)) }
                 InfoRow("열 상태", SystemHealth.thermalText(monitor.thermal))

@@ -240,7 +240,7 @@ struct TunnelPromptSheet: View {
                     TextField(remotePort.map { String(PortAllocator.suggestedLocalPort(forRemote: $0)) } ?? "자동", text: $local)
                         .font(.body.monospaced()).frame(width: 76).focused($focus, equals: .localPort).accessibilityLabel("로컬 포트")
                 }
-                Image(systemName: "arrow.right").foregroundStyle(.tertiary).padding(.top, 12 + 26 + 8 + 4)   // 주소 줄 높이에 (칸 안 여백 + 머리 줄 + 간격)
+                Image(systemName: "arrow.right").foregroundStyle(.tertiary).padding(.top, TunnelSidePanel<EmptyView, EmptyView>.addressOffset + 4)   // 주소 줄 높이에 (칸 안 여백 + 머리 줄 + 간격)
                 if let dbTarget = request.dbTarget {
                     side("\(server.key) 경유", hint: dbTarget.name.map { "데이터베이스 \($0)" } ?? "servers.conf 의 DB 주소") { EmptyView() } address: {
                         Text(verbatim: "\(dbTarget.host):\(dbTarget.port)").font(.body.monospaced()).foregroundStyle(.secondary)

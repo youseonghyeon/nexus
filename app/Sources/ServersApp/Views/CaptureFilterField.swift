@@ -155,7 +155,7 @@ struct FilterSuggestionPanel: View {
             .padding(.horizontal, 10).padding(.vertical, 6)
         }
         .padding(.vertical, 2)
-        .background(Palette.card, in: RoundedRectangle(cornerRadius: 10))
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: Metrics.panelRadius))
         .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
     }
 }
@@ -165,7 +165,7 @@ private struct SuggestionRowStyle: ButtonStyle {
     @State private var hovering = false
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(Color.primary.opacity(configuration.isPressed ? 0.14 : hovering ? 0.08 : 0), in: RoundedRectangle(cornerRadius: 6))
+            .background(Color.primary.opacity(configuration.isPressed ? 0.14 : hovering ? 0.08 : 0), in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
             .padding(.horizontal, 4)
             .onHover { hovering = $0 }
     }

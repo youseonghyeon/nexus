@@ -129,8 +129,8 @@ struct DashboardTabButton: View {
             Text("Dashboard").lineLimit(1).font(.callout)
         }
         .padding(.horizontal, 10).padding(.vertical, 5)
-        .background(isActive ? Palette.raised : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(isActive ? Palette.hairline : Color.clear))
+        .background(isActive ? Palette.raised : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous).strokeBorder(isActive ? Palette.hairline : Color.clear))
         .contentShape(Rectangle())
         .onTapGesture { model.showDashboard() }
     }
@@ -195,8 +195,8 @@ struct TabButton: View {
             .help("탭 닫기 (⌘W)")
         }
         .padding(.horizontal, 10).padding(.vertical, 5)
-        .background(isActive ? Palette.raised : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(isActive ? Palette.hairline : Color.clear))
+        .background(isActive ? Palette.raised : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous).strokeBorder(isActive ? Palette.hairline : Color.clear))
         .contentShape(Rectangle())
         // 두 번 클릭 인식은 동시 제스처로: 순차(onTapGesture count:2 → 1)로 두면 한 번 클릭이 두 번째 클릭을 기다리느라 전환이 늦어진다.
         .onTapGesture { model.showTab(tab.id) }

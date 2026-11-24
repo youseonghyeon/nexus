@@ -73,7 +73,7 @@ struct OpenWrtNetworkView: View {
         let iface = item.interface
         let isExpanded = expanded.contains(item.id)
         return VStack(alignment: .leading, spacing: 2) {
-            OpenWrtRow(dot: iface.state == .up ? .green : (iface.state == .failed ? .red : .secondary), help: item.hasDetail ? "누르면 상세" : nil,
+            OpenWrtRow(dot: iface.state == .up ? .good : (iface.state == .failed ? .bad : .muted), help: item.hasDetail ? "누르면 상세" : nil,
                        action: item.hasDetail ? { toggle(item.id) } : nil) {
                 Text(iface.name).lineLimit(1).layoutPriority(1)
                 Text((item.descriptors + [OpenWrtPort.summary(item.ports)].compactMap { $0 }).joined(separator: " · "))
@@ -98,7 +98,7 @@ struct OpenWrtNetworkView: View {
 
     private func interfaceDetail(_ item: OpenWrtNetworkLayout.Item) -> some View {
         let iface = item.interface
-        return Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 4) {
+        return Grid(alignment: .topLeading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 4) {
             if !iface.addresses.isEmpty {
                 infoDetailRow("Address") {
                     ForEach(iface.addresses, id: \.self) { address in
@@ -138,7 +138,7 @@ struct OpenWrtNetworkView: View {
     }
 
     private func portRow(_ port: OpenWrtPort) -> some View {
-        OpenWrtRow(dot: port.carrier ? .green : .secondary) {
+        OpenWrtRow(dot: port.carrier ? .good : .muted) {
             Text(port.name).lineLimit(1)
             // 이 포트를 쓰는 인터페이스 — 인터페이스 줄의 "proto · 장치" 와 같은 흐린 글씨
             Text(port.interfaces.joined(separator: " · ")).foregroundStyle(.tertiary).lineLimit(1)
@@ -184,7 +184,7 @@ struct OpenWrtFirewallView: View {
                     foldable("Scripts \(firewall.scripts.count)", isOpen: $showScripts) {
                         Text("이 스크립트가 직접 넣는 규칙은 위 목록에 나오지 않습니다.").font(.caption).foregroundStyle(.tertiary).padding(.horizontal, 6).padding(.bottom, 2)
                         ForEach(firewall.scripts) { script in
-                            OpenWrtRow(dot: script.enabled ? .green : .secondary) {
+                            OpenWrtRow(dot: script.enabled ? .good : .muted) {
                                 Text(script.path).foregroundStyle(script.enabled ? .primary : .secondary).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
                             } trailing: { EmptyView() }
                         }
@@ -272,7 +272,7 @@ struct OpenWrtFirewallView: View {
             // 허용·차단은 좋고 나쁨이 아니라 열림·닫힘 — 색 대신 명암으로: 열린 칸은 채운 면, 닫힌 칸은 선만 두른 빈 면.
             // 색(노랑 점)은 기본 정책과 반대로 하는 규칙이 있는 칸에만 — "어디에 예외가 있나"가 먼저 보이게 (2026-11-10).
             // 초록 면은 "전부 정상"으로 읽혔다: wan → lan 이 열려 있어도 초록이었다.
-            let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+            let shape = RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
             let hasException = cell.note != nil   // 예외 규칙이 있거나, 조건 없는 규칙이 기본 정책을 뒤집은 칸
             VStack(spacing: 1) {
                 Text(cell.allowed ? "허용" : "차단")
@@ -311,7 +311,7 @@ struct OpenWrtFirewallView: View {
 
     private func ruleRow(_ rule: OpenWrtFirewall.Rule, shadowed: Bool = false) -> some View {
         let active = rule.enabled && !shadowed
-        return OpenWrtRow(dot: active ? .green : .secondary, help: rule.extras) {
+        return OpenWrtRow(dot: active ? .good : .muted, help: rule.extras) {
             Text(rule.name).foregroundStyle(active ? .primary : .secondary).lineLimit(1).layoutPriority(1)
             Text(rule.flow).foregroundStyle(.tertiary).lineLimit(1)
             if let source = rule.source { StatusChip(text: source, tone: .muted) }
@@ -347,7 +347,7 @@ struct OpenWrtClientsView: View {
     private func row(_ client: OpenWrtClient, showsLease: Bool) -> some View {
         // 제조사(MAC 앞자리, 오프라인 IEEE 목록) — 임의 MAC 이면 그렇게. 모르면 MAC 으로 구분한다
         let vendor = DeviceIdentity.isRandomMAC(client.mac) ? "임의 MAC" : AppModel.ouiTable?.vendor(mac: client.mac)
-        return OpenWrtRow(dot: client.active ? .green : .secondary, help: help(client),
+        return OpenWrtRow(dot: client.active ? .good : .muted, help: help(client),
                           action: client.ip.map { ip in { model.copy(ip) } }) {
             Text(client.name ?? "–").foregroundStyle(client.name == nil ? .tertiary : (client.active ? .primary : .secondary)).lineLimit(1).layoutPriority(1)
             if client.isDynamic { Text("DHCP").font(.caption).foregroundStyle(.secondary) }
@@ -397,7 +397,7 @@ struct WireGuardView: View {
     }
 
     private func row(_ peer: WireGuardPeer) -> some View {
-        OpenWrtRow(dot: peer.isActive ? .green : .secondary, help: help(peer), action: { model.copy(peer.publicKey) }) {
+        OpenWrtRow(dot: peer.isActive ? .good : .muted, help: help(peer), action: { model.copy(peer.publicKey) }) {
             Text(peer.name ?? String(peer.publicKey.prefix(8)) + "…").lineLimit(1).layoutPriority(1)
             Text(peer.allowedIPs.joined(separator: ", ")).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.tail)
         } trailing: {
@@ -427,13 +427,13 @@ struct OpenWrtServicesView: View {
                 if !report.stopped.isEmpty {
                     infoSection("멈춤 \(report.stopped.count)") {
                         ForEach(report.stopped) { service in
-                            row(service, dot: .red) { Text(service.exitCode.map { "exit \($0)" } ?? "") }
+                            row(service, dot: .bad) { Text(service.exitCode.map { "exit \($0)" } ?? "") }
                         }
                     }
                 }
                 infoSection("실행 중 \(report.running.count)") {
                     ForEach(report.running) { service in
-                        row(service, dot: .green) {
+                        row(service, dot: .good) {
                             Text(service.instances > 1 ? "\(service.running)/\(service.instances)" : "")
                             Text(service.enabled ? "" : "부팅 시 꺼짐").frame(width: Column.uptime, alignment: .trailing)
                         }
@@ -449,7 +449,7 @@ struct OpenWrtServicesView: View {
                     if showOther {
                         VStack(alignment: .leading, spacing: 2) {
                             ForEach(report.other) { service in
-                                row(service, dot: .secondary) { Text(service.enabled ? "" : "꺼짐") }
+                                row(service, dot: .muted) { Text(service.enabled ? "" : "꺼짐") }
                             }
                         }
                     }
@@ -461,7 +461,7 @@ struct OpenWrtServicesView: View {
         }
     }
 
-    private func row<Trailing: View>(_ service: OpenWrtService, dot: Color, @ViewBuilder trailing: () -> Trailing) -> some View {
+    private func row<Trailing: View>(_ service: OpenWrtService, dot: StatusTone, @ViewBuilder trailing: () -> Trailing) -> some View {
         OpenWrtRow(dot: dot, help: "누르면 최근 로그", action: { model.showServiceLog(server, unit: service.name) }) {
             Text(service.name).lineLimit(1)
         } trailing: {

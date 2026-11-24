@@ -33,9 +33,6 @@ struct DiagnosticCard: View {
     /// 이 화면에서 고를 수 있는 도구 — VPN 화면엔 ARP 가 없다 (utun 은 ARP 가 없다)
     private var tools: [Tool] { Tool.allCases.filter { $0 != .arp || screen != AppModel.vpnKey } }
 
-    /// 결과는 입력칸과 같은 왼쪽 줄에서 시작한다
-    private static let indent: CGFloat = 0
-
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
@@ -108,7 +105,7 @@ struct DiagnosticCard: View {
             }
             // 지금 장치로 보낸 결과만 (장치가 바뀌었으면 옛 결과는 숨긴다 — 실행 중인 것은 그대로 보인다)
             if let result = model.diagnostics[screen]?.ping, showsResult(result.device, .ping, .trace) {
-                Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
                     GridRow {
                         Text("대상").font(.fieldLabel).foregroundStyle(.secondary)
                         HStack(spacing: 8) {
@@ -150,7 +147,6 @@ struct DiagnosticCard: View {
                         }
                     }
                 }
-                .padding(.leading, Self.indent)
             }
         }
     }
@@ -307,7 +303,6 @@ struct DiagnosticCard: View {
     private func resultGrid<Rows: View>(target: String, at: Date, device: String, report: String?, reset: @escaping () -> Void,
                                         @ViewBuilder rows: @escaping () -> Rows) -> some View {
         DiagnosticResultGrid(target: target, at: at, source: device, report: report, reset: reset, rows: rows)
-            .padding(.leading, Self.indent)
     }
 
     // MARK: ARP
@@ -361,7 +356,6 @@ struct DiagnosticCard: View {
                         }
                     }
                 }
-                .padding(.leading, Self.indent)
             }
         }
     }

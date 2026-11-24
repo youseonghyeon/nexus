@@ -149,7 +149,7 @@ struct BluetoothDashboardView: View {
     }
 
     private func details(_ device: BluetoothDevice) -> some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 4) {
+        Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 4) {
             InfoRow("주소", device.address ?? "–")
             if let vendor = device.vendorID { InfoRow("제조사 ID", vendor) }
             if let product = device.productID { InfoRow("제품 ID", product) }
@@ -170,7 +170,7 @@ struct BluetoothDashboardView: View {
             if let controller {
                 // 전원 버튼은 상태 줄이 있는 카드 오른쪽 (Wi-Fi·Intranet·Tailscale·VPN 과 같은 자리)
                 HStack(alignment: .top) {
-                    Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+                    Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
                         InfoRow("상태", controller.on ? "켜짐" : "꺼짐")
                         InfoRow("주소", controller.address ?? "–")
                         InfoRow("칩셋", [controller.chipset, controller.vendor].compactMap { $0 }.joined(separator: " · "))

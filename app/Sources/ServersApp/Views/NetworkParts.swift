@@ -190,7 +190,7 @@ struct InternetRows: View {
     let device: String?
 
     var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
+        Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 8) {
             GridRow {
                 Text("응답").font(.fieldLabel).foregroundStyle(.secondary)
                 HStack(spacing: 8) {

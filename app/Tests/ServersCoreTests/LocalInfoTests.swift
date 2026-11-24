@@ -32,6 +32,29 @@ final class LocalInfoTests: XCTestCase {
         XCTAssertEqual(ports.first { $0.port == 15432 }?.pid, 9123)
     }
 
+    /// Ports 카드의 "터널 → 서버" 딱지: 포트와 바인드 주소가 모두 같은 줄에만.
+    /// 번호만 견주던 때는 다른 프로그램의 같은 포트 줄에도 붙고, 같은 포트의 터널이 둘이면 첫 서버 이름만 나왔다.
+    func testTunnelForListeningPortMatchesBindAddress() {
+        let web = Server.sample(key: "web", network: .lan, type: .linux, ip: "192.0.2.10", check: .ssh)
+        let db = Server.sample(key: "db", network: .lan, type: .linux, ip: "192.0.2.11", check: .ssh)
+        let plain = TunnelSpec(server: web, kind: .port(remotePort: 3000), localPort: 3000)
+        let named = TunnelSpec(server: db, kind: .port(remotePort: 3000), localPort: 3000, bindAddress: "127.0.0.2", hostName: "db.example")
+        func port(_ address: String, _ number: Int = 3000) -> LocalPort { LocalPort(port: number, address: address, command: "x", pid: 1) }
+
+        // 겹치는 포트: 주소로 가른다 (순서와 무관)
+        XCTAssertEqual(port("127.0.0.1").tunnel(among: [named, plain])?.server.key, "web")
+        XCTAssertEqual(port("127.0.0.2").tunnel(among: [plain, named])?.server.key, "db")
+        // 다른 루프백 별칭 · 모든 주소 · IPv6 루프백의 같은 포트는 다른 프로그램이다
+        XCTAssertNil(port("127.0.0.3").tunnel(among: [plain, named]))
+        XCTAssertNil(port("*").tunnel(among: [plain, named]))
+        XCTAssertNil(port("::1").tunnel(among: [plain, named]))
+        XCTAssertNil(port("127.0.0.1").tunnel(among: [named]))
+        // 주소는 같고 포트가 다르면 아니다
+        XCTAssertNil(port("127.0.0.1", 3001).tunnel(among: [plain]))
+        // 터널 없음
+        XCTAssertNil(port("127.0.0.1").tunnel(among: []))
+    }
+
     func testParseInterfaceAddressesSkipsLoopbackAndIPv6() {
         let text = """
         lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST> mtu 16384

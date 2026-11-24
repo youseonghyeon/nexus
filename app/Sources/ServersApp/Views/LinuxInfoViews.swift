@@ -65,7 +65,7 @@ struct LinuxNetworkView: View {
                     infoSection("Policy rules \(routing.policyRules.count)") { PolicyRulesView(routing: routing) }
                 }
                 infoSection("DNS") {
-                    Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 4) {
+                    Grid(alignment: .topLeading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 4) {
                         GridRow {
                             Text("Servers").font(.caption).foregroundStyle(.secondary).gridColumnAlignment(.leading)
                             if network.dns.isEmpty {
@@ -99,7 +99,7 @@ struct LinuxNetworkView: View {
         let iface = item.interface
         let isExpanded = expanded.contains(item.id)
         return VStack(alignment: .leading, spacing: 2) {
-            OpenWrtRow(dot: iface.up ? .green : .secondary, help: item.hasDetail ? "누르면 상세" : nil,
+            OpenWrtRow(dot: iface.up ? .good : .muted, help: item.hasDetail ? "누르면 상세" : nil,
                        action: item.hasDetail ? { toggle(item.id) } : nil) {
                 Text(iface.name).lineLimit(1).layoutPriority(1)
                 Text(iface.descriptors.joined(separator: " · ")).foregroundStyle(.tertiary).lineLimit(1)
@@ -123,7 +123,7 @@ struct LinuxNetworkView: View {
 
     private func interfaceDetail(_ item: LinuxNetworkLayout.Item) -> some View {
         let iface = item.interface
-        return Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 4) {
+        return Grid(alignment: .topLeading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 4) {
             if !iface.addresses.isEmpty {
                 infoDetailRow("Address") {
                     ForEach(iface.addresses, id: \.self) { address in
@@ -170,7 +170,7 @@ struct ScheduleView: View {
                 }
                 if !report.periodic.isEmpty {
                     infoSection("Periodic") {
-                        Grid(alignment: .topLeading, horizontalSpacing: 14, verticalSpacing: 4) {
+                        Grid(alignment: .topLeading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 4) {
                             ForEach(report.periodic) { jobs in
                                 GridRow {
                                     Text(jobs.period).font(.caption).foregroundStyle(.secondary).gridColumnAlignment(.leading)
@@ -190,7 +190,7 @@ struct ScheduleView: View {
 
     /// 다음 실행이 있으면 초록. 오른쪽: 다음 "14분 뒤" · 지난 "2시간 전"
     private func timerRow(_ timer: SystemdTimer, now: Date) -> some View {
-        OpenWrtRow(dot: timer.next != nil ? .green : .secondary) {
+        OpenWrtRow(dot: timer.next != nil ? .good : .muted) {
             Text(timer.name).lineLimit(1).layoutPriority(1)
             if let activates = timer.activatesIfDifferent { Text(activates).foregroundStyle(.tertiary).lineLimit(1) }
         } trailing: {

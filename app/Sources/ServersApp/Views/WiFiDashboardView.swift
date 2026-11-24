@@ -169,7 +169,7 @@ struct WiFiDashboardView: View {
     @ViewBuilder
     private var statusRows: some View {
         HStack(alignment: .top) {
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+            Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
                 InfoRow("전원", wifi.info.map { $0.powerOn ? "켜짐" : "꺼짐" } ?? "–")
                 InfoRow("SSID", ssidText)
                 InfoRow("보안", wifi.info?.security ?? "–")
@@ -184,7 +184,7 @@ struct WiFiDashboardView: View {
 
     @ViewBuilder
     private var addressRows: some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+        Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
             InfoRow("IP", ipText)
             InfoRow("서브넷", model.wifiAddress.subnet ?? "–")
             InfoRow("게이트웨이", model.wifiAddress.router ?? "–")
@@ -202,7 +202,7 @@ struct WiFiDashboardView: View {
     /// 루트로만 보이는 값(혼잡도·MCS·스트림·가드 인터벌·국가 코드)은 [상세 보기] 로 인증한 뒤 채워진다 — 그 전엔 "–"
     private var detailRows: some View {
         let detail = associated ? model.wifiDetail : nil
-        return Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+        return Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
             InfoRow("채널", wifi.info?.channel ?? "–")
             InfoRow("채널 혼잡도", detail?.cca.map { "\($0)%" } ?? "–")
             InfoRow("PHY", wifi.info?.phyMode ?? "–")
@@ -249,7 +249,7 @@ struct WiFiDashboardView: View {
             }
         }
         .padding(12)
-        .background(StatusTone.warn.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+        .background(StatusTone.warn.color.opacity(0.12), in: RoundedRectangle(cornerRadius: Metrics.panelRadius))
     }
 
     // MARK: 값

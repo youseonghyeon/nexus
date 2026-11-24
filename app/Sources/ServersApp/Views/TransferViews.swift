@@ -30,7 +30,7 @@ struct TransferDropZone: View {
     var body: some View {
         let reachable = model.isReachable(server)
         // 카드의 남는 자리를 채우는 우묵한 면. 파일을 올려 가져오면 선이 또렷해진다 (색은 쓰지 않는다)
-        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous)
         ZStack {
             shape.fill(Palette.well.opacity(targeted ? 1 : 0.6))
             shape.strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
@@ -299,7 +299,7 @@ struct TransferInfoSheet: View {
                     .font(.caption).foregroundStyle(StatusTone.warn.color).lineLimit(3)
             }
             Divider()
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 8) {
+            Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 8) {
                 GridRow {
                     Text("방향").font(.fieldLabel).foregroundStyle(.secondary)
                     Text(spec.direction == .upload ? "업로드 (이 Mac → \(spec.server.key))" : "다운로드 (\(spec.server.key) → 이 Mac)")

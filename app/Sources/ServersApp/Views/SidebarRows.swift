@@ -130,7 +130,7 @@ struct NetworkRow: View {
     private var help: String {
         switch kind {
         case .tailscale: return isUp ? "이 Mac 의 Tailscale 연결 전체를 끕니다 (확인)" : "Tailscale 켜기"
-        case .lan: return isUp ? "내부망 서비스를 끄고 추가 경로를 지웁니다 (Touch ID)" : "내부망 서비스를 켜고 경로를 추가합니다 (Touch ID)"
+        case .lan: return isUp ? "내부망 서비스를 끕니다 (Touch ID)" : "내부망 서비스를 켭니다 (Touch ID)"
         }
     }
 
@@ -337,7 +337,7 @@ struct ServerRow: View {
                             .font(.system(size: 10, weight: .semibold)).monospacedDigit()
                             .foregroundStyle(Palette.plainBadgeTextLight)
                             .frame(width: 15, height: 15)
-                            .background(Palette.plainBadgeLight, in: RoundedRectangle(cornerRadius: 4))
+                            .background(Palette.plainBadgeLight, in: RoundedRectangle(cornerRadius: Metrics.chipRadius))
                             .fixedSize()
                             .accessibilityHidden(true)
                     }
@@ -443,7 +443,7 @@ struct AddFirstServerRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .listRowBackground(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
                 .strokeBorder(Color.primary.opacity(hovering ? 0.4 : 0.22), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                 .padding(.horizontal, 10)
         )

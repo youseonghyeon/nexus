@@ -161,7 +161,7 @@ struct NetworkDashboardView: View {
     private var tailscaleCards: some View {
         InfoCard(title: "상태") {
             HStack(alignment: .top) {
-                Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
                     InfoRow("Backend", model.tailscaleInfo?.backendState ?? "–")
                     InfoRow("버전", model.tailscaleInfo?.shortVersion ?? "–")
                     InfoRow("Peers", model.tailscaleInfo.map { "\($0.peers.filter(\.online).count)/\($0.peers.count) 온라인" } ?? "–")
@@ -180,7 +180,7 @@ struct NetworkDashboardView: View {
             }
         }
         InfoCard(title: "이 Mac") {
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+            Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
                 InfoRow("이름", model.tailscaleInfo?.hostName ?? "–")
                 InfoRow("IPv4", model.tailscaleInfo?.ipv4 ?? "–")
                 InfoRow("IPv6", model.tailscaleInfo?.ipv6 ?? "–")
@@ -206,7 +206,7 @@ struct NetworkDashboardView: View {
         let info = model.lanInfo
         let status = InfoCard(title: "상태") {
             HStack(alignment: .top) {
-                Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
                     GridRow {
                         Text("서비스").font(.fieldLabel).foregroundStyle(.secondary)
                         LanServicePicker()
@@ -220,7 +220,7 @@ struct NetworkDashboardView: View {
             }
         }
         let address = InfoCard(title: "주소") {
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+            Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
                 InfoRow("IP", ipText(info))
                 InfoRow("게이트웨이", gatewayText(info))
                 InfoRow("구성", info?.configuration ?? "–")

@@ -133,8 +133,8 @@ struct RouteGraphView: View {
         }
         .lineLimit(1).fixedSize()
         .padding(.horizontal, 8).padding(.vertical, 4)
-        .background(Palette.control, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+        .background(Palette.control, in: RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
             .strokeBorder(border?.opacity(0.6) ?? (strong ? Color.primary.opacity(0.28) : Palette.hairline)))
     }
 

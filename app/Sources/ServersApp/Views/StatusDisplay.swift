@@ -78,4 +78,14 @@ extension StatusTone {
         case .muted: self = .muted
         }
     }
+
+    /// 컨테이너 · 파드 줄의 상태 → 색
+    init(_ tone: ContainerItem.Tone) {
+        switch tone {
+        case .good: self = .good
+        case .warn: self = .warn
+        case .bad: self = .bad
+        case .muted: self = .muted
+        }
+    }
 }

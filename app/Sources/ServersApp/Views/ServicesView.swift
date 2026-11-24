@@ -29,7 +29,7 @@ struct ServicesView: View {
                 if !report.failed.isEmpty {
                     section("실패 \(report.failed.count)") {
                         ForEach(report.failed) { unit in
-                            ServiceRow(unit: unit, dot: unit.removed ? .secondary : .red, canOpenLog: canOpenLog, openLog: { openLog(unit) }) {
+                            ServiceRow(unit: unit, dot: unit.removed ? .muted : .bad, canOpenLog: canOpenLog, openLog: { openLog(unit) }) {
                                 Text(ServicesFormat.failure(unit)).foregroundStyle(.secondary).lineLimit(1)
                             }
                         }
@@ -68,7 +68,7 @@ struct ServicesView: View {
     private func openLog(_ unit: ServiceUnit) { model.showServiceLog(server, unit: unit.name) }
 
     private func runningRow(_ unit: ServiceUnit) -> some View {
-        ServiceRow(unit: unit, dot: (unit.restarts ?? 0) > 0 ? StatusTone.warn.color : StatusTone.good.color, canOpenLog: canOpenLog, openLog: { openLog(unit) }) {
+        ServiceRow(unit: unit, dot: (unit.restarts ?? 0) > 0 ? .warn : .good, canOpenLog: canOpenLog, openLog: { openLog(unit) }) {
             Text((unit.restarts ?? 0) > 0 ? "재시작 \(unit.restarts!)" : "").frame(width: Column.restarts, alignment: .trailing)
             Text(unit.uptime.map(ServicesFormat.duration) ?? "").frame(width: Column.uptime, alignment: .trailing)
         }
@@ -230,7 +230,7 @@ private struct FoldButton: View {
 /// 서비스 한 줄: 점 · 이름 · 설명(남는 폭) · 오른쪽 열들. 리눅스면 마우스를 올리면 옅은 면, 누르면 최근 로그.
 private struct ServiceRow<Trailing: View>: View {
     let unit: ServiceUnit
-    let dot: Color
+    let dot: StatusTone
     let canOpenLog: Bool
     let openLog: () -> Void
     @ViewBuilder let trailing: Trailing
@@ -238,14 +238,14 @@ private struct ServiceRow<Trailing: View>: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Circle().fill(dot).frame(width: 8, height: 8)
+            StatusDot.tableRow(dot)
             Text(unit.name).lineLimit(1).layoutPriority(1)
             Text(unit.description).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8)
             HStack(spacing: 0) { trailing }.foregroundStyle(.secondary).monospacedDigit()
         }
         .padding(.horizontal, 6).padding(.vertical, 3)
-        .background(canOpenLog && hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+        .background(canOpenLog && hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { if canOpenLog { openLog() } }
@@ -273,7 +273,7 @@ private struct ContainerRow: View {
     var body: some View {
         let name = item.displayName
         HStack(spacing: 8) {
-            Circle().fill(color).frame(width: 8, height: 8)
+            StatusDot.tableRow(StatusTone(item.tone))
             (Text(name.base) + Text(name.hash).foregroundStyle(.tertiary))
                 .lineLimit(1).truncationMode(.middle).layoutPriority(1)
             if item.kind == .docker, !item.detail.isEmpty {
@@ -300,20 +300,11 @@ private struct ContainerRow: View {
             .foregroundStyle(.secondary).monospacedDigit()
         }
         .padding(.horizontal, 6).padding(.vertical, 3)
-        .background(hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+        .background(hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(perform: tap)
         .contextMenu { if opensLog { Button("이름 복사", action: copy) } }
         .help(opensLog ? (item.kind == .pod ? "누르면 상태 · 최근 로그" : "누르면 최근 로그") : "누르면 이름 복사")
-    }
-
-    private var color: Color {
-        switch item.tone {
-        case .good: return .green
-        case .warn: return StatusTone.warn.color   // 라이트에서 읽히는 노랑
-        case .bad: return .red
-        case .muted: return .secondary
-        }
     }
 }

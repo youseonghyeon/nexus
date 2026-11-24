@@ -81,16 +81,16 @@ struct ActionsEditSheet: View {
                 }
             }
             .padding(.horizontal, 12).padding(.vertical, 5)
-            .background(Palette.well, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Palette.hairline))
+            .background(Palette.well, in: RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous).strokeBorder(Palette.hairline))
 
             if let adding {
                 // 추가하는 중: 따로 띄운 면 — 목록과 섞이지 않고 "지금 이것을 넣는 중"으로 읽힌다
                 form(adding)
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Palette.control, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Palette.hairline))
+                    .background(Palette.control, in: RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Metrics.panelRadius, style: .continuous).strokeBorder(Palette.hairline))
             } else {
                 Menu {
                     Button("Chrome 프록시") { start(.proxy) }.disabled(actions.proxyPort != nil)

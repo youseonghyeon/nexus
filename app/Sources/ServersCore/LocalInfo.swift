@@ -33,6 +33,14 @@ public struct LocalPort: Sendable, Equatable, Identifiable {
     }
 }
 
+extension LocalPort {
+    /// 이 리스닝 줄을 연 터널. 포트와 바인드 주소가 모두 같아야 한다 — 서버 이름 터널은 루프백 별칭(127.0.0.x)에 열리므로
+    /// 번호만 보면 다른 프로그램이 127.0.0.1 · 모든 주소(*)의 같은 포트에서 듣는 줄에도 붙는다. 열린 터널만 넘긴다.
+    public func tunnel(among open: [TunnelSpec]) -> TunnelSpec? {
+        open.first { $0.localPort == port && $0.localBind == address }
+    }
+}
+
 public struct LocalInfo: Sendable, Equatable {
     public var spec: [SpecItem]
     public var addresses: [LocalAddress]

@@ -88,7 +88,7 @@ struct LocalDashboardView: View {
         // 기본 경로 장치에 주소 줄이 없을 때만 따로 한 줄
         let routeDevice = model.defaultRoute?.interface
         let addresses = info?.addresses ?? []
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+        Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
             ForEach(addresses) { address in
                 GridRow {
                     Text(address.name).foregroundStyle(.secondary)
@@ -270,8 +270,8 @@ struct LocalDashboardView: View {
                         Text(port.command).lineLimit(1).truncationMode(.middle).frame(width: 150, alignment: .leading)
                         Text(port.address).foregroundStyle(.secondary).frame(width: 120, alignment: .leading)
                         // 앱이 연 터널이면 어디로 가는지, 아니면 잘 알려진 포트 이름
-                        if let tunnel = model.tunnels.first(where: { $0.state == .open && $0.spec.localPort == port.port }) {
-                            StatusChip(text: "터널 → \(tunnel.spec.server.key)", tone: .good)
+                        if let tunnel = port.tunnel(among: model.tunnels.filter { $0.state == .open }.map(\.spec)) {
+                            StatusChip(text: "터널 → \(tunnel.server.key)", tone: .good)
                         } else if let label = RemoteInfo.knownPorts[port.port] {
                             Text(label).foregroundStyle(.tertiary)
                         }

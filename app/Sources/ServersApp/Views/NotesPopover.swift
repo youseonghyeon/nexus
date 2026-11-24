@@ -169,7 +169,7 @@ private struct NoteRow: View {
             }
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(hovering || isSelected ? Color.primary.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+        .background(hovering || isSelected ? Color.primary.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(perform: activate)
@@ -214,7 +214,7 @@ private struct RowCopyButton: View {
             }
             .padding(.horizontal, 6)
             .frame(height: 24)
-            .background(hovering && isEnabled ? Color.primary.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+            .background(hovering && isEnabled ? Color.primary.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

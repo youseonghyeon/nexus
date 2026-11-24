@@ -59,7 +59,7 @@ struct TopRowIconStyle: ButtonStyle {
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .frame(width: 26, height: 24)
-                .background(Color.primary.opacity(configuration.isPressed ? 0.14 : hovering ? 0.08 : 0), in: RoundedRectangle(cornerRadius: 6))
+                .background(Color.primary.opacity(configuration.isPressed ? 0.14 : hovering ? 0.08 : 0), in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
                 .contentShape(Rectangle())
                 .onHover { hovering = $0 }
         }

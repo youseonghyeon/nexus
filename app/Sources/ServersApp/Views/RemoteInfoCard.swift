@@ -232,7 +232,7 @@ private struct PortsTableRow: View {
                 .allowsHitTesting(hovering)
         }
         .padding(.horizontal, 6).padding(.vertical, 3)
-        .background(hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: 6))   // Services 표와 같은 행 강조
+        .background(hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))   // Services 표와 같은 행 강조
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { model.copy(item.primaryAddress.contains(":") ? "[\(item.primaryAddress)]:\(item.port)" : "\(item.primaryAddress):\(item.port)") }

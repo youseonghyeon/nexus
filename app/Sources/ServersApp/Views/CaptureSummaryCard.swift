@@ -13,7 +13,7 @@ struct CaptureSummaryCard: View {
         let s = capture.snapshot
         VStack(alignment: .leading, spacing: 8) {
             Text("요약").font(.caption).foregroundStyle(.secondary)
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 6) {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
                 GridRow(alignment: .top) {
                     Text("대화").font(.fieldLabel).foregroundStyle(.secondary)
                     conversations(s)

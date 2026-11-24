@@ -29,7 +29,7 @@ func transferText(_ rx: UInt64?, _ tx: UInt64?) -> String {
 
 /// 한 줄: 점 · 내용 · 오른쪽 열. 누를 수 있으면 마우스를 올렸을 때 옅은 면
 struct OpenWrtRow<Leading: View, Trailing: View>: View {
-    let dot: Color
+    let dot: StatusTone
     var help: String?
     var action: (() -> Void)?
     @ViewBuilder let leading: Leading
@@ -38,13 +38,13 @@ struct OpenWrtRow<Leading: View, Trailing: View>: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Circle().fill(dot).frame(width: 8, height: 8)
+            StatusDot.tableRow(dot)
             leading
             Spacer(minLength: 8)
             HStack(spacing: 0) { trailing }.foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
         }
         .padding(.horizontal, 6).padding(.vertical, 3)
-        .background(action != nil && hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+        .background(action != nil && hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture { action?() }

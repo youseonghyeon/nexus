@@ -147,7 +147,7 @@ struct ConnectionCard: View {
     @State private var device: String?
 
     var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+        Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
             InfoRow("주소", server.ip)
             GridRow {
                 Text("사용자").font(.fieldLabel).foregroundStyle(.secondary)
@@ -436,7 +436,7 @@ struct ActionButtons: View {
         // 전원 줄이 있는 서버만 줄 이름을 단다 — 파일뿐이면 카드 제목이 이미 "파일"
         Group {
             if model.wakeVia(server) != nil || server.type == .windows {
-                Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 10) {
+                Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 10) {
                     GridRow {
                         Text("전원").font(.fieldLabel).foregroundStyle(.secondary)
                         PowerToggle(server: server)

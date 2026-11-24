@@ -113,7 +113,7 @@ struct EthernetDashboardView: View {
     }
 
     private func statusRows(_ adapter: EthernetAdapter) -> some View {
-        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+        Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
             InfoRow("서비스", adapter.service)
             InfoRow("어댑터", adapter.hardwarePort ?? "–")
             InfoRow("인터페이스", adapter.device)
@@ -126,7 +126,7 @@ struct EthernetDashboardView: View {
     private func addressRows(_ adapter: EthernetAdapter) -> some View {
         // 서비스 값(IP·서브넷·게이트웨이·구성)은 그 서비스 것, NIC 값(DNS·공인 IP)은 연결됨일 때만
         let info = adapter.info
-        return Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
+        return Grid(alignment: .leading, horizontalSpacing: Metrics.labelGap, verticalSpacing: 6) {
             InfoRow("IP", ipText(adapter))
             InfoRow("서브넷", adapter.netmask ?? "–")
             InfoRow("게이트웨이", info?.router ?? "–")

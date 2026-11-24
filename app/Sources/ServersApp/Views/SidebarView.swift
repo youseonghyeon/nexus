@@ -195,7 +195,7 @@ struct SidebarSearchField: View {
                         ForEach(["⌘", "K"], id: \.self) { key in
                             Text(key).font(.caption2).foregroundStyle(.secondary)
                                 .padding(.horizontal, 4).padding(.vertical, 1)
-                                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.35)))
+                                .overlay(RoundedRectangle(cornerRadius: Metrics.chipRadius).stroke(Color.secondary.opacity(0.35)))
                         }
                     }
                 }
@@ -272,9 +272,9 @@ extension View {
     /// 탭 전환의 고른 칸과 같은 말투다. 시스템 강조는 SidebarHighlightOff 가 끈다 (2026-11-10 사용자 지적)
     func sidebarSelection(_ selected: Bool) -> some View {
         environment(\.sidebarRowSelected, selected).listRowBackground(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous)
                 .fill(selected ? Palette.raisedSidebar : Color.clear)
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(selected ? Palette.hairline : Color.clear))
+                .overlay(RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous).strokeBorder(selected ? Palette.hairline : Color.clear))
                 .padding(.horizontal, 10)
         )
     }
