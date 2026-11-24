@@ -39,7 +39,7 @@ extension ServerConfigEditor {
     private static func unitRange(_ name: String, in all: [String]) -> ClosedRange<Int>? {
         guard let span = blockSpan(name, in: all) else { return nil }
         var start = span.header
-        while start > 0, all[start - 1].trimmingCharacters(in: .whitespaces).hasPrefix("#") { start -= 1 }
+        while start > 0, ConfigLine.isComment(all[start - 1]) { start -= 1 }
         return start...span.last
     }
 

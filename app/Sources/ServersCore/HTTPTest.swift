@@ -9,6 +9,13 @@ public enum HTTPTest {
     public static let connectTimeout = 3
     public static let maxTime = 10
 
+    /// curl 공통 인자 — 이 Mac 의 확인(check)과 서버 진단 스크립트(ServerDiagnose)가 같이 쓴다.
+    /// -g: [] {} 를 범위 문법으로 읽지 않게 (IPv6 주소) · --proto: http·https 밖으로 가지 않게
+    static let baseArguments = ["-sS", "-g", "-o", "/dev/null", "--proto", "=http,https", "--noproxy", "*",
+                                "--connect-timeout", "\(connectTimeout)", "--max-time", "\(maxTime)"]
+    /// 같은 인자를 셸 한 줄로 (셸이 풀어 버리는 * 만 따옴표)
+    static var baseShellArguments: String { baseArguments.map { $0 == "*" ? shellQuote($0) : $0 }.joined(separator: " ") }
+
     static let format = "exit=%{exitcode}\\ncode=%{http_code}\\nscheme=%{scheme}\\nip=%{remote_ip}\\nport=%{remote_port}\\ndns=%{time_namelookup}\\nconnect=%{time_connect}\\ntls=%{time_appconnect}\\nfirst=%{time_starttransfer}\\ntotal=%{time_total}\\nredirect=%{redirect_url}\\nerror=%{errormsg}\\n"
 
     /// 입력 → 요청할 URL. 스킴이 없으면 http:// (curl 과 같음). http·https 만, 호스트 필수.
@@ -55,9 +62,7 @@ public enum HTTPTest {
         guard let bind = NetworkProbe.bindArguments(device, flag: "--interface") else {
             return HTTPCheck(exitCode: 45, error: "장치 이름이 올바르지 않습니다: \(device)")
         }
-        // -g: [] {} 를 범위 문법으로 읽지 않게 (IPv6 주소) · --proto: http·https 밖으로 가지 않게
-        let arguments = ["-sS", "-g", "-o", "/dev/null", "--proto", "=http,https", "--noproxy", "*",
-                         "--connect-timeout", "\(connectTimeout)", "--max-time", "\(maxTime)"] + bind + ["-w", format, url]
+        let arguments = baseArguments + bind + ["-w", format, url]
         let result = await runner.run("curl", arguments, timeout: TimeInterval(maxTime + 5))
         if let check = parse(result.stdout) { return check }
         // -w 줄이 없다 = curl 이 끝나지 못했다 (앱 쪽 시간 초과 · curl 없음) — curl 종료 코드가 아니므로 따로 적는다
@@ -176,7 +181,7 @@ public struct HTTPCheck: Sendable, Equatable {
         switch exitCode {
         case 60, 51, 58, 77, 83, 90, 91: return "인증서 확인 실패"
         case 35: return "TLS 연결 실패"
-        case 6: return "이름을 찾지 못했습니다"
+        case 6: return DiagnosticText.unresolved
         case 7: return "연결 실패"   // 거부·경로 없음·호스트 꺼짐이 다 7 — 원인은 상세 줄의 curl 문장
         case 28:
             // --connect-timeout 은 TLS 핸드셰이크까지 포함한다
@@ -199,6 +204,26 @@ public struct HTTPCheck: Sendable, Equatable {
         case 56: return "본문 받는 중 연결이 끊겼습니다"
         default: return "본문 받는 중 실패 (curl 종료 코드 \(exitCode))"
         }
+    }
+
+    /// 결과 한 줄: 실패 문구, 아니면 "200 성공" (본문을 덜 받았으면 " · …" 를 덧붙인다). 진단 카드의 [복사] 텍스트와 서버 Diagnose 탭이 같은 말을 쓴다
+    var headline: String? {
+        if let failureText { return failureText }
+        guard let status else { return nil }
+        var text = "\(status)"
+        if let kind = HTTPTest.statusKind(status) { text += " \(kind)" }
+        if let note = bodyNote { text += " · \(note)" }
+        return text
+    }
+
+    /// 결과 줄 아래에 덧붙는 줄 — 상세(실패 · 본문 문제일 때만) · 이동 · 연결 · 시간 순
+    var detailLines: [String] {
+        var lines: [String] = []
+        if failureText != nil || bodyNote != nil, let error { lines.append("상세: \(error)") }
+        if let redirect { lines.append("이동: \(redirect)") }
+        if let endpoint { lines.append("연결: \(endpoint)") }
+        if let stages, stages.dnsMs != nil { lines.append("시간: \(stages.text)") }
+        return lines
     }
 
     /// "10.50.10.17:443"
@@ -227,18 +252,7 @@ extension HTTPTestResult {
     public var reportText: String {
         var lines = ["HTTP \(url) · \(device) · \(at.formatted(date: .abbreviated, time: .standard))"]
         guard let check else { return (lines + ["결과: 요청 중"]).joined(separator: "\n") }
-        if let failure = check.failureText {
-            lines.append("결과: \(failure)")
-        } else if let status = check.status {
-            var text = "결과: \(status)"
-            if let kind = HTTPTest.statusKind(status) { text += " \(kind)" }
-            if let note = check.bodyNote { text += " · \(note)" }
-            lines.append(text)
-        }
-        if check.failureText != nil || check.bodyNote != nil, let error = check.error { lines.append("상세: \(error)") }
-        if let redirect = check.redirect { lines.append("이동: \(redirect)") }
-        if let endpoint = check.endpoint { lines.append("연결: \(endpoint)") }
-        if let stages = check.stages, stages.dnsMs != nil { lines.append("시간: \(stages.text)") }
-        return lines.joined(separator: "\n")
+        if let headline = check.headline { lines.append("결과: \(headline)") }
+        return (lines + check.detailLines).joined(separator: "\n")
     }
 }

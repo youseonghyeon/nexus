@@ -70,6 +70,9 @@ public struct PingSummary: Sendable, Equatable {
     public let lossPercent: Double
     public let jitterMs: Double?
 
+    /// 응답이 하나도 없음 (재지 못했을 때도)
+    public static let none = PingSummary(averageMs: nil, lossPercent: 100, jitterMs: nil)
+
     /// "12.3 ms · 손실 0%" / "응답 없음"
     public var text: String {
         guard let averageMs else { return "응답 없음" }
@@ -221,9 +224,16 @@ public enum NetworkProbe {
 
     /// 그 장치로만 보낸다 (ping -b) — 어댑터가 빠져 기본 경로(VPN 등)로 새면 다른 망의 같은 주소가 대답할 수 있다
     public static func ping(_ target: String, device: String, count: Int = 3, runner: any CommandRunner) async -> PingSummary {
-        guard let bind = bindArguments(device, flag: "-b") else { return PingSummary(averageMs: nil, lossPercent: 100, jitterMs: nil) }
-        let result = await runner.run("ping", ["-c", "\(count)", "-i", "0.2", "-W", "1000"] + bind + [target], timeout: 10)
-        return parsePing(result.stdout + result.stderr)
+        guard let output = await pingOutput(target, device: device, count: count, timeout: 10, runner: runner) else { return .none }
+        return parsePing(output)
+    }
+
+    /// ping 을 돌린 출력 (stdout + stderr — 이름을 못 풀었다는 말은 stderr 에 온다). 0.2초 간격, 응답은 1초까지 기다린다.
+    /// device 가 nil 이면 묶지 않고, 장치 이름이 이상하면 돌리지 않고 nil. 진단 카드의 ping(PingTest.ping)도 이것을 쓴다
+    static func pingOutput(_ target: String, device: String?, count: Int, timeout: TimeInterval, runner: any CommandRunner) async -> String? {
+        guard let bind = bindArguments(device, flag: "-b") else { return nil }
+        let result = await runner.run("ping", ["-c", "\(count)", "-i", "0.2", "-W", "1000"] + bind + [target], timeout: timeout)
+        return result.stdout + result.stderr
     }
 
     /// ping 요약 줄: "3 packets transmitted, 3 packets received, 0.0% packet loss" +
@@ -258,7 +268,7 @@ public enum NetworkProbe {
     /// 병렬 HTTPS 요청 N 번. 204 가 아닌 응답(포털 가로채기 등)은 실패로 센다.
     /// device 를 주면 그 장치로만 나간다 (curl --interface) — Wi-Fi·Ethernet 화면은 기본 경로가 아니라 자기 장치의 응답을 본다.
     public static func internetProbe(device: String? = nil, runner: any CommandRunner) async -> PingSummary {
-        guard let bind = bindArguments(device, flag: "--interface") else { return PingSummary(averageMs: nil, lossPercent: 100, jitterMs: nil) }
+        guard let bind = bindArguments(device, flag: "--interface") else { return .none }
         let script = """
         for i in $(seq 1 \(probeCount)); do
           curl -s -o /dev/null --connect-timeout 1 --max-time 2\(bind.map { " " + $0 }.joined()) -w '%{http_code} %{time_connect}\\n' \(probeURL) &
@@ -278,7 +288,7 @@ public enum NetworkProbe {
             samples.append(seconds * 1000)
         }
         let loss = Double(max(0, count - samples.count)) * 100 / Double(count)
-        guard !samples.isEmpty else { return PingSummary(averageMs: nil, lossPercent: 100, jitterMs: nil) }
+        guard !samples.isEmpty else { return .none }
         let avg = samples.reduce(0, +) / Double(samples.count)
         let variance = samples.reduce(0) { $0 + ($1 - avg) * ($1 - avg) } / Double(samples.count)
         return PingSummary(averageMs: avg, lossPercent: loss, jitterMs: variance > 0 ? variance.squareRoot() : 0)

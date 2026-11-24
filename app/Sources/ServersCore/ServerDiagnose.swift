@@ -92,31 +92,33 @@ public enum ServerDiagnose {
             return """
                 command -v bash >/dev/null 2>&1 || { echo "@MISSING bash"; exit 0; }
                 command -v timeout >/dev/null 2>&1 || { echo "@MISSING timeout"; exit 0; }
-                s=$(date +%s%N)
-                timeout \(Int(TCPPortTest.timeout)) bash -c 'exec 3<>/dev/tcp/\(request.host)/\(request.port)' 2>/dev/null
-                rc=$?
-                e=$(date +%s%N)
-                echo "@RC $rc"
-                case "$s$e" in *[!0-9]*) ;; *) echo "@MS $(( (e - s) / 1000000 ))" ;; esac
+                \(timed("timeout \(Int(TCPPortTest.timeout)) bash -c 'exec 3<>/dev/tcp/\(request.host)/\(request.port)' 2>/dev/null"))
                 """
         case .http:
             return """
                 command -v curl >/dev/null 2>&1 || { echo "@MISSING curl"; exit 0; }
-                curl -sS -g -o /dev/null --proto =http,https --noproxy '*' --connect-timeout \(HTTPTest.connectTimeout) --max-time \(HTTPTest.maxTime) -w '\(HTTPTest.format)' \(target) 2>&1
+                curl \(HTTPTest.baseShellArguments) -w '\(HTTPTest.format)' \(target) 2>&1
                 echo "@RC $?"
                 """
         case .dns:
             // 서버의 프로그램들이 보는 그대로 (nsswitch — /etc/hosts · 리졸버). 2 = 없는 이름
             return """
                 command -v getent >/dev/null 2>&1 || { echo "@MISSING getent"; exit 0; }
-                s=$(date +%s%N)
-                getent ahosts \(target) 2>/dev/null
-                rc=$?
-                e=$(date +%s%N)
-                echo "@RC $rc"
-                case "$s$e" in *[!0-9]*) ;; *) echo "@MS $(( (e - s) / 1000000 ))" ;; esac
+                \(timed("getent ahosts \(target) 2>/dev/null"))
                 """
         }
+    }
+
+    /// 명령 한 줄을 돌려 종료 코드(@RC)와 걸린 시간(@MS)을 낸다. date 가 나노초(%N)를 모르면 @MS 는 내지 않는다
+    private static func timed(_ command: String) -> String {
+        """
+        s=$(date +%s%N)
+        \(command)
+        rc=$?
+        e=$(date +%s%N)
+        echo "@RC $rc"
+        case "$s$e" in *[!0-9]*) ;; *) echo "@MS $(( (e - s) / 1000000 ))" ;; esac
+        """
     }
 
     /// OpenWrt(BusyBox) 용 — http 는 linux 와 같은 스크립트라 nil (curl 은 기본으로 없다: 있으면 재고 없으면 없다고 알린다).
@@ -224,7 +226,7 @@ public enum ServerDiagnose {
     // MARK: 출력 풀이
 
     /// 이름이 안 풀렸을 때의 결과 줄 (ping · dns) — 화면이 진단 카드처럼 흐리게 그린다
-    public static let unresolvedText = "이름을 찾지 못했습니다"
+    public static let unresolvedText = DiagnosticText.unresolved
 
     /// ping 출력 (Linux 요약 줄도 macOS 와 같은 꼴 — NetworkProbe.parsePing)
     static func ping(_ output: String) -> Outcome {
@@ -235,17 +237,11 @@ public enum ServerDiagnose {
         return Outcome(state: summary.averageMs == nil ? .failed : .ok, headline: summary.text)
     }
 
-    /// 결과 줄·덧붙는 줄은 진단 카드의 [복사] 텍스트와 같은 말·같은 순서 (HTTPTestResult.reportText)
+    /// 결과 줄·덧붙는 줄은 진단 카드의 [복사] 텍스트와 같은 것 (HTTPCheck.headline · detailLines — HTTPTestResult.reportText 도 이것을 쓴다)
     static func http(_ check: HTTPCheck) -> Outcome {
-        var lines: [String] = []
-        if check.failureText != nil || check.bodyNote != nil, let error = check.error { lines.append("상세: \(error)") }
-        if let redirect = check.redirect { lines.append("이동: \(redirect)") }
-        if let endpoint = check.endpoint { lines.append("연결: \(endpoint)") }
-        if let stages = check.stages, stages.dnsMs != nil { lines.append("시간: \(stages.text)") }
+        let lines = check.detailLines
         if let failure = check.failureText { return Outcome(state: .failed, headline: failure, lines: lines, check: check) }
-        guard let status = check.status else { return Outcome(state: .failed, headline: "응답 없음", lines: lines, check: check) }
-        var headline = "\(status)" + (HTTPTest.statusKind(status).map { " \($0)" } ?? "")
-        if let note = check.bodyNote { headline += " · \(note)" }
+        guard let status = check.status, let headline = check.headline else { return Outcome(state: .failed, headline: "응답 없음", lines: lines, check: check) }
         // 응답을 받았으면 된 것이다 (4xx·5xx 도 — 상대가 답했다. 코드는 결과 줄에 있다)
         return Outcome(state: .ok, headline: headline, lines: lines, addresses: check.remoteIP.map { [$0] } ?? [], status: status, check: check)
     }

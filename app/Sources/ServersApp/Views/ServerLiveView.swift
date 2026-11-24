@@ -55,10 +55,10 @@ struct ServerLiveView: View {
     // MARK: 요약 줄
 
     /// Windows 는 부하 평균 · iowait · 버퍼/캐시 구분 · 프로세스 상태 글자가 없다
-    private func windows(_ s: LinuxLiveSnapshot) -> Bool { s.system == .windows }
+    private func windows(_ s: LiveSnapshot) -> Bool { s.system == .windows }
 
-    private func summary(_ s: LinuxLiveSnapshot) -> some View {
-        let health = LinuxHealth.judge(s)
+    private func summary(_ s: LiveSnapshot) -> some View {
+        let health = LiveHealth.judge(s)
         return HStack(spacing: 8) {
             Circle().fill(health.level.tone.color).frame(width: 8, height: 8)
             Text(health.text).fontWeight(.medium)
@@ -74,7 +74,7 @@ struct ServerLiveView: View {
 
     // MARK: 수치
 
-    private func metrics(_ s: LinuxLiveSnapshot) -> some View {
+    private func metrics(_ s: LiveSnapshot) -> some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 16, alignment: .topLeading)], alignment: .leading, spacing: 12) {
             let cpuLevel = SystemHealth.level(s.cpu?.total ?? 0, .cpu)
             LiveMetric(title: "CPU", value: s.cpu.map { "\(Int($0.total.rounded()))%" } ?? "–", tone: cpuLevel.valueTone,
@@ -131,7 +131,7 @@ struct ServerLiveView: View {
 
     // MARK: 코어
 
-    private func cores(_ s: LinuxLiveSnapshot) -> some View {
+    private func cores(_ s: LiveSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("코어").font(.caption).foregroundStyle(.secondary)
             if let values = s.cpu?.cores, !values.isEmpty {
@@ -154,7 +154,7 @@ struct ServerLiveView: View {
 
     // MARK: 메모리 · 디스크
 
-    private func memory(_ s: LinuxLiveSnapshot) -> some View {
+    private func memory(_ s: LiveSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("메모리").font(.caption).foregroundStyle(.secondary)
             if let m = s.memory {
@@ -221,7 +221,7 @@ struct ServerLiveView: View {
         }
     }
 
-    private func disks(_ s: LinuxLiveSnapshot) -> some View {
+    private func disks(_ s: LiveSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("디스크").font(.caption).foregroundStyle(.secondary)
             // RAID 는 손상이 가장 중요한 경고라 맨 위 (disk.sh 도 공간보다 먼저 본다)
@@ -274,7 +274,7 @@ struct ServerLiveView: View {
 
     // MARK: 네트워크
 
-    private func network(_ s: LinuxLiveSnapshot) -> some View {
+    private func network(_ s: LiveSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("네트워크").font(.caption).foregroundStyle(.secondary)
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
@@ -297,7 +297,7 @@ struct ServerLiveView: View {
 
     // MARK: 프로세스
 
-    private func processes(_ s: LinuxLiveSnapshot) -> some View {
+    private func processes(_ s: LiveSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("프로세스").font(.caption).foregroundStyle(.secondary)

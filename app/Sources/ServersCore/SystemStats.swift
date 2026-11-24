@@ -434,7 +434,7 @@ public enum SystemHealth {
         value >= bad ? .bad : (value >= warn ? .warn : .good)
     }
 
-    /// 막대·타일 색 기준 (%·°C). 결론(judge · LinuxHealth.judge)도 이 숫자를 쓴다.
+    /// 막대·타일 색 기준 (%·°C). 결론(judge · LiveHealth.judge)도 이 숫자를 쓴다.
     public enum Gauge: Sendable {
         /// CPU 전체·코어
         case cpu

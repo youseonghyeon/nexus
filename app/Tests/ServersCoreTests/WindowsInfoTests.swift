@@ -28,7 +28,7 @@ final class WindowsInfoTests: XCTestCase {
         XCTAssertFalse(raw.processes.contains { $0.command.contains("#") }, "같은 이름에 붙는 #번호는 뗀다")
         XCTAssertTrue(raw.processes.contains { $0.command == "svchost" })
         XCTAssertEqual(Set(raw.disks.keys), ["C:", "D:"], "_Total 은 뺀다, 이름은 드라이브 글자")
-        XCTAssertEqual(raw.diskInfo["C:"], LinuxDiskInfo(rotational: false, size: 500_107_862_016, model: "Samsung SSD 870 EVO 500GB", healthy: true))
+        XCTAssertEqual(raw.diskInfo["C:"], LiveDiskInfo(rotational: false, size: 500_107_862_016, model: "Samsung SSD 870 EVO 500GB", healthy: true))
         XCTAssertEqual(raw.diskInfo["D:"]?.rotational, true)
         XCTAssertEqual(raw.volumes.map(\.mountPoint), ["C:", "D:"])
         XCTAssertEqual(raw.volumes[0].percent, 93)
@@ -74,7 +74,7 @@ final class WindowsInfoTests: XCTestCase {
         XCTAssertEqual(b.networkTotal?.rx, net.rx)
         XCTAssertTrue(b.processes.contains { $0.cpu > 0 }, "두 번째 표본부터 프로세스 CPU 가 나온다")
         XCTAssertTrue(b.processes.allSatisfy { $0.cpu >= 0 && $0.cpu <= 1600 })
-        XCTAssertEqual(LinuxHealth.judge(b).text, "공간 부족", "C: 93%")
+        XCTAssertEqual(LiveHealth.judge(b).text, "공간 부족", "C: 93%")
     }
 
     func testLiveEdgeCases() {
@@ -88,7 +88,7 @@ final class WindowsInfoTests: XCTestCase {
         XCTAssertNil(snapshot.cpu)
         XCTAssertNil(snapshot.coresText, "코어를 못 읽었으면 적지 않는다")
         // 하이퍼스레딩이 없으면(물리 = 논리) · 물리 코어를 모르면(리눅스 · 옛 출력) "코어 N개"
-        var plain = LinuxLiveSnapshot(at: Date())
+        var plain = LiveSnapshot(at: Date())
         plain.cores = 8
         XCTAssertEqual(plain.coresText, "코어 8개")
         plain.physicalCores = 8
@@ -106,10 +106,10 @@ final class WindowsInfoTests: XCTestCase {
         XCTAssertEqual(raw?.diskInfo["Disk 2"]?.healthy, false)
         XCTAssertNil(raw?.diskInfo["Disk 2"]?.rotational, "MediaType 0 = 모름")
         XCTAssertEqual(raw?.diskInfo["C: D:"]?.healthy, false)
-        var s = LinuxLiveSnapshot(at: Date())
+        var s = LiveSnapshot(at: Date())
         s.diskInfo = raw?.diskInfo ?? [:]
-        XCTAssertEqual(LinuxHealth.judge(s).level, .bad)
-        XCTAssertEqual(LinuxHealth.judge(s).text, "디스크 이상 · SSD Y")
+        XCTAssertEqual(LiveHealth.judge(s).level, .bad)
+        XCTAssertEqual(LiveHealth.judge(s).text, "디스크 이상 · SSD Y")
         // nvidia-smi 가 값을 못 읽으면 "[N/A]"
         XCTAssertEqual(LiveGPU.parse("[N/A], 100, 200, [N/A], [N/A], Tesla T4"),
                        LiveGPU(name: "Tesla T4", utilization: nil, memoryUsed: 100 * 1_048_576, memoryTotal: 200 * 1_048_576, temperature: nil, power: nil))
@@ -121,7 +121,7 @@ final class WindowsInfoTests: XCTestCase {
         func raw(stamp: UInt64, ticks: UInt64, start: UInt64) -> WindowsRaw {
             var r = WindowsRaw()
             r.processStamp = stamp
-            r.processes = [LinuxProcessSample(pid: 100, state: "", ticks: ticks, threads: 1, rssPages: 10, startTime: start, command: "a")]
+            r.processes = [LiveProcessSample(pid: 100, state: "", ticks: ticks, threads: 1, memory: 10, startTime: start, command: "a")]
             return r
         }
         var sampler = WindowsLiveSampler()

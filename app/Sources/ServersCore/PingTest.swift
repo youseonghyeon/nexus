@@ -23,17 +23,12 @@ public enum PingTest {
 
     /// 앞뒤 공백을 지운 대상. 비었거나 허용 밖 글자가 있으면 nil.
     public static func target(_ input: String) -> String? {
-        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, text.count <= 253, !text.hasPrefix("-"),
-              text.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-" || $0 == ":") }) else { return nil }
-        return text
+        DiagnosticInput.host(input, extra: ":")
     }
 
     /// ping 5회 (device 에 묶음). 이름을 못 풀면 resolveFailed.
     public static func ping(_ target: String, device: String?, runner: any CommandRunner) async -> (summary: PingSummary, resolveFailed: Bool) {
-        guard let bind = NetworkProbe.bindArguments(device, flag: "-b") else { return (PingSummary(averageMs: nil, lossPercent: 100, jitterMs: nil), false) }
-        let result = await runner.run("ping", ["-c", "\(count)", "-i", "0.2", "-W", "1000"] + bind + [target], timeout: 15)
-        let output = result.stdout + result.stderr
+        guard let output = await NetworkProbe.pingOutput(target, device: device, count: count, timeout: 15, runner: runner) else { return (.none, false) }
         return (NetworkProbe.parsePing(output), resolveFailed(output))
     }
 
@@ -106,7 +101,7 @@ extension PingTestResult {
     public var reportText: String {
         var lines = ["ping \(target) · \(device) · \(at.formatted(date: .abbreviated, time: .standard))"]
         if resolveFailed {
-            lines.append("응답: 이름을 찾지 못했습니다")
+            lines.append("응답: \(DiagnosticText.unresolved)")
             return lines.joined(separator: "\n")
         }
         if let summary { lines.append("응답: \(summary.text) (\(PingTest.count)회)") }

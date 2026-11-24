@@ -10,7 +10,7 @@ final class ServerLiveMonitor: ObservableObject {
     static let historyLength = 60
     static let processLimit = 12
 
-    @Published private(set) var snapshot: LinuxLiveSnapshot?
+    @Published private(set) var snapshot: LiveSnapshot?
     @Published private(set) var cpuHistory: [Double] = []
     @Published private(set) var error: String?
     /// 인증에 실패해 멈춘 상태 — 틀린 비밀번호로 매 간격 로그인을 시도하면 운영 서버의 계정 잠금(fail2ban·faillock)에 걸릴 수 있다.
@@ -23,7 +23,7 @@ final class ServerLiveMonitor: ObservableObject {
     private var sampling = false
     private var lastSampleAt: Date?
 
-    var processes: [LinuxProcessRow] {
+    var processes: [LiveProcessRow] {
         guard let all = snapshot?.processes else { return [] }
         let sorted = processSort == .cpu ? all : all.sorted { ($0.memory, $0.cpu) > ($1.memory, $1.cpu) }
         return Array(sorted.prefix(Self.processLimit))
@@ -65,7 +65,7 @@ final class ServerLiveMonitor: ObservableObject {
             return false
         }
         let now = Date()
-        let next: LinuxLiveSnapshot
+        let next: LiveSnapshot
         if server.type == .windows, let raw = WindowsRaw.parse(result.stdout) {
             next = windowsSampler.step(raw, at: now)
         } else if server.type != .windows, let raw = LinuxRaw.parse(result.stdout) {

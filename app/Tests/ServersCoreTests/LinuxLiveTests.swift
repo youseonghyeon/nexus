@@ -61,7 +61,7 @@ final class LinuxLiveTests: XCTestCase {
         let arm = sampler.step(real, at: Date())
         XCTAssertEqual(arm.coresText, "코어 \(real.cores.count)개")
 
-        func snapshot(cores: String) -> LinuxLiveSnapshot? {
+        func snapshot(cores: String) -> LiveSnapshot? {
             let stat = (["cpu  1 0 1 1 0 0 0 0"] + (0..<16).map { "cpu\($0) 1 0 1 1 0 0 0 0" }).joined(separator: "\n")
             var s = LinuxLiveSampler()
             return LinuxRaw.parse("@INFO\n100\n4096\n@CORES\n\(cores)\n@STAT\n\(stat)\n@END\n").map { s.step($0, at: Date()) }
@@ -149,7 +149,7 @@ final class LinuxLiveTests: XCTestCase {
         let a = try XCTUnwrap(LinuxRaw.parse(output(stat: "cpu 100 0 100 700 100 0 0 0\ncpu0 100 0 100 700 100 0 0 0")))
         let b = try XCTUnwrap(LinuxRaw.parse(output(stat: "cpu 150 10 120 780 120 5 5 10\ncpu0 150 10 120 780 120 5 5 10")))
         // Δ: user 50 nice 10 sys 20 idle 80 iowait 20 irq 5 softirq 5 steal 10 → 전체 200, 바쁨 100
-        let cpu = try XCTUnwrap(LinuxCPUUsage.between(try XCTUnwrap(a.cpu), try XCTUnwrap(b.cpu), oldCores: a.cores, newCores: b.cores))
+        let cpu = try XCTUnwrap(LiveCPUUsage.between(try XCTUnwrap(a.cpu), try XCTUnwrap(b.cpu), oldCores: a.cores, newCores: b.cores))
         XCTAssertEqual(cpu.total, 50, accuracy: 0.001)
         XCTAssertEqual(cpu.user, 30, accuracy: 0.001, "user + nice")
         XCTAssertEqual(cpu.system, 15, accuracy: 0.001, "system + irq + softirq")
@@ -157,13 +157,13 @@ final class LinuxLiveTests: XCTestCase {
         XCTAssertEqual(cpu.steal, 5, accuracy: 0.001)
         XCTAssertEqual(cpu.idle, 40, accuracy: 0.001)
         XCTAssertEqual(cpu.cores, [50])
-        XCTAssertNil(LinuxCPUUsage.between(try XCTUnwrap(a.cpu), try XCTUnwrap(a.cpu), oldCores: [], newCores: []), "시간이 흐르지 않았으면 nil")
+        XCTAssertNil(LiveCPUUsage.between(try XCTUnwrap(a.cpu), try XCTUnwrap(a.cpu), oldCores: [], newCores: []), "시간이 흐르지 않았으면 nil")
     }
 
     func testMemoryHtopFormulaAndPressure() throws {
         let kb: [String: UInt64] = ["MemTotal": 1000, "MemFree": 100, "Buffers": 50, "Cached": 300, "SReclaimable": 50, "Shmem": 20,
                                     "MemAvailable": 400, "SwapTotal": 200, "SwapFree": 150]
-        let memory = try XCTUnwrap(LinuxMemory.from(kb))
+        let memory = try XCTUnwrap(LiveMemory.from(kb))
         XCTAssertEqual(memory.used, (1000 - 100 - 50 - 300 - 50) * 1024, "전체 − free − buffers − cached − SReclaimable")
         XCTAssertEqual(memory.cache, (300 + 50 - 20) * 1024, "cached + SReclaimable − Shmem")
         XCTAssertEqual(memory.available, 400 * 1024)
@@ -172,10 +172,10 @@ final class LinuxLiveTests: XCTestCase {
         XCTAssertEqual(memory.pressure(psiSome: 12, psiFull: 0), .warning)
         XCTAssertEqual(memory.pressure(psiSome: 12, psiFull: 10), .critical)
         XCTAssertEqual(memory.pressure(psiSome: 55, psiFull: nil), .critical)
-        let tight = try XCTUnwrap(LinuxMemory.from(["MemTotal": 1000, "MemFree": 10, "MemAvailable": 40]))
+        let tight = try XCTUnwrap(LiveMemory.from(["MemTotal": 1000, "MemFree": 10, "MemAvailable": 40]))
         XCTAssertEqual(tight.pressure(psiSome: nil, psiFull: nil), .critical, "PSI 없으면 남은 메모리 5% 미만 → 위험")
-        XCTAssertNil(LinuxMemory.from([:]))
-        XCTAssertEqual(LinuxMemory.from(["MemTotal": 100, "MemFree": 10])?.available, 10 * 1024, "MemAvailable 이 없으면 MemFree")
+        XCTAssertNil(LiveMemory.from([:]))
+        XCTAssertEqual(LiveMemory.from(["MemTotal": 100, "MemFree": 10])?.available, 10 * 1024, "MemAvailable 이 없으면 MemFree")
     }
 
     func testDisksVolumesTemperaturesAndProcesses() throws {
@@ -219,7 +219,7 @@ final class LinuxLiveTests: XCTestCase {
         XCTAssertEqual(s.processes.first?.cpuTime ?? 0, 1.5, accuracy: 0.001, "ticks / CLK_TCK")
         XCTAssertEqual(s.processes.first(where: { $0.pid == 11 })?.cpu, 0, "pid 가 재사용되면 이전 값과 빼지 않는다")
         XCTAssertEqual(s.processes.last?.command, "nginx: worker", "이름에 공백·콜론")
-        XCTAssertEqual(LinuxHealth.judge(s).text, "공간 부족", "/ 가 95%")
+        XCTAssertEqual(LiveHealth.judge(s).text, "공간 부족", "/ 가 95%")
         XCTAssertEqual(s.running, 1, "상태가 R 인 프로세스 수 (stats.sh)")
 
         // 서버 uptime 차이가 있으면 그걸로 나눈다 — Mac 이 받은 시각(여기선 2초)은 ssh 왕복 편차가 섞인다
@@ -239,14 +239,14 @@ final class LinuxLiveTests: XCTestCase {
     }
 
     func testHealthOrder() {
-        var s = LinuxLiveSnapshot(at: Date())
-        XCTAssertEqual(LinuxHealth.judge(s).level, .good)
-        s.volumes = [LinuxVolume(device: "d", fsType: "ext4", size: 100, used: 85, available: 15, mountPoint: "/")]
-        XCTAssertEqual(LinuxHealth.judge(s).text, "공간이 차는 중")
+        var s = LiveSnapshot(at: Date())
+        XCTAssertEqual(LiveHealth.judge(s).level, .good)
+        s.volumes = [LiveVolume(device: "d", fsType: "ext4", size: 100, used: 85, available: 15, mountPoint: "/")]
+        XCTAssertEqual(LiveHealth.judge(s).text, "공간이 차는 중")
         s.pressure = .warning
-        XCTAssertEqual(LinuxHealth.judge(s).text, "메모리 압력 경고")
+        XCTAssertEqual(LiveHealth.judge(s).text, "메모리 압력 경고")
         s.pressure = .critical
-        XCTAssertEqual(LinuxHealth.judge(s).level, .bad)
+        XCTAssertEqual(LiveHealth.judge(s).level, .bad)
     }
 }
 
@@ -277,16 +277,16 @@ final class LinuxLiveExtrasTests: XCTestCase {
         XCTAssertEqual(raids[2].progress, "복구 12.6%")
         XCTAssertEqual(LinuxRAID.parse([]), [])
 
-        var s = LinuxLiveSnapshot(at: Date())
+        var s = LiveSnapshot(at: Date())
         s.raids = [raids[0]]
-        XCTAssertEqual(LinuxHealth.judge(s).level, .good)
+        XCTAssertEqual(LiveHealth.judge(s).level, .good)
         s.raids = raids
-        XCTAssertEqual(LinuxHealth.judge(s).text, "RAID 손상 · md1", "RAID 손상이 맨 먼저")
+        XCTAssertEqual(LiveHealth.judge(s).text, "RAID 손상 · md1", "RAID 손상이 맨 먼저")
         s.raids = [LinuxRAID(name: "md3", level: "raid1", active: true, members: [], failedMembers: 0, total: 2, working: 2, progress: "검사 3.0%",
                              checking: true, external: false)]
-        XCTAssertEqual(LinuxHealth.judge(s).level, .good, "매달 도는 정기 검사는 경고가 아니다")
+        XCTAssertEqual(LiveHealth.judge(s).level, .good, "매달 도는 정기 검사는 경고가 아니다")
         s.raids = [raids[2]]
-        XCTAssertEqual(LinuxHealth.judge(s).text, "RAID 손상 · md2")
+        XCTAssertEqual(LiveHealth.judge(s).text, "RAID 손상 · md2")
 
         let more = LinuxRAID.parse(["md127 : inactive sda[1](S) sdb[0](S)", "      5104 blocks super external:imsm",
                                     "md4 : active raid1 sdc1[1] sdd1[0]", "      100 blocks [2/2] [UU]", "        resync=PENDING",
@@ -313,7 +313,7 @@ final class LinuxLiveExtrasTests: XCTestCase {
         XCTAssertEqual(eth.tx, 1000)
         XCTAssertEqual(eth.speedMbps, 1000)
         XCTAssertNil(s.interfaces[2].speedMbps, "꺼진 랜카드는 속도 모름")
-        XCTAssertEqual(s.networkTotal, LinuxTraffic(rx: 2000, tx: 1000), "합계는 물리만 — tailscale0 은 같은 트래픽을 한 번 더 센다")
+        XCTAssertEqual(s.networkTotal, LiveTraffic(rx: 2000, tx: 1000), "합계는 물리만 — tailscale0 은 같은 트래픽을 한 번 더 센다")
         let odd = try XCTUnwrap(LinuxRaw.parse("@INFO\n@NET\neth1 1 up 4294967295 1 1\ntunl0 0 unknown - 1 1\n@END\n"))
         XCTAssertNil(odd.interfaces.first?.speedMbps, "옛 커널의 모름 값")
         XCTAssertFalse(odd.interfaces[1].shown, "Calico tunl0 은 VPN 이 아니다")
@@ -322,7 +322,7 @@ final class LinuxLiveExtrasTests: XCTestCase {
     func testDiskInfoFrequencyThrottle() throws {
         let text = "@INFO\n100\n4096\n@UP\n10.0 1.0\n@STAT\ncpu 1 0 1 10 0 0 0 0\ncpu0 1 0 1 10 0 0 0 0\n@BLK\nnvme0n1 0 0 2000409264 Samsung SSD 980 PRO 1TB\nsda 0 1 3907029168 WDC WD40EFRX\nloop0 0 0 100\nsdb 1 0 100 member\n@MD\n@FREQ\n3200000\n2400000\n@THROTTLE\n2\n1\n@PROC\n@END\n"
         let raw = try XCTUnwrap(LinuxRaw.parse(text))
-        XCTAssertEqual(raw.diskInfo["nvme0n1"], LinuxDiskInfo(rotational: false, size: 2_000_409_264 * 512, model: "Samsung SSD 980 PRO 1TB"), "모델에 공백")
+        XCTAssertEqual(raw.diskInfo["nvme0n1"], LiveDiskInfo(rotational: false, size: 2_000_409_264 * 512, model: "Samsung SSD 980 PRO 1TB"), "모델에 공백")
         XCTAssertEqual(raw.diskInfo["sda"]?.rotational, true, "HDD")
         XCTAssertNil(raw.diskInfo["loop0"], "loop 제외")
         XCTAssertNil(raw.diskInfo["sdb"], "RAID 구성원(slaves) 제외")

@@ -201,6 +201,41 @@ enum ConfigPattern {
     static let mac = #"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"#
 }
 
+/// servers.conf 한 줄의 문법 (파서와 편집기가 같이 쓴다): 뒤 주석 · 머리 줄 · 주석 줄 · 값에 쓸 수 없는 글자
+enum ConfigLine {
+    /// 뒤 주석(공백 뒤의 # 부터 줄 끝)을 뗀 글. 공백 없이 붙은 # 은 값이다 (role=a#b)
+    static func withoutTrailingComment(_ text: String) -> String {
+        var text = text
+        if let range = text.range(of: #"\s#.*$"#, options: .regularExpression) { text.removeSubrange(range) }
+        return text
+    }
+
+    /// 뒤 주석과 앞뒤 공백을 뗀 줄. 빈 줄 · 주석 줄(# 으로 시작)은 내용이 없는 줄이다
+    static func content(_ line: String) -> String {
+        withoutTrailingComment(line).trimmingCharacters(in: .whitespaces)
+    }
+
+    /// 머리 줄 "[이름]" 의 이름 (content 를 거친 줄에서). 머리가 아니면 nil
+    static func header(_ content: String) -> String? {
+        content.hasPrefix("[") && content.hasSuffix("]") ? String(content.dropFirst().dropLast()) : nil
+    }
+
+    /// 주석 줄 (들여 써도)
+    static func isComment(_ line: String) -> Bool {
+        line.trimmingCharacters(in: .whitespaces).hasPrefix("#")
+    }
+
+    static func isBlankOrComment(_ line: String) -> Bool {
+        let t = line.trimmingCharacters(in: .whitespaces)
+        return t.isEmpty || t.hasPrefix("#")
+    }
+
+    /// 값에 넣으면 줄 문법이 깨지는 글자가 있는가: # (뒤 주석) · [ (머리 줄) · 줄바꿈
+    static func breaksLine(_ value: String) -> Bool {
+        value.contains("#") || value.contains("[") || value.contains(where: \.isNewline)
+    }
+}
+
 public struct ConfigError: Error, CustomStringConvertible, Sendable {
     public let problem: String
     public let fix: String
@@ -230,15 +265,11 @@ public enum ServerConfigParser {
 
         for rawLine in text.replacingOccurrences(of: "\r\n", with: "\n").split(separator: "\n", omittingEmptySubsequences: false) {
             lineNumber += 1
-            var line = String(rawLine)
-            if let range = line.range(of: #"\s#.*$"#, options: .regularExpression) {
-                line.removeSubrange(range)
-            }
-            line = line.trimmingCharacters(in: .whitespaces)
+            let line = ConfigLine.content(String(rawLine))
             if line.isEmpty || line.hasPrefix("#") { continue }
 
-            if line.hasPrefix("["), line.hasSuffix("]") {
-                section = String(line.dropFirst().dropLast())
+            if let name = ConfigLine.header(line) {
+                section = name
                 if !section.hasPrefix("network:"), !section.hasPrefix("group:") {
                     guard section.range(of: ConfigPattern.key, options: .regularExpression) != nil else {
                         throw ConfigError(problem: "서버 키 '\(section)'는 소문자 영문·숫자·밑줄만 쓸 수 있습니다 (\(reference):\(lineNumber)).",
@@ -270,16 +301,24 @@ public enum ServerConfigParser {
         return try build(sections: sections, serverKeys: serverKeys, reference: reference)
     }
 
-    private static func build(sections: [String: [String: String]], serverKeys: [String], reference: String) throws -> ServerConfig {
-        func die(_ problem: String, _ fix: String) -> ConfigError {
+    /// 오류에 참조(파일 경로)를 붙인다 — 값 검사 함수들이 `throw die(문제, 해결)` 로 쓴다
+    private struct Failure {
+        let reference: String
+        func callAsFunction(_ problem: String, _ fix: String) -> ConfigError {
             ConfigError(problem: problem, fix: fix, reference: reference)
         }
-        func port(_ value: String) -> Int? {
-            // zsh 의 <1-65535> 패턴과 같이 부호·공백 없는 숫자만 허용한다
-            guard value.range(of: #"^[0-9]+$"#, options: .regularExpression) != nil,
-                  let n = Int(value), (1...65535).contains(n) else { return nil }
-            return n
-        }
+    }
+
+    private static func port(_ value: String) -> Int? {
+        // zsh 의 <1-65535> 패턴과 같이 부호·공백 없는 숫자만 허용한다
+        guard value.range(of: #"^[0-9]+$"#, options: .regularExpression) != nil,
+              let n = Int(value), (1...65535).contains(n) else { return nil }
+        return n
+    }
+
+    /// 읽은 줄 → 설정. 서버는 파일에 나온 순서로 하나씩 검사하고(첫 문제에서 멈춘다), 그룹 설정은 서버를 다 본 뒤.
+    private static func build(sections: [String: [String: String]], serverKeys: [String], reference: String) throws -> ServerConfig {
+        let die = Failure(reference: reference)
 
         var lan: LanNetwork?
         if let s = sections["network:lan"], let service = s["service"], !service.isEmpty {
@@ -290,137 +329,166 @@ public enum ServerConfigParser {
         var servers: [Server] = []
         var groups: [String] = []
         for key in serverKeys {
-            let s = sections[key] ?? [:]
-            for field in ["group", "type", "ip", "user", "port"] where (s[field] ?? "").isEmpty {
-                throw die("서버 '\(key)'에 \(field)= 가 없습니다.",
-                          "[\(key)] 블록에 \(field)= 를 추가하세요. 필수: group type ip user port")
-            }
-            let rawNetwork = s["network"] ?? ""
-            guard let network = rawNetwork.isEmpty ? .direct : ServerNetwork(rawValue: rawNetwork) else {
-                throw die("서버 '\(key)'의 network='\(rawNetwork)'는 지원하지 않습니다.",
-                          "network=tailscale · lan · vpn · direct(망 설정 없음) 중 하나로 바꾸거나 줄을 지우세요 (지우면 direct).")
-            }
-            guard let type = ServerType(rawValue: s["type"]!) else {
-                throw die("서버 '\(key)'의 type='\(s["type"]!)'는 지원하지 않습니다.", "type=linux · windows · openwrt 중 하나로 바꾸세요.")
-            }
-            // 형식은 편집기(ServerConfigEditor.problem)보다 느슨하게 받되(admin@corp 등), '-' 로 시작하면 ssh·ping 이 옵션으로 읽는다
-            // (가져온 파일의 user=-oProxyCommand=… 가 상태 확인 때 이 Mac 에서 명령을 돌린다)
-            for field in ["ip", "user"] where s[field]!.utf8.first == UInt8(ascii: "-") {
-                throw die("서버 '\(key)'의 \(field)='\(s[field]!)'는 '-' 로 시작해 쓸 수 없습니다.",
-                          "\(field)= 값을 고치세요 ('-' 로 시작하면 ssh 가 옵션으로 읽습니다).")
-            }
-            var extraUsers: [String] = []
-            for name in (s["extra_users"] ?? "").split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) }) where !name.isEmpty {
-                if name.utf8.first == UInt8(ascii: "-") {
-                    throw die("서버 '\(key)'의 extra_users= 의 '\(name)'는 '-' 로 시작해 쓸 수 없습니다.", "extra_users= 값을 고치세요 ('-' 로 시작하면 ssh 가 옵션으로 읽습니다).")
-                }
-                if name == s["user"] {
-                    throw die("서버 '\(key)'의 extra_users= 의 '\(name)'는 user= 와 같습니다.", "extra_users= 에는 user= 말고 다른 계정만 적으세요.")
-                }
-                if extraUsers.contains(name) {
-                    throw die("서버 '\(key)'의 extra_users= 에 '\(name)'가 두 번 있습니다.", "한 계정은 한 번만 적으세요.")
-                }
-                extraUsers.append(name)
-            }
-            let check: CheckMethod
-            if let raw = s["check"] {
-                guard let c = CheckMethod(rawValue: raw) else {
-                    throw die("서버 '\(key)'의 check='\(raw)'는 지원하지 않습니다.", "check=ssh (BatchMode 로그인) 또는 check=tcp (포트 열림) 로 바꾸세요.")
-                }
-                check = c
-            } else {
-                // Tailscale 은 Tailscale SSH 로 키 없이 로그인되지만, 내부망·Direct(VPN 너머 등)는 비밀번호 서버가 많아 ssh 확인이 늘 실패한다
-                // 공유기(openwrt)도 보통 비밀번호 로그인이다
-                check = (type == .windows || type == .openwrt || network != .tailscale) ? .tcp : .ssh
-            }
-            guard let p = port(s["port"]!) else {
-                throw die("서버 '\(key)'의 port='\(s["port"]!)'가 1~65535 범위가 아닙니다.", "port= 값을 고치세요.")
-            }
-            if network == .lan, lan == nil {
-                throw die("서버 '\(key)'는 network=lan 인데 [network:lan] service= 가 없습니다.",
-                          "[network:lan] 블록에 service=<macOS 네트워크 서비스 이름> 을 추가하세요.")
-            }
-            let mac = s["wol_mac"], via = s["wol_via"]
-            var wolRoutes: [WakeRoute] = []
-            if mac != nil || via != nil {
-                guard let mac, let via, !mac.isEmpty, !via.isEmpty else {
-                    throw die("서버 '\(key)'의 wol_mac= 과 wol_via= 는 함께 있어야 합니다.", "둘 다 적거나 둘 다 지우세요.")
-                }
-                guard mac.range(of: ConfigPattern.mac, options: .regularExpression) != nil else {
-                    throw die("서버 '\(key)'의 wol_mac='\(mac)'가 MAC 주소 형식(AA:BB:CC:DD:EE:FF)이 아닙니다.", "wol_mac= 값을 고치세요.")
-                }
-                for entry in via.split(separator: ",", omittingEmptySubsequences: false) {
-                    // "brume3:br-lan" 또는 "nexus"
-                    let parts = entry.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
-                    let routeVia = parts[0], iface = parts.count == 2 ? parts[1] : nil
-                    guard serverKeys.contains(routeVia) else {
-                        throw die("서버 '\(key)'의 wol_via= 의 '\(routeVia)'는 등록되지 않은 서버 키입니다.", "wol_via= 에 이 파일에 있는 다른 서버 키를 쉼표로 적으세요 (예: brume3:br-lan,nexus).")
-                    }
-                    if let iface, iface.range(of: WakeRoute.ifacePattern, options: .regularExpression) == nil {
-                        throw die("서버 '\(key)'의 wol_via= 의 인터페이스 '\(iface)'가 이름 형식(영문·숫자·._- 15자 이내)이 아닙니다.", "서버:인터페이스 로 적으세요 (예: brume3:br-lan).")
-                    }
-                    guard !wolRoutes.contains(where: { $0.via == routeVia }) else {
-                        throw die("서버 '\(key)'의 wol_via= 에 '\(routeVia)'가 두 번 있습니다.", "한 서버는 한 번만 적으세요.")
-                    }
-                    wolRoutes.append(WakeRoute(via: routeVia, iface: iface))
-                }
-            }
-            var proxyPort: Int?
-            if let raw = s["proxy_port"] {
-                guard let v = port(raw) else {
-                    throw die("서버 '\(key)'의 proxy_port='\(raw)'가 1~65535 범위가 아닙니다.", "proxy_port= 값을 고치세요 (예: 1080).")
-                }
-                proxyPort = v
-            }
-            var tunnelPorts: [QuickTunnel] = []
-            if let raw = s["tunnel_ports"] {
-                for entry in raw.split(separator: ",") {
-                    let text = entry.trimmingCharacters(in: .whitespaces)
-                    // "Jenkins:9090" 또는 "9090"
-                    let parts = text.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
-                    let name = parts.count == 2 ? parts[0] : nil
-                    let portText = parts.count == 2 ? parts[1] : text
-                    guard let v = port(portText), name?.isEmpty != true else {
-                        throw die("서버 '\(key)'의 tunnel_ports='\(raw)'에 잘못된 항목이 있습니다: '\(text)'", "이름:포트 또는 포트만, 쉼표로 구분하세요 (예: Jenkins:9090,8080).")
-                    }
-                    if !tunnelPorts.contains(where: { $0.port == v }) { tunnelPorts.append(QuickTunnel(name: name, port: v)) }
-                }
-            }
-            var notify = false
-            if let raw = s["notify"] {
-                guard raw == "on" || raw == "off" else {
-                    throw die("서버 '\(key)'의 notify='\(raw)'는 지원하지 않습니다.", "notify=on (켜짐·꺼짐 알림) 또는 notify=off 로 바꾸세요.")
-                }
-                notify = raw == "on"
-            }
-            // vpn= 은 network=vpn 의 VPN 이름 (빈 값·없음 = 연결된 첫 VPN). 다른 망에 적혀 있으면 무엇에 묶일지 헷갈리니 막는다
-            let vpn = s["vpn"].flatMap { $0.isEmpty ? nil : $0 }
-            if vpn != nil, network != .vpn {
-                throw die("서버 '\(key)'에 vpn= 이 있는데 network=\(network.rawValue) 입니다.",
-                          "network=vpn 으로 바꾸거나 vpn= 줄을 지우세요 (vpn= 은 network=vpn 에서만 씁니다).")
-            }
-            let group = s["group"]!
-            if !groups.contains(group) { groups.append(group) }
-            servers.append(Server(key: key, group: group, network: network, type: type, ip: s["ip"]!, user: s["user"]!,
-                                  port: p, check: check, role: s["role"], env: s["env"], wolMac: mac, wolRoutes: wolRoutes, proxyPort: proxyPort, tunnelPorts: tunnelPorts,
-                                  notify: notify, vpn: vpn, extraUsers: extraUsers))
+            let server = try server(key, sections[key] ?? [:], lan: lan, serverKeys: serverKeys, die: die)
+            if !groups.contains(server.group) { groups.append(server.group) }
+            servers.append(server)
         }
 
         var groupSettings: [String: GroupSettings] = [:]
         for group in groups {
-            let s = sections["group:\(group)"] ?? [:]
-            for field in ["db_port", "db_local"] {
-                if let v = s[field], !v.isEmpty, port(v) == nil {
-                    throw die("[group:\(group)] \(field)='\(v)'가 1~65535 범위가 아닙니다.", "\(field)= 값을 고치세요.")
-                }
-            }
-            if let jump = s["db_jump"], !jump.isEmpty, !serverKeys.contains(jump) {
-                throw die("[group:\(group)] db_jump='\(jump)'는 등록되지 않은 서버 키입니다.", "db_jump= 에 이 파일의 서버 키를 적으세요.")
-            }
-            groupSettings[group] = GroupSettings(dbJump: s["db_jump"], dbHost: s["db_host"],
-                                                 dbPort: s["db_port"].flatMap(port), dbLocal: s["db_local"].flatMap(port),
-                                                 dbName: s["db_name"])
+            groupSettings[group] = try self.groupSettings(group, sections["group:\(group)"] ?? [:], serverKeys: serverKeys, die: die)
         }
         return ServerConfig(servers: servers, groups: groups, lan: lan, groupSettings: groupSettings)
+    }
+
+    /// [키] 블록 하나 → 서버. 검사 순서가 곧 문제를 알리는 순서다 (ConfigPinTests.testServerErrorsAreReportedInOrder) — 칸을 보탤 때 사이에 끼우면 순서가 바뀐다.
+    private static func server(_ key: String, _ s: [String: String], lan: LanNetwork?, serverKeys: [String], die: Failure) throws -> Server {
+        for field in ["group", "type", "ip", "user", "port"] where (s[field] ?? "").isEmpty {
+            throw die("서버 '\(key)'에 \(field)= 가 없습니다.",
+                      "[\(key)] 블록에 \(field)= 를 추가하세요. 필수: group type ip user port")
+        }
+        let rawNetwork = s["network"] ?? ""
+        guard let network = rawNetwork.isEmpty ? .direct : ServerNetwork(rawValue: rawNetwork) else {
+            throw die("서버 '\(key)'의 network='\(rawNetwork)'는 지원하지 않습니다.",
+                      "network=tailscale · lan · vpn · direct(망 설정 없음) 중 하나로 바꾸거나 줄을 지우세요 (지우면 direct).")
+        }
+        guard let type = ServerType(rawValue: s["type"]!) else {
+            throw die("서버 '\(key)'의 type='\(s["type"]!)'는 지원하지 않습니다.", "type=linux · windows · openwrt 중 하나로 바꾸세요.")
+        }
+        // 형식은 편집기(ServerConfigEditor.problem)보다 느슨하게 받되(admin@corp 등), '-' 로 시작하면 ssh·ping 이 옵션으로 읽는다
+        // (가져온 파일의 user=-oProxyCommand=… 가 상태 확인 때 이 Mac 에서 명령을 돌린다)
+        for field in ["ip", "user"] where s[field]!.utf8.first == UInt8(ascii: "-") {
+            throw die("서버 '\(key)'의 \(field)='\(s[field]!)'는 '-' 로 시작해 쓸 수 없습니다.",
+                      "\(field)= 값을 고치세요 ('-' 로 시작하면 ssh 가 옵션으로 읽습니다).")
+        }
+        let extraUsers = try extraUsers(key, s["extra_users"], user: s["user"], die: die)
+        let check = try check(key, s["check"], type: type, network: network, die: die)
+        guard let p = port(s["port"]!) else {
+            throw die("서버 '\(key)'의 port='\(s["port"]!)'가 1~65535 범위가 아닙니다.", "port= 값을 고치세요.")
+        }
+        if network == .lan, lan == nil {
+            throw die("서버 '\(key)'는 network=lan 인데 [network:lan] service= 가 없습니다.",
+                      "[network:lan] 블록에 service=<macOS 네트워크 서비스 이름> 을 추가하세요.")
+        }
+        let mac = s["wol_mac"]
+        let wolRoutes = try wakeRoutes(key, mac: mac, via: s["wol_via"], serverKeys: serverKeys, die: die)
+        var proxyPort: Int?
+        if let raw = s["proxy_port"] {
+            guard let v = port(raw) else {
+                throw die("서버 '\(key)'의 proxy_port='\(raw)'가 1~65535 범위가 아닙니다.", "proxy_port= 값을 고치세요 (예: 1080).")
+            }
+            proxyPort = v
+        }
+        let tunnelPorts = try tunnelPorts(key, s["tunnel_ports"], die: die)
+        var notify = false
+        if let raw = s["notify"] {
+            guard raw == "on" || raw == "off" else {
+                throw die("서버 '\(key)'의 notify='\(raw)'는 지원하지 않습니다.", "notify=on (켜짐·꺼짐 알림) 또는 notify=off 로 바꾸세요.")
+            }
+            notify = raw == "on"
+        }
+        // vpn= 은 network=vpn 의 VPN 이름 (빈 값·없음 = 연결된 첫 VPN). 다른 망에 적혀 있으면 무엇에 묶일지 헷갈리니 막는다
+        let vpn = s["vpn"].flatMap { $0.isEmpty ? nil : $0 }
+        if vpn != nil, network != .vpn {
+            throw die("서버 '\(key)'에 vpn= 이 있는데 network=\(network.rawValue) 입니다.",
+                      "network=vpn 으로 바꾸거나 vpn= 줄을 지우세요 (vpn= 은 network=vpn 에서만 씁니다).")
+        }
+        return Server(key: key, group: s["group"]!, network: network, type: type, ip: s["ip"]!, user: s["user"]!,
+                      port: p, check: check, role: s["role"], env: s["env"], wolMac: mac, wolRoutes: wolRoutes, proxyPort: proxyPort, tunnelPorts: tunnelPorts,
+                      notify: notify, vpn: vpn, extraUsers: extraUsers)
+    }
+
+    /// extra_users= "deploy, admin" → 추가 계정 (적힌 순서). user= 와 같거나 겹치는 이름은 오류
+    private static func extraUsers(_ key: String, _ raw: String?, user: String?, die: Failure) throws -> [String] {
+        var extraUsers: [String] = []
+        for name in (raw ?? "").split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) }) where !name.isEmpty {
+            if name.utf8.first == UInt8(ascii: "-") {
+                throw die("서버 '\(key)'의 extra_users= 의 '\(name)'는 '-' 로 시작해 쓸 수 없습니다.", "extra_users= 값을 고치세요 ('-' 로 시작하면 ssh 가 옵션으로 읽습니다).")
+            }
+            if name == user {
+                throw die("서버 '\(key)'의 extra_users= 의 '\(name)'는 user= 와 같습니다.", "extra_users= 에는 user= 말고 다른 계정만 적으세요.")
+            }
+            if extraUsers.contains(name) {
+                throw die("서버 '\(key)'의 extra_users= 에 '\(name)'가 두 번 있습니다.", "한 계정은 한 번만 적으세요.")
+            }
+            extraUsers.append(name)
+        }
+        return extraUsers
+    }
+
+    /// check= 가 없으면 서버 종류와 망으로 정한다
+    private static func check(_ key: String, _ raw: String?, type: ServerType, network: ServerNetwork, die: Failure) throws -> CheckMethod {
+        if let raw {
+            guard let c = CheckMethod(rawValue: raw) else {
+                throw die("서버 '\(key)'의 check='\(raw)'는 지원하지 않습니다.", "check=ssh (BatchMode 로그인) 또는 check=tcp (포트 열림) 로 바꾸세요.")
+            }
+            return c
+        }
+        // Tailscale 은 Tailscale SSH 로 키 없이 로그인되지만, 내부망·Direct(VPN 너머 등)는 비밀번호 서버가 많아 ssh 확인이 늘 실패한다
+        // 공유기(openwrt)도 보통 비밀번호 로그인이다
+        return (type == .windows || type == .openwrt || network != .tailscale) ? .tcp : .ssh
+    }
+
+    /// wol_mac= · wol_via= "brume3:br-lan,nexus" → 깨우는 경로 (적힌 순서). 둘 다 없으면 빈 목록
+    private static func wakeRoutes(_ key: String, mac: String?, via: String?, serverKeys: [String], die: Failure) throws -> [WakeRoute] {
+        var wolRoutes: [WakeRoute] = []
+        if mac != nil || via != nil {
+            guard let mac, let via, !mac.isEmpty, !via.isEmpty else {
+                throw die("서버 '\(key)'의 wol_mac= 과 wol_via= 는 함께 있어야 합니다.", "둘 다 적거나 둘 다 지우세요.")
+            }
+            guard mac.range(of: ConfigPattern.mac, options: .regularExpression) != nil else {
+                throw die("서버 '\(key)'의 wol_mac='\(mac)'가 MAC 주소 형식(AA:BB:CC:DD:EE:FF)이 아닙니다.", "wol_mac= 값을 고치세요.")
+            }
+            for entry in via.split(separator: ",", omittingEmptySubsequences: false) {
+                // "brume3:br-lan" 또는 "nexus"
+                let parts = entry.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+                let routeVia = parts[0], iface = parts.count == 2 ? parts[1] : nil
+                guard serverKeys.contains(routeVia) else {
+                    throw die("서버 '\(key)'의 wol_via= 의 '\(routeVia)'는 등록되지 않은 서버 키입니다.", "wol_via= 에 이 파일에 있는 다른 서버 키를 쉼표로 적으세요 (예: brume3:br-lan,nexus).")
+                }
+                if let iface, iface.range(of: WakeRoute.ifacePattern, options: .regularExpression) == nil {
+                    throw die("서버 '\(key)'의 wol_via= 의 인터페이스 '\(iface)'가 이름 형식(영문·숫자·._- 15자 이내)이 아닙니다.", "서버:인터페이스 로 적으세요 (예: brume3:br-lan).")
+                }
+                guard !wolRoutes.contains(where: { $0.via == routeVia }) else {
+                    throw die("서버 '\(key)'의 wol_via= 에 '\(routeVia)'가 두 번 있습니다.", "한 서버는 한 번만 적으세요.")
+                }
+                wolRoutes.append(WakeRoute(via: routeVia, iface: iface))
+            }
+        }
+        return wolRoutes
+    }
+
+    /// tunnel_ports= "Jenkins:9090,8080" → 포트 목록 (같은 포트는 처음 것만)
+    private static func tunnelPorts(_ key: String, _ raw: String?, die: Failure) throws -> [QuickTunnel] {
+        var tunnelPorts: [QuickTunnel] = []
+        if let raw {
+            for entry in raw.split(separator: ",") {
+                let text = entry.trimmingCharacters(in: .whitespaces)
+                // "Jenkins:9090" 또는 "9090"
+                let parts = text.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+                let name = parts.count == 2 ? parts[0] : nil
+                let portText = parts.count == 2 ? parts[1] : text
+                guard let v = port(portText), name?.isEmpty != true else {
+                    throw die("서버 '\(key)'의 tunnel_ports='\(raw)'에 잘못된 항목이 있습니다: '\(text)'", "이름:포트 또는 포트만, 쉼표로 구분하세요 (예: Jenkins:9090,8080).")
+                }
+                if !tunnelPorts.contains(where: { $0.port == v }) { tunnelPorts.append(QuickTunnel(name: name, port: v)) }
+            }
+        }
+        return tunnelPorts
+    }
+
+    /// [group:이름] 블록 → 그룹 설정 (DB 터널)
+    private static func groupSettings(_ group: String, _ s: [String: String], serverKeys: [String], die: Failure) throws -> GroupSettings {
+        for field in ["db_port", "db_local"] {
+            if let v = s[field], !v.isEmpty, port(v) == nil {
+                throw die("[group:\(group)] \(field)='\(v)'가 1~65535 범위가 아닙니다.", "\(field)= 값을 고치세요.")
+            }
+        }
+        if let jump = s["db_jump"], !jump.isEmpty, !serverKeys.contains(jump) {
+            throw die("[group:\(group)] db_jump='\(jump)'는 등록되지 않은 서버 키입니다.", "db_jump= 에 이 파일의 서버 키를 적으세요.")
+        }
+        return GroupSettings(dbJump: s["db_jump"], dbHost: s["db_host"],
+                             dbPort: s["db_port"].flatMap(port), dbLocal: s["db_local"].flatMap(port),
+                             dbName: s["db_name"])
     }
 }

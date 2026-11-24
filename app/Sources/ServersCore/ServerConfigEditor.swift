@@ -51,7 +51,7 @@ public enum ServerConfigEditor {
         if let problem = extraUsersProblem(user: server.user, extras: server.extraUsers) { return problem }
         if !(1...65535).contains(server.port) { return "포트는 1~65535 사이여야 합니다" }
         for (label, value) in [("역할", server.role), ("태그", server.env), ("VPN 이름", server.vpn)] {
-            if let value, value.contains("#") || value.contains(where: \.isNewline) || value.contains("[") { return "\(label)에 # [ 줄바꿈은 쓸 수 없습니다" }
+            if let value, ConfigLine.breaksLine(value) { return "\(label)에 # [ 줄바꿈은 쓸 수 없습니다" }
         }
         return nil
     }
@@ -91,7 +91,7 @@ public enum ServerConfigEditor {
     /// 이미 있으면 ConfigError (서비스 바꾸기는 Intranet 화면 → lan.json).
     public static func addingLanService(_ service: String, to text: String, reference: String = "servers.conf") throws -> String {
         let name = service.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty, !name.contains("#"), !name.contains("["), !name.contains(where: \.isNewline) else {
+        guard !name.isEmpty, !ConfigLine.breaksLine(name) else {
             throw ConfigError(problem: "내부망 서비스 이름을 쓸 수 없습니다: '\(service)'", fix: "# [ 줄바꿈이 없는 서비스를 고르세요.", reference: reference)
         }
         let current = try ServerConfigParser.parse(text, reference: reference)
@@ -112,7 +112,7 @@ public enum ServerConfigEditor {
         if let first = all.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces).hasPrefix("[") }) {
             // 첫 블록 바로 위에 붙은 주석(빈 줄 없이)은 그 블록의 것 — 그 위에 넣는다. 파일 처음부터 이어진 주석은 머리 주석이라 그 뒤에.
             var at = first
-            while at > 0, all[at - 1].trimmingCharacters(in: .whitespaces).hasPrefix("#") { at -= 1 }
+            while at > 0, ConfigLine.isComment(all[at - 1]) { at -= 1 }
             if at == 0 { at = first }
             all.insert(block, at: at)   // 블록 뒤 빈 줄은 block 끝의 \n 이 만든다
             result = all.joined(separator: "\n")
@@ -255,14 +255,12 @@ public enum ServerConfigEditor {
     static func fieldValue(_ name: String, key: String, in all: [String]) -> String? {
         guard let span = blockSpan(key, in: all) else { return nil }
         guard let line = (span.header + 1..<span.next).last(where: { fieldName(all[$0]) == name }).map({ all[$0] }), let eq = line.firstIndex(of: "=") else { return nil }
-        var value = String(line[line.index(after: eq)...])
-        if let range = value.range(of: #"\s#.*$"#, options: .regularExpression) { value.removeSubrange(range) }
-        return value.trimmingCharacters(in: .whitespaces)
+        return ConfigLine.content(String(line[line.index(after: eq)...]))
     }
 
     static func fieldName(_ line: String) -> String? {
         let t = line.trimmingCharacters(in: .whitespaces)
-        guard !t.hasPrefix("#"), let eq = t.firstIndex(of: "=") else { return nil }
+        guard !ConfigLine.isComment(t), let eq = t.firstIndex(of: "=") else { return nil }
         return t[..<eq].trimmingCharacters(in: .whitespaces)
     }
 
@@ -274,11 +272,7 @@ public enum ServerConfigEditor {
 
     static func headerLines(in lines: [String]) -> [(name: String, line: Int)] {
         lines.enumerated().compactMap { i, raw in
-            var line = raw
-            if let range = line.range(of: #"\s#.*$"#, options: .regularExpression) { line.removeSubrange(range) }
-            line = line.trimmingCharacters(in: .whitespaces)
-            guard line.hasPrefix("["), line.hasSuffix("]") else { return nil }
-            return (String(line.dropFirst().dropLast()), i)
+            ConfigLine.header(ConfigLine.content(raw)).map { ($0, i) }
         }
     }
 
@@ -304,8 +298,7 @@ public enum ServerConfigEditor {
     }
 
     static func isBlankOrComment(_ line: String) -> Bool {
-        let t = line.trimmingCharacters(in: .whitespaces)
-        return t.isEmpty || t.hasPrefix("#")
+        ConfigLine.isBlankOrComment(line)
     }
 
     static func trimmed(_ value: String?) -> String? {

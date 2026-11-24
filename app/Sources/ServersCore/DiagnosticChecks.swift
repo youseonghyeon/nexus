@@ -9,6 +9,23 @@
 
 import Foundation
 
+// MARK: 공용 (이 Mac 의 진단 카드와 서버 Diagnose 탭이 같이 쓰는 문구 · 입력 검사)
+
+public enum DiagnosticText {
+    /// 이름이 안 풀렸을 때의 결과 줄 (ping · HTTP · 서버 쪽 ping · dns)
+    public static let unresolved = "이름을 찾지 못했습니다"
+}
+
+enum DiagnosticInput {
+    /// 앞뒤 공백을 지운 호스트(이름 · 주소): 영문·숫자·. - 와 extra 한 글자만, 253자까지. "-" 로 시작하면 옵션으로 읽히므로 거른다. 아니면 nil
+    static func host(_ input: String, extra: Character) -> String? {
+        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, text.count <= 253, !text.hasPrefix("-"),
+              text.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-" || $0 == extra) }) else { return nil }
+        return text
+    }
+}
+
 // MARK: TCP
 
 public struct TCPPortResult: Sendable, Equatable {
@@ -117,10 +134,7 @@ public struct DNSLookupResult: Sendable, Equatable {
 public enum DNSLookup {
     /// 이름: 영문·숫자·. - _ 만, "-" 로 시작하지 않게 (dig 옵션으로 읽히지 않게)
     public static func name(_ input: String) -> String? {
-        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, text.count <= 253, !text.hasPrefix("-"),
-              text.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-" || $0 == "_") }) else { return nil }
-        return text
+        DiagnosticInput.host(input, extra: "_")
     }
 
     /// dig +noall +comments +answer +stats 출력

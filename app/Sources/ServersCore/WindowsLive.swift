@@ -84,19 +84,19 @@ public struct WindowsRaw: Sendable, Equatable {
     /// MB (페이지 파일 전부의 합)
     public var pageTotal: UInt64 = 0
     public var pageUsed: UInt64 = 0
-    /// user · system(privileged) · idle 만 채운다 (LinuxCPUTicks 의 0 · 2 · 3 번 자리)
-    public var cpu: LinuxCPUTicks?
+    /// user · system(privileged) · idle 만 채운다 (LiveCPUTicks 의 0 · 2 · 3 번 자리)
+    public var cpu: LiveCPUTicks?
     /// 코어 번호순
-    public var cores: [LinuxCPUTicks] = []
+    public var cores: [LiveCPUTicks] = []
     public var processStamp: UInt64?
-    /// ticks = 누적 CPU 시간(100ns), rssPages = 전용 작업 집합(바이트 — 작업 관리자의 "메모리"), startTime = 만든 시각. Idle(pid 0)은 뺀다
-    public var processes: [LinuxProcessSample] = []
+    /// ticks = 누적 CPU 시간(100ns), memory = 전용 작업 집합(바이트 — 작업 관리자의 "메모리"), startTime = 만든 시각. Idle(pid 0)은 뺀다
+    public var processes: [LiveProcessSample] = []
     /// 키는 화면 이름: 드라이브 글자("C:" · "C: D:"), 없으면 "Disk 번호"
-    public var disks: [String: LinuxDiskCounter] = [:]
+    public var disks: [String: DiskCounters] = [:]
     public var diskStamp: UInt64?
-    public var diskInfo: [String: LinuxDiskInfo] = [:]
-    public var volumes: [LinuxVolume] = []
-    public var interfaces: [LinuxInterface] = []
+    public var diskInfo: [String: LiveDiskInfo] = [:]
+    public var volumes: [LiveVolume] = []
+    public var interfaces: [LiveInterface] = []
     public var networkStamp: UInt64?
     public var gpus: [LiveGPU] = []
     public init() {}
@@ -118,10 +118,10 @@ public struct WindowsRaw: Sendable, Equatable {
         if info.count > 1 { raw.model = info[1].trimmingCharacters(in: .whitespaces) }
         if info.count > 2 { raw.physicalCores = Int(info[2].trimmingCharacters(in: .whitespaces)).flatMap { $0 > 0 ? $0 : nil } }
 
-        var cores: [(order: [Int], ticks: LinuxCPUTicks)] = []
+        var cores: [(order: [Int], ticks: LiveCPUTicks)] = []
         for line in s["CPU"] ?? [] {
             guard let f = fields(line, 5), let idle = UInt64(f[1]), let user = UInt64(f[2]), let system = UInt64(f[3]) else { continue }
-            let ticks = LinuxCPUTicks([user, 0, system, idle])
+            let ticks = LiveCPUTicks([user, 0, system, idle])
             if f[0] == "_Total" { raw.cpu = ticks; continue }
             // 프로세서 그룹이 여럿이면 "0,3" 꼴 — 숫자 묶음으로 줄 세운다 (글자순이면 0 · 1 · 10 · 11 · 2)
             let order = f[0].split(separator: ",").compactMap { Int($0) }
@@ -141,7 +141,7 @@ public struct WindowsRaw: Sendable, Equatable {
             guard let f = fields(line, 7), let pid = Int(f[0]), pid != 0, let ticks = UInt64(f[1]) else { continue }
             // 같은 이름이 여럿이면 "svchost#17" 로 온다 — 번호는 뗀다
             let name = f[6].range(of: #"#\d+$"#, options: .regularExpression).map { String(f[6][..<$0.lowerBound]) } ?? f[6]
-            raw.processes.append(LinuxProcessSample(pid: pid, state: "", ticks: ticks, threads: Int(f[4]) ?? 1, rssPages: UInt64(f[2]) ?? 0,
+            raw.processes.append(LiveProcessSample(pid: pid, state: "", ticks: ticks, threads: Int(f[4]) ?? 1, memory: UInt64(f[2]) ?? 0,
                                                     startTime: UInt64(f[5]) ?? 0, command: name))
         }
 
@@ -155,26 +155,26 @@ public struct WindowsRaw: Sendable, Equatable {
             guard let index = parts.first.flatMap({ Int($0) }) else { continue }
             let name = parts.count > 1 ? parts[1] : "Disk \(index)"
             diskNames[index] = name
-            raw.disks[name] = LinuxDiskCounter(reads: reads, writes: writes, bytesRead: bytesRead, bytesWritten: bytesWritten)
+            raw.disks[name] = DiskCounters(bytesRead: bytesRead, bytesWritten: bytesWritten, opsRead: reads, opsWritten: writes)
         }
         for line in s["BLK"] ?? [] {
             guard let f = fields(line, 6), let index = Int(f[0]) else { continue }
             let model = f[5].trimmingCharacters(in: .whitespaces)
             let health = Int(f[4])
-            raw.diskInfo[diskNames[index] ?? "Disk \(index)"] = LinuxDiskInfo(
+            raw.diskInfo[diskNames[index] ?? "Disk \(index)"] = LiveDiskInfo(
                 rotational: f[1] == "3" ? true : (f[1] == "4" ? false : nil), size: UInt64(f[3]) ?? 0, model: model.isEmpty ? nil : model,
                 healthy: health == 0 ? true : (health == 1 || health == 2 ? false : nil))
         }
         for line in s["VOL"] ?? [] {
             guard let f = fields(line, 5), let size = UInt64(f[1]), size > 0, let free = UInt64(f[2]), free <= size else { continue }
-            raw.volumes.append(LinuxVolume(device: f[4], fsType: f[3], size: size, used: size - free, available: free, mountPoint: f[0]))
+            raw.volumes.append(LiveVolume(device: f[4], fsType: f[3], size: size, used: size - free, available: free, mountPoint: f[0]))
         }
         for line in s["NET"] ?? [] {
             guard let f = fields(line, 5), let rx = UInt64(f[0]), let tx = UInt64(f[1]) else { continue }
             raw.networkStamp = UInt64(f[3])
             // 카운터에 나오는 것은 실제 어댑터뿐이다 (Hyper-V 가상 스위치는 따로 센다)
-            raw.interfaces.append(LinuxInterface(name: f[4], physical: true, state: "up",
-                                                 speedMbps: UInt64(f[2]).flatMap { $0 > 0 ? Int($0 / 1_000_000) : nil }.flatMap { $0 > 0 && $0 <= 400_000 ? $0 : nil },
+            raw.interfaces.append(LiveInterface(name: f[4], physical: true, state: "up",
+                                                 speedMbps: UInt64(f[2]).flatMap { $0 > 0 ? Int($0 / 1_000_000) : nil }.flatMap(LiveInterface.knownSpeed),
                                                  rxBytes: rx, txBytes: tx))
         }
         raw.gpus = (s["GPU"] ?? []).compactMap(LiveGPU.parse)
@@ -183,13 +183,13 @@ public struct WindowsRaw: Sendable, Equatable {
 }
 
 /// 직전 표본과의 차이로 CPU·디스크·네트워크 속도·프로세스 %CPU 를 낸다. 첫 표본은 차이가 없어 그 값들이 빈다.
-/// 화면이 리눅스와 같아 결과는 LinuxLiveSnapshot (system = .windows — 부하·iowait·캐시처럼 Windows 에 없는 줄은 화면이 뺀다).
+/// 화면이 리눅스와 같아 결과는 리눅스와 같은 LiveSnapshot (system = .windows — 부하·iowait·캐시처럼 Windows 에 없는 줄은 화면이 뺀다).
 public struct WindowsLiveSampler: Sendable {
     private var last: WindowsRaw?
     public init() {}
 
-    public mutating func step(_ raw: WindowsRaw, at: Date) -> LinuxLiveSnapshot {
-        var snapshot = LinuxLiveSnapshot(at: at)
+    public mutating func step(_ raw: WindowsRaw, at: Date) -> LiveSnapshot {
+        var snapshot = LiveSnapshot(at: at)
         snapshot.system = .windows
         snapshot.model = raw.model
         snapshot.cores = raw.cores.count
@@ -197,7 +197,7 @@ public struct WindowsLiveSampler: Sendable {
         snapshot.uptime = raw.uptime
         if raw.memoryTotal > 0 {
             let total = raw.memoryTotal * 1024, available = min(raw.memoryAvailable, raw.memoryTotal) * 1024
-            let memory = LinuxMemory(total: total, used: total - available, shared: 0, buffers: 0, cache: 0, free: available, available: available,
+            let memory = LiveMemory(total: total, used: total - available, shared: 0, buffers: 0, cache: 0, free: available, available: available,
                                      swapTotal: raw.pageTotal * 1_048_576, swapUsed: min(raw.pageUsed, raw.pageTotal) * 1_048_576)
             snapshot.memory = memory
             snapshot.pressure = memory.pressure(psiSome: nil, psiFull: nil)   // PSI 가 없다 — 남은 메모리 5% · 10% 미만
@@ -213,43 +213,27 @@ public struct WindowsLiveSampler: Sendable {
             guard let old, let new, new > old else { return 0 }
             return Double(new - old) / WindowsRaw.ticksPerSecond
         }
-        var oldTicks: [String: UInt64] = [:]
         var processSeconds = 0.0
         if let last {
             if let a = last.cpu, let b = raw.cpu {
-                snapshot.cpu = LinuxCPUUsage.between(a, b, oldCores: last.cores, newCores: raw.cores)
+                snapshot.cpu = LiveCPUUsage.between(a, b, oldCores: last.cores, newCores: raw.cores)
             }
-            let old = last.disks.mapValues { DiskCounters(bytesRead: $0.bytesRead, bytesWritten: $0.bytesWritten, opsRead: $0.reads, opsWritten: $0.writes) }
-            let new = raw.disks.mapValues { DiskCounters(bytesRead: $0.bytesRead, bytesWritten: $0.bytesWritten, opsRead: $0.reads, opsWritten: $0.writes) }
-            if let rates = DiskIO.rates(old, new, seconds: seconds(last.diskStamp, raw.diskStamp)) {
+            if let rates = DiskIO.rates(last.disks, raw.disks, seconds: seconds(last.diskStamp, raw.diskStamp)) {
                 snapshot.disk = rates.total
                 snapshot.perDisk = rates.perDisk
             }
             let networkSeconds = seconds(last.networkStamp, raw.networkStamp)
             if networkSeconds > 0 {
-                let before = Dictionary(last.interfaces.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
-                var totalRx = 0.0, totalTx = 0.0
-                for i in raw.interfaces {
-                    guard let old = before[i.name] else { continue }
-                    let rx = i.rxBytes >= old.rxBytes ? Double(i.rxBytes - old.rxBytes) / networkSeconds : 0
-                    let tx = i.txBytes >= old.txBytes ? Double(i.txBytes - old.txBytes) / networkSeconds : 0
-                    snapshot.interfaces.append(LinuxInterfaceRate(name: i.name, physical: i.physical, state: i.state, speedMbps: i.speedMbps, rx: rx, tx: tx))
-                    totalRx += rx; totalTx += tx
-                }
-                snapshot.networkTotal = LinuxTraffic(rx: totalRx, tx: totalTx)
+                // 온 어댑터를 전부 싣고 전부 더한다
+                let network = LiveInterfaceRate.rates(from: last.interfaces, to: raw.interfaces, seconds: networkSeconds, counted: { _ in true })
+                snapshot.interfaces = network.interfaces
+                snapshot.networkTotal = network.total
             }
             processSeconds = seconds(last.processStamp, raw.processStamp)
-            for p in last.processes { oldTicks["\(p.pid):\(p.startTime)"] = p.ticks }
         }
         // %CPU = ΔCPU 시간 / Δ시각 × 100 (코어 하나 = 100). pid 재사용은 만든 시각으로 가른다.
-        snapshot.processes = raw.processes.map { p in
-            var cpu = 0.0
-            if processSeconds > 0, let before = oldTicks["\(p.pid):\(p.startTime)"], p.ticks >= before {
-                cpu = Double(p.ticks - before) / WindowsRaw.ticksPerSecond / processSeconds * 100
-            }
-            return LinuxProcessRow(pid: p.pid, cpu: cpu, memory: p.rssPages, state: p.state, threads: p.threads,
-                                   cpuTime: Double(p.ticks) / WindowsRaw.ticksPerSecond, command: p.command)
-        }.sorted { ($0.cpu, $0.memory, $1.pid) > ($1.cpu, $1.memory, $0.pid) }
+        snapshot.processes = LiveProcessRow.rows(raw.processes, since: last?.processes ?? [], ticksPerSecond: WindowsRaw.ticksPerSecond,
+                                                 percent: processSeconds > 0 ? { $0 / WindowsRaw.ticksPerSecond / processSeconds * 100 } : nil)
         last = raw
         return snapshot
     }
