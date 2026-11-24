@@ -53,6 +53,17 @@ final class BrowserPolicyTests: XCTestCase {
         XCTAssertNil(BrowserPolicy.loopback(fromAlias: "example.com"))
     }
 
+    /// 인증서 확인을 건너뛰는 것은 서버 자신의 루프백(별칭)뿐 — 진짜 이름·IP·별칭 흉내는 평소대로 확인
+    func testOnlyLoopbackAliasSkipsCertificateCheck() {
+        for host in ["localhost.server.localhost", "127-0-0-1.server.localhost", "127-0-0-53.server.localhost", "LOCALHOST.Server.Localhost"] {
+            XCTAssertTrue(BrowserPolicy.acceptsUnverifiedCertificate(host: host), host)
+        }
+        for host in ["localhost", "127.0.0.1", "example.com", "192.0.2.10", "10-0-0-5.server.localhost", "evil.server.localhost", "server.localhost",
+                     "localhost.server.localhost.example.com", "example.com.server.localhost", ""] {
+            XCTAssertFalse(BrowserPolicy.acceptsUnverifiedCertificate(host: host), host)
+        }
+    }
+
     func testOpenableSchemes() {
         for yes in ["http://a/", "https://a/", "ws://a/", "wss://a/", "about:blank", "data:text/html,hi", "blob:http://a/1"] {
             XCTAssertTrue(BrowserPolicy.isOpenable(URL(string: yes)!), yes)

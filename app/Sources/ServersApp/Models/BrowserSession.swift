@@ -426,6 +426,15 @@ extension BrowserSession: WKNavigationDelegate {
         navigationResponse.canShowMIMEType ? .allow : .download
     }
 
+    /// 서버 인증서 확인: 서버 자신의 루프백(별칭 이름)으로 붙을 때만 받아들인다 — 이름을 앱이 바꿨으니 맞는 인증서가 있을 수 없다 (BrowserPolicy).
+    /// 그 밖의 주소와 다른 인증 요청(기본 인증 · 클라이언트 인증서)은 WebKit 이 평소대로 처리한다.
+    func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        let space = challenge.protectionSpace
+        guard space.authenticationMethod == NSURLAuthenticationMethodServerTrust, let trust = space.serverTrust,
+              BrowserPolicy.acceptsUnverifiedCertificate(host: space.host) else { return (.performDefaultHandling, nil) }
+        return (.useCredential, URLCredential(trust: trust))
+    }
+
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) { download.delegate = self }
     func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) { download.delegate = self }
 

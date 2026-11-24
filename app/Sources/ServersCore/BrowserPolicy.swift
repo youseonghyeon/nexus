@@ -42,6 +42,13 @@ public enum BrowserPolicy {
         return isLoopback(original) ? original : nil
     }
 
+    /// 인증서를 확인하지 않고 받아들일 호스트인가: 서버 자신의 루프백(별칭 이름)뿐.
+    /// 앱이 이름을 별칭으로 바꿔 붙으므로 어떤 인증서도 이름이 맞을 수 없고, 상대가 그 서버라는 것은 ssh 가 이미 보증한다 (ssh -D → 서버 안의 127.0.0.1).
+    /// 그 밖(서버가 닿는 다른 내부 서버 · 인터넷)은 평소대로 확인한다 (2026-11-23 — 80 → https://localhost/ 가 탭에서 인증서 오류로 멈췄다).
+    public static func acceptsUnverifiedCertificate(host: String) -> Bool {
+        loopback(fromAlias: host) != nil
+    }
+
     /// 웹 주소(http·https·ws·wss)인가 — 별칭 바꾸기는 이 스킴에만 한다
     public static func isWeb(_ url: URL) -> Bool {
         ["http", "https", "ws", "wss"].contains(url.scheme?.lowercased() ?? "")
