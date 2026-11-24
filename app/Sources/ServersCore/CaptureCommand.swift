@@ -67,3 +67,14 @@ public enum CaptureCommand {
         return out
     }
 }
+
+extension CaptureCommand {
+    /// 캡처가 스스로 끝났을 때 화면에 보일 문장. 먼저 받은 데이터의 문제(pipelineFailure), 다음 tcpdump 표준 오류의 이유, 없으면 종료 코드
+    public static func endText(pipelineFailure: String?, stderr: String, code: Int32) -> String {
+        if let pipelineFailure { return pipelineFailure }
+        if let reason = failureReason(stderr) {
+            return reason.contains("password") || reason.contains("sudo") ? "관리자 인증을 받지 못했습니다 (\(reason))" : reason
+        }
+        return "캡처가 끝났습니다 (종료 코드 \(code))"
+    }
+}

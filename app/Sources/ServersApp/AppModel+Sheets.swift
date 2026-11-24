@@ -13,6 +13,10 @@ extension AppModel {
     func closeAddServerPrompt() { addServerPrompt = nil }
     func closeServerEditor() { serverEditor = nil }
     func closeQueryResult() { queryResult = nil }
+    /// 토스트 닫기 (누르거나 5초 뒤)
+    func dismissStatus() { statusMessage = nil }
+    /// 확인 창 닫기. 동작을 실행할 때도 먼저 닫고 실행한다 (동작이 다음 확인 창을 띄울 수 있다)
+    func dismissConfirm() { pendingConfirm = nil }
 
     /// 사이드바 목록의 선택 (nil = 선택 해제)
     func select(key: String?) { selectedKey = key }

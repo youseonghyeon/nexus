@@ -216,13 +216,7 @@ final class PacketCaptureController: ObservableObject {
             start(askPass: true)
             return
         }
-        if let problem = pipeline.status.failure {
-            state = .failed(problem)
-        } else if let reason = CaptureCommand.failureReason(stderr) {
-            state = .failed(reason.contains("password") || reason.contains("sudo") ? "관리자 인증을 받지 못했습니다 (\(reason))" : reason)
-        } else {
-            state = .failed("캡처가 끝났습니다 (종료 코드 \(code))")
-        }
+        state = .failed(CaptureCommand.endText(pipelineFailure: pipeline.status.failure, stderr: stderr, code: code))
     }
 
     private func startRefresh() {

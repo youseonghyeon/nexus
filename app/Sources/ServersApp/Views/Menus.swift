@@ -3,7 +3,7 @@
 import ServersCore
 import SwiftUI
 
-/// Server 메뉴(메뉴바)와 사이드바 우클릭이 공유하는 항목.
+/// Server 메뉴(메뉴바)의 항목. 사이드바 우클릭은 따로 조립한다 (ServerContextMenu — SidebarRows.swift, 항목이 서로 다르다).
 struct ServerActionsMenu: View {
     @Environment(AppModel.self) private var model
 

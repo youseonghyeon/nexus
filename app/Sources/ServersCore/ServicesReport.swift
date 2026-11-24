@@ -520,3 +520,14 @@ public enum ServicesFormat {
             .compactMap { $0 }.joined(separator: " · ")
     }
 }
+
+extension ServiceLog {
+    /// 로그 창에 보일 줄. 실패하면 오류 출력까지 붙여 보이고, 아무것도 못 받았으면 "로그 없음" 이 아니라 실패로 (인증 취소 · 접속 실패).
+    /// stripANSI: docker 로그처럼 색 코드가 섞여 오는 출력
+    public static func displayLines(_ result: CommandResult, stripANSI strip: Bool) -> [String] {
+        let text = result.ok ? result.stdout : result.stdout + result.stderr
+        let lines = RemoteCommands.outputLines(strip ? stripANSI(text) : text, type: .linux)
+        let empty = result.ok ? "(로그가 없습니다)" : "로그를 가져오지 못했습니다 (exit \(result.exitCode))"
+        return lines.isEmpty ? [empty] : lines
+    }
+}

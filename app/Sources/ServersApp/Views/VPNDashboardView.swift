@@ -8,23 +8,13 @@ import ServersCore
 import SwiftUI
 
 extension SystemVPN {
-    var tone: StatusTone {
-        switch state {
-        case .connected: return .good
-        case .connecting, .disconnecting: return .warn
-        default: return .muted
-        }
-    }
+    var tone: StatusTone { StatusTone(level) }
 }
 
 struct VPNDashboardView: View {
     @Environment(AppModel.self) private var model
 
-    static func tone(_ vpns: [SystemVPN]) -> StatusTone {
-        if vpns.contains(where: { $0.state == .connected }) { return .good }
-        if vpns.contains(where: { $0.state == .connecting || $0.state == .disconnecting }) { return .warn }
-        return .muted
-    }
+    static func tone(_ vpns: [SystemVPN]) -> StatusTone { StatusTone(SystemVPN.overallLevel(vpns)) }
 
     private var connected: [SystemVPN] { (model.vpns ?? []).filter { $0.state == .connected } }
 

@@ -40,22 +40,9 @@ struct DiskDashboardView: View {
     }
 
     /// "APPLE SSD AP0512Z · 500 GB · 내장 SSD · Apple Fabric · disk0 → disk3"
-    private var subtitle: String {
-        guard let disk = monitor.bootDisk else { return "이 Mac 의 디스크" }
-        var parts = [disk.name, DiskFormat.bytes(disk.size), diskKind(disk)]
-        if let bus = disk.bus { parts.append(bus) }
-        if let container = monitor.rootContainer { parts.append("\(disk.id) → \(container.id)") }
-        return parts.joined(separator: " · ")
-    }
+    private var subtitle: String { PhysicalDisk.subtitle(boot: monitor.bootDisk, rootContainer: monitor.rootContainer?.id) }
 
-    private func diskKind(_ disk: PhysicalDisk) -> String {
-        let place = disk.isDiskImage ? "이미지" : (disk.isInternal ? "내장" : "외장")
-        switch disk.solidState {
-        case true?: return "\(place) SSD"
-        case false?: return "\(place) HDD"
-        case nil: return place
-        }
-    }
+    private func diskKind(_ disk: PhysicalDisk) -> String { disk.kindText }
 
     // MARK: 수치 타일
 

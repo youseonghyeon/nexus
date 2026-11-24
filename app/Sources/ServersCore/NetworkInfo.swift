@@ -187,3 +187,19 @@ public enum NetworkInfoFetcher {
         return (configuration, ip, mask, router)
     }
 }
+
+// MARK: Wi-Fi 화면의 주소 (명령은 AppModel.fetchNetworkInfoIfSelected 가 돌리고, 여기는 출력 → 값)
+
+extension NetworkInfoFetcher {
+    /// `ipconfig getifaddr <장치>` 의 결과 → 그 장치의 주소. 실패했거나 비었으면 nil
+    public static func parseIfAddr(_ result: CommandResult) -> String? {
+        let ip = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return result.ok && !ip.isEmpty ? ip : nil
+    }
+
+    /// Wi-Fi 주소 카드의 값: IP 는 장치에 실제로 붙은 주소(actualIP)를 먼저, 없으면 서비스 설정(-getinfo)의 주소. 나머지는 서비스 설정
+    public static func wifiAddress(getInfo text: String, actualIP: String?) -> (ip: String?, subnet: String?, router: String?, configuration: String?) {
+        let info = parseGetInfo(text)
+        return (ip: actualIP ?? info.ip, subnet: info.mask, router: info.router, configuration: info.configuration)
+    }
+}

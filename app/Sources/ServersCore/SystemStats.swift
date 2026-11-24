@@ -486,3 +486,13 @@ public enum SystemFormat {
         return hours > 0 ? String(format: "%d:%02d:%02d", hours, minutes, secs) : String(format: "%d:%02d", minutes, secs)
     }
 }
+
+extension SystemSnapshot {
+    /// 사이드바 System 행의 아래 줄: "CPU 12% · 메모리 63%". 첫 표본 전(nil)은 "확인 중…", 값을 못 낸 칸은 "–"
+    public static func sidebarSummary(_ snapshot: SystemSnapshot?) -> String {
+        guard let snapshot else { return "확인 중…" }
+        let cpu = snapshot.cpu.map { "CPU \(Int($0.total.rounded()))%" } ?? "CPU –"
+        let memory = snapshot.memory.map { "메모리 \(Int(($0.usedFraction * 100).rounded()))%" } ?? "메모리 –"
+        return "\(cpu) · \(memory)"
+    }
+}

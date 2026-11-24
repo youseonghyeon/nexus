@@ -195,27 +195,12 @@ struct EthernetDashboardView: View {
     }
 
     private func conclusion(_ adapter: EthernetAdapter?) -> String {
-        guard model.ethernet != nil else { return "확인 중…" }
-        guard let adapter else { return "연결 안 됨" }
-        switch adapter.link {   // 서비스 판정 하나
-        case .connected: return "연결됨"
-        case .noLink: return "링크 없음"
-        default: return adapter.link.shortText
-        }
+        StatusText.ethernetConclusion(loaded: model.ethernet != nil, primary: adapter)   // 서비스 판정 하나
     }
 
-    /// 주소가 없으면 NIC 의 링크는 이 서비스 것이 아니다 (같은 NIC 의 다른 서비스가 그 선을 쓴다) — "–"
-    private func linkText(_ adapter: EthernetAdapter) -> String {
-        switch adapter.state {
-        case .noLink: return "링크 없음"
-        case .noAddress: return "–"
-        case .connected: return adapter.interface.media ?? "연결됨"
-        }
-    }
+    private func linkText(_ adapter: EthernetAdapter) -> String { StatusText.ethernetLinkText(adapter) }
 
     private func ipText(_ adapter: EthernetAdapter) -> String {
-        guard let ip = adapter.address else { return "–" }   // 이 서비스의 IP (같은 장치의 다른 서비스 주소가 아니라)
-        let prefix = adapter.netmask.flatMap(NetworkInfoFetcher.prefixLength(mask:)).map { "/\($0)" } ?? ""
-        return ip + prefix
+        StatusText.addressText(ip: adapter.address, mask: adapter.netmask)   // 이 서비스의 IP (같은 장치의 다른 서비스 주소가 아니라)
     }
 }

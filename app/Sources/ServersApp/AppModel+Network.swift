@@ -169,15 +169,13 @@ extension AppModel {
             wifi.requestLocationIfNeeded()
             if !inRound { wifi.refresh() }   // 라운드에선 refreshNow 가 방금 읽었다
             let service = NetworkInfoFetcher.serviceName(forDevice: wifi.info?.interface, in: inRound ? lanServices : await NetworkInfoFetcher.services(runner: runner))
-            let info = NetworkInfoFetcher.parseGetInfo(await runner.run("networksetup", ["-getinfo", service], timeout: 5).stdout)
+            let getInfo = await runner.run("networksetup", ["-getinfo", service], timeout: 5).stdout
             var actual: String?
             if let device = wifi.info?.interface, wifi.info?.associated == true {
-                let r = await runner.run("ipconfig", ["getifaddr", device], timeout: 5)
-                let ip = r.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-                if r.ok, !ip.isEmpty { actual = ip }
+                actual = NetworkInfoFetcher.parseIfAddr(await runner.run("ipconfig", ["getifaddr", device], timeout: 5))
             }
             // 튜플은 비교가 안 돼 같은 값을 매 라운드 다시 쓰면 화면이 다시 그려진다 — 바뀔 때만
-            let address = (ip: actual ?? info.ip, subnet: info.mask, router: info.router, configuration: info.configuration)
+            let address = NetworkInfoFetcher.wifiAddress(getInfo: getInfo, actualIP: actual)
             if wifiAddress != address { wifiAddress = address }
             await refreshDefaultRoute()
             dnsConfig = await DNSConfig.fetch(runner: runner)

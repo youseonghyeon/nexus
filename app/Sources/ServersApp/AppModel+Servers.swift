@@ -142,8 +142,7 @@ extension AppModel {
     func unregisteredTailscalePeers() async -> [TailscalePeer] {
         let result = await runner.run("tailscale", ["status", "--json"], timeout: 5)
         guard result.ok else { return [] }
-        let registered = Set(config?.servers.map(\.ip) ?? [])
-        return TailscalePeers.parse(result.stdout).filter { !registered.contains($0.ip) }
+        return TailscalePeers.unregistered(result.stdout, registeredIPs: Set(config?.servers.map(\.ip) ?? []))
     }
 
     /// 서버 추가·편집 창이 Ping·포트 확인을 묶을 장치 (ServerFormCheck.bindDevice — 스냅숏에 없는 VPN 은 지금 읽고,
@@ -254,10 +253,7 @@ extension AppModel {
         writeNotes(NoteVault.renamingServer(from: old, to: new, in: notes))   // 메모·로그인
         saveHistory(ServerHistory.renamingServer(from: old, to: new, in: history))   // 변경 이력
         let aliases = HostAliasStore.renaming(from: old, to: new, in: hostAliases)
-        if aliases != hostAliases {
-            hostAliases = aliases
-            do { try HostAliasStore.save(aliases) } catch { statusMessage = "주소 배정표 저장 실패: \(error.localizedDescription)" }
-        }
+        if aliases != hostAliases { saveHostAliases(aliases) }
         // Chrome 프록시 프로필 (로그인·방문 기록). 프록시가 떠 있으면 Chrome 이 쓰는 중일 수 있고, 새 이름에 이미 있으면 덮지 않는다 — 옛 이름에 남기고 알린다
         let profile = ChromeProxy.profileDir(serverKey: old), target = ChromeProxy.profileDir(serverKey: new)
         if FileManager.default.fileExists(atPath: profile.path) {

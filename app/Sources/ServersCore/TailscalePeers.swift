@@ -43,3 +43,10 @@ public enum TailscalePeers {
         return list.sorted { ($0.online ? 0 : 1, $0.name.lowercased()) < ($1.online ? 0 : 1, $1.name.lowercased()) }
     }
 }
+
+extension TailscalePeers {
+    /// 서버 추가 창의 [피어에서 고르기]: `tailscale status --json` 의 피어 중 아직 등록하지 않은 것 (서버 목록의 IP 와 견준다)
+    public static func unregistered(_ json: String, registeredIPs: Set<String>) -> [TailscalePeer] {
+        parse(json).filter { !registeredIPs.contains($0.ip) }
+    }
+}

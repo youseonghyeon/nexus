@@ -70,3 +70,10 @@ public enum PrivilegedOutcome: Sendable, Equatable {
         }
     }
 }
+
+extension LanCommands {
+    /// 관리자 스크립트가 실패했을 때 문구에 붙일 꼬리: 출력(표준 출력 + 오류)의 마지막 두 줄을 " · " 로 (빈 줄은 뺀다)
+    public static func failureTail(_ result: CommandResult) -> String {
+        RemoteCommands.cleanOutput(result.stdout + result.stderr, type: .linux).filter { !$0.isEmpty }.suffix(2).joined(separator: " · ")
+    }
+}

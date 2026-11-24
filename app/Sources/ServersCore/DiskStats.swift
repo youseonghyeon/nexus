@@ -393,3 +393,11 @@ public enum DiskProbe {
         return result.ok ? LocalSnapshots.parse(result.stdout) : nil
     }
 }
+
+extension StorageUsage {
+    /// 사이드바 Disk 행의 아래 줄: "120 GB 남음 · 76% 사용". 아직 못 읽었으면(nil) "확인 중…"
+    public static func sidebarSummary(_ storage: StorageUsage?) -> String {
+        guard let storage else { return "확인 중…" }
+        return "\(DiskFormat.bytes(storage.free)) 남음 · \(Int((storage.usedFraction * 100).rounded()))% 사용"
+    }
+}

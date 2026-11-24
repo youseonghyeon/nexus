@@ -63,9 +63,8 @@ struct WiFiDashboardView: View {
         if wifi.info?.powerOn != true {
             Text("Wi-Fi 가 꺼져 있습니다.").foregroundStyle(.secondary)
         } else if wifi.nearby.isEmpty {
-            Text(wifi.scanning || wifi.nearbyAt == nil && !wifi.scanFailed ? "검색 중…"
-                 : wifi.scanFailed ? "주변 네트워크를 검색하지 못했습니다 · 다시 검색하세요"
-                 : (wifi.locationAuthorized ? "주변 네트워크가 없습니다." : "위치 권한이 없어 네트워크 이름을 읽지 못했습니다."))
+            Text(StatusText.wifiNearbyEmptyText(scanning: wifi.scanning, scanned: wifi.nearbyAt != nil, failed: wifi.scanFailed,
+                                                locationAuthorized: wifi.locationAuthorized))
                 .foregroundStyle(.secondary)
         } else {
             VStack(alignment: .leading, spacing: 6) {
@@ -259,27 +258,14 @@ struct WiFiDashboardView: View {
     /// 사이드바와 같은 판정 (StatusDisplay)
     private var tone: StatusTone { model.wifiTone(wifi.info) }
 
-    private var conclusion: String {
-        guard let info = wifi.info else { return "인터페이스 없음" }
-        if !info.powerOn { return "꺼짐" }
-        return info.associated ? "연결됨" : "연결 안 됨"
-    }
+    private var conclusion: String { StatusText.wifiConclusion(wifi.info?.statusInput) }
 
-    private var ssidText: String {
-        guard let info = wifi.info, info.powerOn else { return "Wi-Fi" }
-        guard info.associated else { return "연결 안 됨" }
-        return info.ssid ?? (wifi.locationAuthorized ? "이름 없음" : "이름 숨김")
-    }
+    private var ssidText: String { StatusText.wifiTitle(wifi.info?.statusInput, locationAuthorized: wifi.locationAuthorized) }
 
     private var isDefaultRoute: Bool {
         guard let device = wifi.info?.interface else { return false }
         return model.defaultRoute?.interface == device
     }
 
-    private var ipText: String {
-        let address = model.wifiAddress
-        guard let ip = address.ip else { return "–" }
-        let prefix = address.subnet.flatMap(NetworkInfoFetcher.prefixLength(mask:)).map { "/\($0)" } ?? ""
-        return ip + prefix
-    }
+    private var ipText: String { StatusText.addressText(ip: model.wifiAddress.ip, mask: model.wifiAddress.subnet) }
 }

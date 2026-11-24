@@ -114,9 +114,7 @@ extension AppModel {
                 statusMessage = "다른 작업 중이라 \(name) 서비스 순서를 맨 뒤로 옮기지 못했습니다 · 시스템 설정 > 네트워크 > 서비스 순서 설정에서 맨 아래로 옮기세요."
                 return
             }
-            busyAction = BusyAction(.service, "서비스 순서 · 인증")
-            let result = await LanCommands.runPrivileged(LanCommands.moveLastScript(name, libDir: libDir), runner: runner)
-            busyAction = nil
+            let result = await runPrivileged(LanCommands.moveLastScript(name, libDir: libDir), busy: BusyAction(.service, "서비스 순서 · 인증"))
             await refreshServiceState()
             if let problem = PrivilegedOutcome(result).authProblem {
                 statusMessage = "\(problem) · \(name) 서비스 순서를 맨 뒤로 옮기지 않았습니다 (켜면 기본 경로를 가져갈 수 있습니다)."
@@ -158,7 +156,7 @@ extension AppModel {
         var linked: [HardwarePort] = []
         for port in ports {
             let text = await runner.run("ifconfig", [port.device], timeout: 5).stdout
-            if text.contains("status: active") { linked.append(port) }
+            if HardwarePort.linkActive(ifconfig: text) { linked.append(port) }
         }
         return linked
     }
@@ -168,9 +166,7 @@ extension AppModel {
         let draft = draft.trimmed
         guard busyAction == nil else { return "다른 작업이 끝난 뒤 다시 하세요." }
         if let problem = draft.problem(existing: lanServices.map(\.name)) { return problem }
-        busyAction = BusyAction(.service, "서비스 추가 · 인증")
-        let result = await LanCommands.runPrivileged(LanCommands.createServiceScript(draft, libDir: libDir), runner: runner)
-        busyAction = nil
+        let result = await runPrivileged(LanCommands.createServiceScript(draft, libDir: libDir), busy: BusyAction(.service, "서비스 추가 · 인증"))
         if let problem = PrivilegedOutcome(result).authProblem { return "\(problem) · 서비스를 만들지 않았습니다." }
         guard result.ok else {
             let detail = (result.stderr + result.stdout).trimmingCharacters(in: .whitespacesAndNewlines)

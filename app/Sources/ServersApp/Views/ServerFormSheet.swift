@@ -75,8 +75,7 @@ struct ServerFormSheet: View {
     private var renameClosesText: String? {
         guard let original, newKey != original.key else { return nil }
         let open = model.openSessionCount(original)
-        let parts = (open.tabs > 0 ? ["열린 탭 \(open.tabs)개"] : []) + (open.tunnels > 0 ? ["터널 \(open.tunnels)개"] : [])
-        return parts.isEmpty ? nil : "이름을 바꾸면 \(parts.joined(separator: "·"))가 닫힙니다"
+        return ServerFormCheck.renameClosesText(tabs: open.tabs, tunnels: open.tunnels)
     }
     /// 저장하면 저장한 비밀번호를 지우는가 (AppModel.updateServer) — 미리 보여 준다
     private var clearsPassword: Bool {
@@ -86,13 +85,7 @@ struct ServerFormSheet: View {
 
     /// 채워야 할 칸 (버튼이 꺼진 이유 — 경고가 아니라 안내)
     private var missing: [String] {
-        var out: [String] = []
-        if key.isEmpty { out.append("이름") }
-        if needsLanService, lanService == nil { out.append("서비스") }
-        if ip.isEmpty { out.append("IP") }
-        if user.isEmpty { out.append("사용자") }
-        if group.trimmingCharacters(in: .whitespaces).isEmpty { out.append("그룹") }   // 빈 목록의 [서버 추가]는 그룹 없이 열린다
-        return out
+        ServerFormCheck.missingFields(key: key, lanServiceMissing: needsLanService && lanService == nil, ip: ip, user: user, group: group)
     }
 
     var body: some View {
@@ -180,10 +173,8 @@ struct ServerFormSheet: View {
                 GridRow { label("알림"); Toggle("켜짐·꺼짐 알림", isOn: $notify) }
             }
             VStack(alignment: .leading, spacing: 4) {
-                if !missing.isEmpty {
-                    // 조사는 마지막 칸 이름에 맞춘다 (이름을 · 그룹을 · IP를 · 사용자를 · 서비스를)
-                    Text("\(missing.joined(separator: "·"))\(["이름", "그룹"].contains(missing.last ?? "") ? "을" : "를") 채우면 \(original == nil ? "추가" : "저장")할 수 있습니다")
-                        .font(.caption).foregroundStyle(.secondary)
+                if let hint = ServerFormCheck.missingHint(missing, adding: original == nil) {
+                    Text(hint).font(.caption).foregroundStyle(.secondary)
                 }
                 if let problem {
                     Label { Text(verbatim: problem) } icon: { Image(systemName: "exclamationmark.triangle") }
@@ -311,19 +302,10 @@ struct ServerFormSheet: View {
         .accessibilityLabel("그룹 고르기")
     }
 
-    private enum PortCheck: Equatable { case idle, checking, open(Int), closed }
-    private var portNumber: Int? {
-        Int(port.trimmingCharacters(in: .whitespaces)).flatMap { (1...65535).contains($0) ? $0 : nil }
-    }
-    private var portCheckText: String? {
-        let target = "\(ip.trimmingCharacters(in: .whitespaces)):\(port.trimmingCharacters(in: .whitespaces))"
-        switch portCheck {
-        case .idle: return nil
-        case .checking: return "\(target) 확인 중…"
-        case let .open(ms): return "\(target) 응답 있음 · \(ms)ms"
-        case .closed: return "\(target) 응답이 없습니다"
-        }
-    }
+    /// 확인 상태와 그 문구는 ServersCore (ServerFormText.swift)
+    private typealias PortCheck = ServerFormCheck.PortResult
+    private var portNumber: Int? { ServerFormCheck.portNumber(port) }
+    private var portCheckText: String? { portCheck.text(ip: ip, port: port) }
 
     /// 포트 줄 연결 그림의 단계 (확인 전엔 그림 없음)
     private var probePhase: PortProbeLine.Phase? {
@@ -334,13 +316,7 @@ struct ServerFormSheet: View {
         case .closed: return .closed
         }
     }
-    private var probeResultText: String? {
-        switch portCheck {
-        case let .open(ms): return "\(ms)ms"
-        case .closed: return "응답 없음"
-        default: return nil
-        }
-    }
+    private var probeResultText: String? { portCheck.resultText }
 
     private func checkPort() {
         guard let p = portNumber else { return }
@@ -358,11 +334,8 @@ struct ServerFormSheet: View {
     }
 
     /// [Ping] 결과: 응답(평균 ms · 손실 %) / 응답 없음
-    private enum PingCheck: Equatable { case idle, checking, replied(ms: Int, loss: Int), none }
-    private var pingHasLoss: Bool {
-        if case let .replied(_, loss) = pingCheck { return loss > 0 }
-        return false
-    }
+    private typealias PingCheck = ServerFormCheck.PingResult
+    private var pingHasLoss: Bool { pingCheck.hasLoss }
     private var pingPhase: PortProbeLine.Phase? {
         switch pingCheck {
         case .idle: return nil
@@ -372,22 +345,8 @@ struct ServerFormSheet: View {
         }
     }
     /// 칸 옆 글자는 짧게 (ms, 일부 손실이면 노랑) — 손실 % 는 그림에 마우스를 올리면
-    private var pingResultText: String? {
-        switch pingCheck {
-        case let .replied(ms, _): return "\(ms)ms"
-        case .none: return "응답 없음"
-        default: return nil
-        }
-    }
-    private var pingCheckText: String? {
-        let target = ip.trimmingCharacters(in: .whitespaces)
-        switch pingCheck {
-        case .idle: return nil
-        case .checking: return "\(target) ping 중…"
-        case let .replied(ms, loss): return "\(target) 응답 있음 · 평균 \(ms)ms · 손실 \(loss)%"
-        case .none: return "\(target) ping 응답이 없습니다"
-        }
-    }
+    private var pingResultText: String? { pingCheck.resultText }
+    private var pingCheckText: String? { pingCheck.text(ip: ip) }
 
     private func ping() {
         let host = ip, net = network, vpn = vpnName, service = chosenLanService
@@ -398,11 +357,7 @@ struct ServerFormSheet: View {
             let summary = await model.pingHost(ip: host, network: net, vpn: vpn, lanService: service)
             // ping 하는 동안 칸을 바꿨으면 결과를 버린다 (onChange 가 idle 로 돌려놓음). 그 뒤 다시 눌렀으면 새 ping 의 것만 받는다
             guard pingCheck == .checking, run == pingCheckRun else { return }
-            if let summary, let avg = summary.averageMs {
-                pingCheck = .replied(ms: Int(avg.rounded()), loss: Int(summary.lossPercent.rounded()))
-            } else {
-                pingCheck = .none
-            }
+            pingCheck = .of(summary)
         }
     }
 

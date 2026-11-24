@@ -261,3 +261,12 @@ public enum RemoteCommands {
         }
     }
 }
+
+extension RemoteCommands {
+    /// cleanOutput 에서 끝의 빈 줄을 뗀 것 (원격 정보 탭 · 로그 창)
+    public static func outputLines(_ text: String, type: ServerType) -> [String] {
+        var lines = cleanOutput(text, type: type)
+        while lines.last?.isEmpty == true { lines.removeLast() }
+        return lines
+    }
+}

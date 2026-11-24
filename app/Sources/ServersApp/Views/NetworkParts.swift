@@ -70,13 +70,7 @@ struct LanServicePicker: View {
         }
     }
 
-    private var stateText: String {
-        switch model.status.lan {
-        case .up: return "활성"
-        case .missing: return "서비스 없음"
-        default: return "비활성"
-        }
-    }
+    private var stateText: String { StatusText.lanServiceState(model.status.lan) }
 }
 
 struct NetworkServersList: View {
@@ -112,15 +106,7 @@ struct NetworkServersList: View {
     }
 
     private func stateText(_ server: Server) -> String {
-        let method = server.check == .tcp ? "포트" : "SSH"
-        switch model.status.remote(server.key) {
-        case let .ok(ms): return "\(method) ok · \(ms)ms"
-        case let .fail(ms): return "\(method) 실패 · \(ms)ms"
-        case .off: return "꺼짐"
-        case .needsAuth: return "Tailscale 인증 필요"
-        case let .skip(reason): return StatusText.skipReasonText(reason, lanName: model.networkName(.lan))
-        case .pending: return "확인 중"
-        }
+        StatusText.remoteBrief(model.status.remote(server.key), check: server.check, lanName: model.networkName(.lan))
     }
 }
 
@@ -148,10 +134,8 @@ struct TrafficTile: View {
     }
 
     private func caption(rate: TrafficRate?, samples: Int) -> String? {
-        if let total { return "누적 \(TransferMeter.format(total))" }
-        guard device != nil else { return connected ? "측정 중…" : nil }
-        if rate == nil { return "측정 중…" }
-        return direction == .tx ? "최근 \(samples)회" : nil   // 링크 표기는 링크 타일에만
+        StatusText.trafficCaption(total: total, hasDevice: device != nil, connected: connected, measured: rate != nil,
+                                  sending: direction == .tx, samples: samples)
     }
 }
 

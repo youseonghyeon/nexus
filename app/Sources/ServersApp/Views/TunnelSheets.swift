@@ -49,7 +49,7 @@ struct TunnelInfoSheet: View {
                     Text(stateText).font(.callout)
                     if session.isActive {
                         TimelineView(.periodic(from: .now, by: 30)) { context in
-                            Text("· \(Self.elapsed(from: session.startedAt, to: context.date))").font(.callout).foregroundStyle(.secondary)
+                            Text("· \(TunnelState.elapsedText(from: session.startedAt, to: context.date))").font(.callout).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -78,17 +78,15 @@ struct TunnelInfoSheet: View {
                     .font(.caption).foregroundStyle(StatusTone.warn.color)
             }
 
-            if case let .db(_, _, name) = spec.kind {
-                let db = name ?? "<db>"
-                let host = spec.localHost
+            if let db = spec.dbConnection {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
-                    copyRow("JDBC", "jdbc:postgresql://\(host):\(spec.localPort)/\(db)")
-                    copyRow("psql", "psql \"postgresql://<user>:<password>@\(host):\(spec.localPort)/\(db)\"")
+                    copyRow("JDBC", db.jdbc)
+                    copyRow("psql", db.psql)
                 }
                 HStack(spacing: 6) {
-                    CopyChip(label: "Host", value: host, model: model)
+                    CopyChip(label: "Host", value: spec.localHost, model: model)
                     CopyChip(label: "Port", value: "\(spec.localPort)", model: model)
-                    CopyChip(label: "DB", value: db, model: model)
+                    CopyChip(label: "DB", value: db.name, model: model)
                 }
             }
 
@@ -109,36 +107,11 @@ struct TunnelInfoSheet: View {
         .frame(width: 620)   // 입력창과 같은 폭
     }
 
-    /// 창 제목: 입력창과 같은 말 ("web-01 포트 터널")
-    private var heading: String {
-        switch session.spec.kind {
-        case .port: return "\(session.spec.server.key) 포트 터널"
-        case .db: return "\(session.spec.server.key) DB 터널"
-        case .socks: return "\(session.spec.server.key) 프록시 터널"
-        }
-    }
-
-    /// 오른쪽 칸의 이름: 서버 자신의 포트면 "…에서", 서버를 거쳐 다른 곳이면 "…경유"
-    private var remoteTitle: String {
-        if case .port = session.spec.kind { return "\(session.spec.server.key) 에서" }
-        return "\(session.spec.server.key) 경유"
-    }
-
-    /// 오른쪽 칸의 주소: 원격 대상 (SOCKS 는 정해진 대상이 없다)
-    private var remoteAddress: String {
-        switch session.spec.kind {
-        case let .port(remote, host): return "\(host):\(remote)"
-        case let .db(host, port, _): return "\(host):\(port)"
-        case .socks: return "모든 주소 (SOCKS5)"
-        }
-    }
-
-    /// 붙여 쓰는 주소: SOCKS 면 프록시 URL, 아니면 호스트:포트 (이름 붙인 터널은 그 이름)
-    private var primaryAddress: String {
-        let spec = session.spec
-        if case .socks = spec.kind { return "socks5://\(spec.localHost):\(spec.localPort)" }
-        return "\(spec.localHost):\(spec.localPort)"
-    }
+    // 제목 · 주소 문구는 ServersCore (SheetText.swift)
+    private var heading: String { session.spec.sheetHeading }
+    private var remoteTitle: String { session.spec.remoteTitle }
+    private var remoteAddress: String { session.spec.remoteAddress }
+    private var primaryAddress: String { session.spec.primaryAddress }
 
     private func copyRow(_ label: String, _ value: String) -> some View {
         GridRow {
@@ -148,21 +121,7 @@ struct TunnelInfoSheet: View {
         }
     }
 
-    static func elapsed(from start: Date, to now: Date) -> String {
-        let minutes = Int(now.timeIntervalSince(start) / 60)
-        if minutes < 1 { return "방금" }
-        if minutes < 60 { return "\(minutes)분 경과" }
-        return "\(minutes / 60)시간 \(minutes % 60)분 경과"
-    }
-
-    private var stateText: String {
-        switch session.state {
-        case .connecting: return "연결 중"
-        case .open: return "열림"
-        case .idle: return "지난번에 연 터널 · [다시 연결]로 엽니다"
-        case .closed: return "닫힘"
-        }
-    }
+    private var stateText: String { session.state.sheetText }
 }
 
 /// 터널 포트 입력. Ports 카드에서 오면 원격 포트와 제안 로컬 포트가 채워져 있다.

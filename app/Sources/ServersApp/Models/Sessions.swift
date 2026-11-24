@@ -164,29 +164,8 @@ final class TransferSession: Identifiable, ObservableObject {
     var isActive: Bool { if case .running = state { return true } else { return false } }
 
     /// 막대 값 0...1. 전체 크기를 알면 전체 기준. 모르면 파일이 하나일 때만 그 파일 기준, 여러 개면 nil (움직이는 막대).
-    var fraction: Double? {
-        guard case let .running(progress) = state, let progress else { return nil }
-        if let overall = meter.fraction { return overall }
-        return meter.fileCount <= 1 ? Double(progress.percent) / 100 : nil
-    }
+    var fraction: Double? { state.fraction(meter: meter) }
 
-    /// 진행 중 한 줄 (파일 이름 없이): "45% · 1.2 GB / 2.7 GB · 10MB/s · 12번째 파일".
-    /// 전체 크기를 모르는 여러 파일이면 "12번째 파일 · 45% · 10MB/s".
-    var progressText: String? {
-        guard case let .running(progress) = state, let progress else { return nil }
-        let many = meter.fileCount > 1
-        if many, meter.fraction == nil {
-            return "\(meter.fileCount)번째 파일 · \(progress.percent)% · \(progress.rate)"
-        }
-        var parts: [String] = []
-        if let fraction { parts.append("\(Int(fraction * 100))%") }
-        if let total = meter.totalBytes, meter.fraction != nil {
-            parts.append("\(TransferMeter.format(meter.doneBytes)) / \(TransferMeter.format(total))")
-        } else {
-            parts.append(progress.transferred)
-        }
-        parts.append(progress.rate)
-        parts.append(many ? "\(meter.fileCount)번째 파일" : progress.eta)   // scp 의 남은 시간은 파일 기준이라 여러 파일이면 뺀다
-        return parts.joined(separator: " · ")
-    }
+    /// 진행 중 한 줄 (파일 이름 없이): "45% · 1.2 GB / 2.7 GB · 10MB/s · 12번째 파일" (TransferState.progressText)
+    var progressText: String? { state.progressText(meter: meter) }
 }

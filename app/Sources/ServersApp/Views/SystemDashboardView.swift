@@ -221,18 +221,9 @@ struct SystemDashboardView: View {
         }
     }
 
-    private var swapText: String {
-        guard let swap = snapshot?.swap else { return "–" }
-        guard swap.total > 0 else { return "사용 안 함" }
-        return "\(SystemFormat.bytes(swap.used)) / \(SystemFormat.bytes(swap.total))" + (swap.encrypted ? " · 암호화" : "")
-    }
+    private var swapText: String { SwapUsage.text(snapshot?.swap) }
 
-    private var pagingText: String {
-        guard let paging = snapshot?.paging else { return "측정 중…" }
-        func rate(_ value: Double) -> String { String(format: "%.0f", value) }
-        // 초당 값 — /s 는 끝에 한 번 (항목마다 붙이면 영어 표기로 길어져 줄이 넘어갔다)
-        return "In \(rate(paging.pageins)) · Out \(rate(paging.pageouts)) · Compress \(rate(paging.compressions)) · Decompress \(rate(paging.decompressions)) · Swap In \(rate(paging.swapins)) · Swap Out \(rate(paging.swapouts)) /s"
-    }
+    private var pagingText: String { PagingRates.text(snapshot?.paging) }
 
     // MARK: 프로세스
 
@@ -296,17 +287,7 @@ struct SystemDashboardView: View {
     }
 
     /// "최대 용량 100% · 충전 사이클 184 / 1000" (80% 미만이면 교체 권장)
-    private func batteryHealthText(_ health: BatteryHealth) -> String {
-        let cycles = health.cycleCount.map { count in "충전 사이클 \(count)" + (health.designCycles.map { " / \($0)" } ?? "") }
-        return [health.maxCapacityPercent.map { "최대 용량 \($0)%" }, cycles, health.needsService ? "교체 권장" : nil]
-            .compactMap { $0 }.joined(separator: " · ")
-    }
+    private func batteryHealthText(_ health: BatteryHealth) -> String { health.text }
 
-    private var temperatureText: String {
-        if monitor.temperaturesUnavailable { return "온도 센서를 읽지 못했습니다" }
-        guard let t = monitor.temperatures else { return "측정 중…" }
-        func degrees(_ label: String, _ value: Double?) -> String? { value.map { "\(label) \(Int($0.rounded()))°" } }
-        return ([degrees("성능 코어", t.performanceMax), degrees("효율 코어", t.efficiencyMax), degrees("GPU", t.gpuMax)].compactMap { $0 }
-                + ["센서 \(t.sensors)개"]).joined(separator: " · ")
-    }
+    private var temperatureText: String { TemperatureSummary.text(monitor.temperatures, unavailable: monitor.temperaturesUnavailable) }
 }

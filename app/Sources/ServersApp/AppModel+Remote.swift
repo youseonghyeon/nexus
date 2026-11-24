@@ -114,8 +114,7 @@ extension AppModel {
             var entry = info(server, query)
             entry.loading = false
             if result.ok {
-                var lines = RemoteCommands.cleanOutput(result.stdout, type: server.type)
-                while lines.last?.isEmpty == true { lines.removeLast() }
+                let lines = RemoteCommands.outputLines(result.stdout, type: server.type)
                 entry.lines = lines
                 entry.parsed = ParsedRemoteInfo.parse(query, lines: lines, type: server.type)
                 entry.fetchedAt = Date()
@@ -138,37 +137,40 @@ extension AppModel {
         case .openwrt: command = OpenWrt.serviceLogCommand(name: unit)
         case .windows: command = nil
         }
-        guard let command, !serviceLogLoading.contains(key) else { return }
-        serviceLogLoading.insert(key)
-        statusMessage = "\(server.key) · \(unit) 로그를 가져옵니다…"
-        Task {
-            let result = await runRemote(server, command: command, allowPrompt: true)
-            serviceLogLoading.remove(key)
-            var lines = RemoteCommands.cleanOutput(result.ok ? result.stdout : result.stdout + result.stderr, type: .linux)
-            while lines.last?.isEmpty == true { lines.removeLast() }
-            if statusMessage?.hasSuffix("로그를 가져옵니다…") == true { statusMessage = nil }
-            // 인증 취소·실패로 아무것도 못 받았으면 "로그 없음" 이 아니라 실패로
-            let empty = result.ok ? "(로그가 없습니다)" : "로그를 가져오지 못했습니다 (exit \(result.exitCode))"
-            queryResult = QueryResult(title: "\(server.key) · \(unit) 최근 로그", lines: lines.isEmpty ? [empty] : lines, failed: !result.ok)
-        }
+        guard let command else { return }
+        showRecentLog(server, key: key, name: unit, command: command, stripANSI: false)
     }
 
     /// Services 탭에서 docker 컨테이너 줄을 누르면: 최근 로그 50줄을 결과 시트로 (리눅스만 — ServiceLog.dockerCommand)
     func showContainerLog(_ server: Server, container: String) {
         let key = "\(server.key)|docker|\(container)"
-        guard server.type == .linux, let command = ServiceLog.dockerCommand(container: container), !serviceLogLoading.contains(key) else { return }
+        guard server.type == .linux, let command = ServiceLog.dockerCommand(container: container) else { return }
+        // 명령이 stderr 를 stdout 에 섞으므로(2>&1) 실패해도 stdout 에 이유가 있다. stderr 는 ssh 자체 오류
+        showRecentLog(server, key: key, name: container, command: command, stripANSI: true)
+    }
+
+    /// 서비스 · 컨테이너의 최근 로그를 결과 시트로 (두 곳 공통 틀): 같은 것을 가져오는 중이면 건너뛰고, 안내 → 실행 → 안내 지우기 → 시트.
+    /// 줄 · 빈 결과 문구는 ServiceLog.displayLines
+    private func showRecentLog(_ server: Server, key: String, name: String, command: String, stripANSI: Bool) {
+        guard !serviceLogLoading.contains(key) else { return }
         serviceLogLoading.insert(key)
-        statusMessage = "\(server.key) · \(container) 로그를 가져옵니다…"
+        statusMessage = "\(server.key) · \(name) 로그를 가져옵니다…"
         Task {
             let result = await runRemote(server, command: command, allowPrompt: true)
             serviceLogLoading.remove(key)
-            // 명령이 stderr 를 stdout 에 섞으므로(2>&1) 실패해도 stdout 에 이유가 있다. stderr 는 ssh 자체 오류
-            var lines = RemoteCommands.cleanOutput(ServiceLog.stripANSI(result.ok ? result.stdout : result.stdout + result.stderr), type: .linux)
-            while lines.last?.isEmpty == true { lines.removeLast() }
             if statusMessage?.hasSuffix("로그를 가져옵니다…") == true { statusMessage = nil }
-            let empty = result.ok ? "(로그가 없습니다)" : "로그를 가져오지 못했습니다 (exit \(result.exitCode))"
-            queryResult = QueryResult(title: "\(server.key) · \(container) 최근 로그", lines: lines.isEmpty ? [empty] : lines, failed: !result.ok)
+            queryResult = QueryResult(title: "\(server.key) · \(name) 최근 로그", lines: ServiceLog.displayLines(result, stripANSI: stripANSI), failed: !result.ok)
         }
+    }
+
+    /// 관리자 스크립트 하나를 잠금(busyAction) 안에서: 잠금 → 실행(Touch ID · 승인 창은 이때 뜬다) → 해제. 결과는 PrivilegedOutcome 으로 가른다.
+    /// 다른 작업 중인지(busyAction == nil)는 부르는 쪽이 먼저 본다 — 못 했을 때의 문구 · 뒤처리가 곳마다 다르다.
+    /// 잠금을 미리 잡거나(setServiceEnabled) 잠그지 않는 곳(Wi-Fi 상세 · ARP)은 이 틀을 쓰지 않는다
+    func runPrivileged(_ script: String, busy: BusyAction) async -> CommandResult {
+        busyAction = busy
+        let result = await LanCommands.runPrivileged(script, runner: runner)
+        busyAction = nil
+        return result
     }
 
     /// Services 탭에서 k3s 파드 줄을 누르면: 왜 그 상태인지(컨테이너 상태 · 직전 종료 · 배치 실패 · 최근 이벤트)와 최근 로그를 결과 창으로 (리눅스만 — PodInspect).

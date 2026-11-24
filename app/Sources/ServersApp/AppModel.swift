@@ -1,5 +1,5 @@
 // 앱 상태의 저장 속성·설정 로딩·5초 주기 상태 갱신. 기능별 메서드는 AppModel+*.swift
-// (Browse·Browser·Credentials·Diagnostics·Live·Local·Network·Notify·Proxy·Remote·Servers·Services·Tabs·TerminalPaste·Transfers·Tunnels).
+// (Browse·Browser·Credentials·Diagnostics·History·Live·Local·Network·Notes·Notify·Proxy·Remote·Servers·Services·Sheets·Tabs·TerminalPaste·Transfers·Tunnels·Update).
 // 규칙: 저장 속성은 이 파일에만 둔다. 뷰는 읽기만 하고, 쓰기는 AppModel 의 메서드를 거친다.
 
 import AppKit
@@ -56,11 +56,11 @@ final class AppModel {
     var networkInfoAt: Date?
     /// Wi-Fi: 전원·SSID·신호는 매 갱신마다(CoreWLAN, 즉시), IP·게이트웨이는 Wi-Fi 화면을 볼 때만 networksetup 으로
     let wifi = WiFiMonitor()
-    /// 시스템 화면(CPU·메모리·GPU·온도·프로세스) 수집기 — 그 화면을 볼 때 3초마다, 사이드바 요약은 창이 보일 때 5초마다 (AppModel+Local)
+    /// 시스템 화면(CPU·메모리·GPU·온도·프로세스) 수집기 — 그 화면을 볼 때 설정의 간격(기본 3초)마다, 사이드바 요약은 창이 보일 때 상태 갱신마다 (AppModel+Local)
     let system = SystemMonitor()
     /// 디스크 화면(볼륨·APFS·입출력) 수집기 — 같은 규칙 (AppModel+Local)
     let disk = DiskMonitor()
-    /// 블루투스 화면(컨트롤러·기기·배터리) 수집기 — 화면 5초, 사이드바 요약 30초 (AppModel+Local)
+    /// 블루투스 화면(컨트롤러·기기·배터리) 수집기 — 화면은 설정의 간격(기본 5초), 사이드바 요약 30초 (AppModel+Local)
     let bluetooth = BluetoothMonitor()
     var wifiAddress: (ip: String?, subnet: String?, router: String?, configuration: String?) = (nil, nil, nil, nil)
     /// 유선 서비스 스냅숏 — 서비스 순서·장치·서비스별 getinfo·게이트웨이 응답 (5초 갱신마다, nil = 아직 안 읽음).

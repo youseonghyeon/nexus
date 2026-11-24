@@ -61,13 +61,7 @@ struct NetworkDashboardView: View {
     private var conclusion: String {
         switch kind {
         case .tailscale: return model.tailscaleDetail
-        case .lan:
-            switch model.status.lan {
-            case .up: return model.lanLink?.text ?? (model.status.lanAdapterPresent ? "활성" : "활성 · 어댑터 없음")   // 서비스 판정 하나
-            case .down: return "비활성"
-            case .missing: return "서비스 없음"
-            case .none: return "설정 없음"
-            }
+        case .lan: return StatusText.lanConclusion(model.status.lan, link: model.lanLink, adapterPresent: model.status.lanAdapterPresent)   // 서비스 판정 하나
         case .direct, .vpn: return ""
         }
     }
@@ -113,14 +107,14 @@ struct NetworkDashboardView: View {
             }
         } else {
             MetricTile(title: "게이트웨이", value: model.gatewayPing == nil ? "–" : "없음",
-                       caption: model.lanInfo?.router ?? (model.status.lan == .up ? "확인 중…" : "연결 안 됨"),
+                       caption: StatusText.lanGatewayIdleCaption(router: model.lanInfo?.router, state: model.status.lan),
                        tone: model.gatewayPing == nil ? .muted : .bad, systemImage: "arrow.triangle.branch")
         }
     }
 
     private func serverTile(reachable: Int, total: Int) -> some View {
         // 이 망의 서버가 없으면 "0 / 0 · 접속 가능" 과 초록 막대 조각 대신 빈 값 (아래 서버 카드도 "이 망의 서버가 없습니다")
-        let tone: StatusTone = total == 0 ? .muted : (reachable == total ? .good : (reachable == 0 ? .bad : .warn))
+        let tone = StatusTone(StatusText.serverCountLevel(reachable: reachable, total: total))
         return MetricTile(title: "서버", value: total == 0 ? "–" : "\(reachable)", unit: total == 0 ? nil : "/ \(total)",
                           caption: total == 0 ? "서버 없음" : "접속 가능", tone: tone, systemImage: "server.rack") {
             MeterBar(level: total == 0 ? 0 : Double(reachable) / Double(total), tone: tone, fill: total == 0 ? .clear : nil)
@@ -248,15 +242,11 @@ struct NetworkDashboardView: View {
 
     /// 게이트웨이 + 응답 (내부망이 실제로 통하는지)
     private func gatewayText(_ info: LanInfo?) -> String {
-        guard let router = info?.router else { return "–" }
-        guard let ping = model.gatewayPing else { return router }
-        return "\(router) · \(ping.text)"
+        StatusText.lanGatewayText(router: info?.router, ping: model.gatewayPing)
     }
 
     private func interfaceText(_ info: LanInfo?) -> String {
-        guard let info else { return "–" }
-        guard let device = info.device else { return "장치 없음" }
-        return model.status.lanAdapterPresent ? device : device + " · 연결 안 됨"
+        StatusText.lanInterfaceText(info, adapterPresent: model.status.lanAdapterPresent)
     }
 
     /// "10.50.10.17/24" (서브넷은 접두 길이로 붙인다)

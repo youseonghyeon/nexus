@@ -259,14 +259,7 @@ struct TransferRow: View {
         }
     }
 
-    private var detail: String {
-        switch transfer.state {
-        case .running: return transfer.progressText ?? "연결 중…"
-        case .done: return "완료"
-        case .cancelled: return "취소됨"
-        case let .failed(code, message): return "실패 (exit \(code)) · \(message.split(separator: "\n").last ?? "")"
-        }
-    }
+    private var detail: String { transfer.state.rowDetail(meter: transfer.meter) }
 }
 
 /// 전송 정보: 상태·진행률 → 방향/서버/로컬/원격(복사·Finder) → 출력 로그(접힘) → 취소/제거.
@@ -356,16 +349,7 @@ struct TransferInfoSheet: View {
         .frame(minWidth: 560)
     }
 
-    private var stateText: String {
-        switch session.state {
-        case let .running(progress):
-            guard progress != nil else { return "연결 중…" }
-            return session.fraction.map { "전송 중 · \(Int($0 * 100))%" } ?? "전송 중"
-        case .done: return "완료"
-        case .cancelled: return "취소됨"
-        case let .failed(code, _): return "실패 · exit \(code)"
-        }
-    }
+    private var stateText: String { session.state.sheetTitle(meter: session.meter) }
 
     private var timing: String {
         let started = session.startedAt.formatted(date: .omitted, time: .shortened)

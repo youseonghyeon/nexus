@@ -73,7 +73,7 @@ struct StackedBar: View {
     }
     let segments: [Segment]
     let total: Double
-    /// 마우스가 올라간 몫의 id (벗어나면 nil). 풀이를 바로 띄우려는 쪽이 받는다 — 시스템 풀이말(.help)은 1~2초 뒤에야 뜬다
+    /// 마우스가 올라간 몫의 id (벗어나면 nil). 풀이를 바로 띄우려는 쪽이 받는다 — 시스템 풀이말(.help)은 5초쯤 지나야 뜬다
     var onHover: ((String?) -> Void)?
 
     var body: some View {

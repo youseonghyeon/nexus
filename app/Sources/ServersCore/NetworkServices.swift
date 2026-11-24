@@ -157,3 +157,10 @@ extension LanCommands {
         return privilegedScript(body: body, prompt: "\(d.name) 서비스 추가")
     }
 }
+
+extension HardwarePort {
+    /// `ifconfig <장치>` 출력에 케이블 링크가 있는가 ([서비스 추가…] 의 어댑터 후보)
+    public static func linkActive(ifconfig text: String) -> Bool {
+        text.contains("status: active")
+    }
+}

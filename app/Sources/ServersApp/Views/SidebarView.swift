@@ -15,12 +15,8 @@ struct SidebarView: View {
 
     private func groupExpanded(_ group: String) -> Binding<Bool> {
         Binding(
-            get: { searching || !collapsedGroups.split(separator: "\n").contains(Substring(group)) },
-            set: { expanded in
-                var names = collapsedGroups.split(separator: "\n").map(String.init).filter { $0 != group }
-                if !expanded { names.append(group) }
-                collapsedGroups = names.joined(separator: "\n")
-            }
+            get: { searching || !CollapsedGroups.contains(collapsedGroups, group) },
+            set: { collapsedGroups = CollapsedGroups.setting(collapsedGroups, group, expanded: $0) }
         )
     }
 
@@ -40,7 +36,7 @@ struct SidebarView: View {
             if let config = model.config {
                 let groups = matchingGroups(config)
                 // 접은 그룹은 여기서 한 번만 푼다 (⌘ 번호 · 그룹 머리 요약). 접기 바인딩(groupExpanded)은 누른 직후 값을 읽히므로 저장값을 그대로 본다
-                let collapsed = Set(collapsedGroups.split(separator: "\n").map(String.init))
+                let collapsed = CollapsedGroups.names(collapsedGroups)
                 // ⌘ 번호: 보이는 서버 앞 9개 (접힌 그룹은 건너뜀) — ⌘1–⌘9 가 같은 목록을 쓴다
                 let numbered = QuickSelect.keys(groups: groups.map { ($0.group, $0.servers.map(\.key)) },
                                                 collapsed: collapsed, searching: searching)

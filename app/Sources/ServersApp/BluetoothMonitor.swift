@@ -1,5 +1,5 @@
 // 블루투스 화면(컨트롤러·기기·배터리) 수집기. 파싱·병합은 ServersCore BluetoothInfo, 동작은 BluetoothActions.
-// 화면이 떠 있고 창이 보일 때만 5초마다 system_profiler + HID·전원 소스(pmset) 배터리, 60초마다 GATT 배터리를 읽는다 (BluetoothDashboardView 의 .task).
+// 화면이 떠 있고 창이 보일 때만 설정의 간격(기본 5초 — AppPreferences.bluetoothInterval)마다 system_profiler + HID·전원 소스(pmset) 배터리, 60초마다 GATT 배터리를 읽는다 (BluetoothDashboardView 의 .sampling).
 // 사이드바 요약은 창이 보일 때 30초에 한 번만 (system_profiler 가 다른 수집보다 무겁다 — 0.06초).
 
 import Foundation

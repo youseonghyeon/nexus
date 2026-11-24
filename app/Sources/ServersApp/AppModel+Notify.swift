@@ -96,7 +96,7 @@ final class PowerNotificationHandler: NSObject, UNUserNotificationCenterDelegate
         let key = response.notification.request.content.userInfo[AppModel.notifyServerKey] as? String
         await MainActor.run {
             showWindow()
-            if let key, let model, model.config?.server(key) != nil { model.selectedKey = key }
+            if let key, let model, model.config?.server(key) != nil { model.select(key: key) }
         }
     }
 }

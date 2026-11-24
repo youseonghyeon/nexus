@@ -81,10 +81,7 @@ extension AppModel {
                 return nil
             }
             if let conflict = namedTunnelConflict(name: resolvedName, address: address) { statusMessage = conflict; return nil }
-            if state != hostAliases {
-                hostAliases = state
-                do { try HostAliasStore.save(state) } catch { statusMessage = "주소 배정표 저장 실패: \(error.localizedDescription)"; return nil }
-            }
+            if state != hostAliases, !saveHostAliases(state) { return nil }
             bindAddress = address
             hostName = resolvedName
         }
@@ -137,13 +134,11 @@ extension AppModel {
                     statusMessage = "터널 \(hostName): \(reason)"
                     return
                 }
-                busyAction = BusyAction("터널 주소 준비 · 인증")
                 let script = HostAliasCommands.setupScript(name: hostName, address: bindAddress, libDir: libDir)
-                let result = await LanCommands.runPrivileged(script, runner: runner)
-                busyAction = nil
+                let result = await runPrivileged(script, busy: BusyAction("터널 주소 준비 · 인증"))
                 guard result.ok else {
                     let reason = PrivilegedOutcome(result).authProblem.map { "\($0) · 주소를 준비하지 않았습니다" }
-                        ?? "주소 준비 실패: " + RemoteCommands.cleanOutput(result.stdout + result.stderr, type: .linux).filter { !$0.isEmpty }.suffix(2).joined(separator: " · ")
+                        ?? "주소 준비 실패: " + LanCommands.failureTail(result)
                     session.state = .closed(exitCode: result.exitCode, message: reason)
                     tunnelStateChanged()
                     statusMessage = "터널 \(hostName): \(reason)"
@@ -197,6 +192,17 @@ extension AppModel {
         if let fresh, tunnelInfo?.id == id { tunnelInfo = fresh }
     }
 
+    /// 주소 배정표(hosts.json)를 바꾸고 저장한다. 저장에 실패하면 알리고 false (값은 바뀐 채 — 예전과 같다)
+    @discardableResult
+    func saveHostAliases(_ state: HostAliasState) -> Bool {
+        hostAliases = state
+        do { try HostAliasStore.save(state) } catch {
+            statusMessage = "주소 배정표 저장 실패: \(error.localizedDescription)"
+            return false
+        }
+        return true
+    }
+
     func saveRecent(_ state: RecentState) {
         recent = state
         do { try RecentStore.save(state) } catch { statusMessage = "최근 기록 저장 실패: \(error.localizedDescription)" }
@@ -234,16 +240,14 @@ extension AppModel {
                 statusMessage = "다른 작업 중이라 \(name) 의 hosts 줄을 지우지 못했습니다."
                 return
             }
-            busyAction = BusyAction("터널 주소 제거 · 인증")
             let script = HostAliasCommands.teardownScript(name: name, address: address, dropAlias: dropAlias, libDir: libDir)
-            let result = await LanCommands.runPrivileged(script, runner: runner)
-            busyAction = nil
+            let result = await runPrivileged(script, busy: BusyAction("터널 주소 제거 · 인증"))
             if let problem = PrivilegedOutcome(result).authProblem {
                 statusMessage = "\(problem) · \(name) 의 hosts 줄은 남겨 두었습니다."
             } else if result.ok {
                 statusMessage = "\(name) → \(address) 제거\(dropAlias ? " (별칭 포함)" : "")."
             } else {
-                statusMessage = "\(name) 제거 실패: " + RemoteCommands.cleanOutput(result.stdout + result.stderr, type: .linux).filter { !$0.isEmpty }.suffix(2).joined(separator: " · ")
+                statusMessage = "\(name) 제거 실패: " + LanCommands.failureTail(result)
             }
         }
     }

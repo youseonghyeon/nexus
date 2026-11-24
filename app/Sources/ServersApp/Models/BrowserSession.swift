@@ -466,28 +466,10 @@ extension BrowserSession: WKNavigationDelegate {
         // 응답을 다운로드로 돌리면 WebKit 이 이동을 "프레임 로드 중단"(102)으로 끝낸다 — 다운로드는 진행 중이라 오류 페이지를 띄우지 않는다
         if nsError.domain == "WebKitErrorDomain", nsError.code == 102 { return }   // WebKitErrorFrameLoadInterruptedByPolicyChange
         let failed = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? (nsError.userInfo[NSURLErrorFailingURLStringErrorKey] as? String).flatMap(URL.init(string:))
-        let title: String, detail: String
-        switch nsError.code {
-        case NSURLErrorCannotConnectToHost: (title, detail) = ("연결할 수 없습니다", "이 주소에서 응답하는 서버가 없습니다.")
-        case NSURLErrorTimedOut: (title, detail) = ("응답이 없습니다", "서버가 제한 시간 안에 응답하지 않았습니다.")
-        case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: (title, detail) = ("주소를 찾을 수 없습니다", "서버 이름을 확인하세요.")
-        case NSURLErrorNetworkConnectionLost: (title, detail) = ("연결이 끊어졌습니다", "페이지를 불러오는 중 연결이 끊어졌습니다.")
-        default: (title, detail) = ("페이지를 열 수 없습니다", nsError.localizedDescription)
-        }
+        let (title, detail) = BrowserErrorPage.message(code: nsError.code, fallback: nsError.localizedDescription)
         let target = failed.map(BrowserPolicy.displayed)?.absoluteString ?? ""
-        let html = """
-        <!doctype html><meta charset="utf-8"><title>\(escape(title))</title>
-        <style>body{font:14px -apple-system,system-ui;color:#333;background:#fafafa;margin:0;display:flex;height:100vh;align-items:center;justify-content:center}
-        @media(prefers-color-scheme:dark){body{color:#ddd;background:#1e1e1e}} .box{max-width:560px;padding:24px} h1{font-size:17px;margin:0 0 6px}
-        p{margin:0 0 14px;opacity:.85} code{font:12px ui-monospace,Menlo;word-break:break-all;opacity:.7}</style>
-        <div class="box"><h1>\(escape(title))</h1><p>\(escape(detail))</p><code>\(escape(target))</code></div>
-        """
-        webView.loadHTMLString(html, baseURL: failed)
+        webView.loadHTMLString(BrowserErrorPage.html(title: title, detail: detail, target: target), baseURL: failed)
         url = failed.map(BrowserPolicy.displayed)
-    }
-
-    private func escape(_ s: String) -> String {
-        s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
     }
 }
 
@@ -495,13 +477,7 @@ extension BrowserSession: WKDownloadDelegate {
     /// ~/Downloads 에 제안된 이름으로, 같은 이름이 있으면 " (2)" 식으로 비켜 저장한다.
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String) async -> URL? {
         let dir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory() + "/Downloads")
-        var target = dir.appendingPathComponent(suggestedFilename)
-        let base = target.deletingPathExtension().lastPathComponent, ext = target.pathExtension
-        var n = 2
-        while FileManager.default.fileExists(atPath: target.path) {
-            target = dir.appendingPathComponent(ext.isEmpty ? "\(base) (\(n))" : "\(base) (\(n)).\(ext)")
-            n += 1
-        }
+        let target = BrowserDownload.destination(in: dir, suggested: suggestedFilename) { FileManager.default.fileExists(atPath: $0.path) }
         downloads[download] = target
         onStatus("다운로드 시작: \(target.lastPathComponent)")
         return target

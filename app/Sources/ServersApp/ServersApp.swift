@@ -35,7 +35,7 @@ struct ServersApp: App {
                                               pasteFiles: { model.pasteIntoTerminal($0) },
                                               selectNumber: { number in
                                                   guard let key = QuickSelect.key(for: number, in: QuickSelectState.shared.keys) else { return false }
-                                                  model.selectedKey = key
+                                                  model.select(key: key)
                                                   return true
                                               },
                                               find: { model.handleFindKey($0) })
@@ -148,12 +148,12 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in WindowTopRow.setMovable(true) }
         .overlay(alignment: .bottomTrailing) {
             if let message = model.statusMessage {
-                StatusToast(message: message, count: model.statusRepeat) { model.statusMessage = nil }
+                StatusToast(message: message, count: model.statusRepeat) { model.dismissStatus() }
                     .padding(16)
                     // 같은 글이 또 오면(×N) 5초를 다시 센다. 새 글·횟수로 바뀌어 취소된 대기는 지우지 않는다.
                     .task(id: "\(message)#\(model.statusRepeat)") {
                         do { try await Task.sleep(for: .seconds(5)) } catch { return }
-                        if model.statusMessage == message { model.statusMessage = nil }
+                        if model.statusMessage == message { model.dismissStatus() }
                     }
             }
         }
@@ -188,20 +188,20 @@ struct ContentView: View {
         }
         .confirmationDialog(model.pendingConfirm?.title ?? "", isPresented: Binding(
             get: { model.pendingConfirm != nil },
-            set: { if !$0 { model.pendingConfirm = nil } }
+            set: { if !$0 { model.dismissConfirm() } }
         ), titleVisibility: .visible) {
             Button(model.pendingConfirm?.title ?? "확인", role: .destructive) {
                 let action = model.pendingConfirm?.action
-                model.pendingConfirm = nil
+                model.dismissConfirm()
                 action?()
             }
             if let alternative = model.pendingConfirm?.alternative {
                 Button(alternative.title) {
-                    model.pendingConfirm = nil
+                    model.dismissConfirm()
                     alternative.action()
                 }
             }
-            Button("취소", role: .cancel) { model.pendingConfirm = nil }
+            Button("취소", role: .cancel) { model.dismissConfirm() }
         } message: {
             Text(model.pendingConfirm?.message ?? "")
         }

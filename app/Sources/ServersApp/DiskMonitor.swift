@@ -1,5 +1,5 @@
 // 디스크 화면(볼륨·APFS·물리 디스크·입출력) 수집기. 계산은 ServersCore DiskStats.
-// 화면이 떠 있고 창이 보일 때만 2초마다 입출력·마운트를, 30초마다 diskutil·tmutil 인벤토리를 읽는다 (DiskDashboardView 의 .task).
+// 화면이 떠 있고 창이 보일 때만 설정의 간격(기본 2초 — AppPreferences.diskInterval)마다 입출력·마운트를, 30초마다 diskutil·tmutil 인벤토리를 읽는다 (DiskDashboardView 의 .sampling).
 // 사이드바 요약(여유 공간)은 창이 보일 때 AppModel 의 5초 갱신이 마운트만(full: false) 읽는다.
 
 import Foundation
@@ -99,8 +99,7 @@ final class DiskMonitor: ObservableObject {
 
     /// "213 GB 남음 · 57% 사용"
     var summary: String {
-        guard let storage else { return "확인 중…" }
-        return "\(DiskFormat.bytes(storage.free)) 남음 · \(Int((storage.usedFraction * 100).rounded()))% 사용"
+        StorageUsage.sidebarSummary(storage)
     }
 
     /// 루트 볼륨이 든 컨테이너 · 그 물리 디스크

@@ -1,5 +1,5 @@
 // 시스템 화면(CPU·메모리·GPU·온도·전원·프로세스) 수집기. 계산은 ServersCore SystemStats.
-// 화면이 떠 있고 창이 보일 때만 3초마다 전부 읽는다 (SystemDashboardView 의 .task).
+// 화면이 떠 있고 창이 보일 때만 설정의 간격(기본 3초 — AppPreferences.systemInterval)마다 전부 읽는다 (SystemDashboardView 의 .sampling).
 // 사이드바 요약(CPU·메모리)은 창이 보일 때 AppModel 의 5초 갱신이 가볍게(full: false) 부른다.
 
 import Foundation
@@ -138,9 +138,6 @@ final class SystemMonitor: ObservableObject {
 
     /// "CPU 12% · 메모리 62%"
     var summary: String {
-        guard let snapshot else { return "확인 중…" }
-        let cpu = snapshot.cpu.map { "CPU \(Int($0.total.rounded()))%" } ?? "CPU –"
-        let memory = snapshot.memory.map { "메모리 \(Int(($0.usedFraction * 100).rounded()))%" } ?? "메모리 –"
-        return "\(cpu) · \(memory)"
+        SystemSnapshot.sidebarSummary(snapshot)
     }
 }
