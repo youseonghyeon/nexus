@@ -10,7 +10,7 @@ struct LocalDashboardView: View {
 
     var body: some View {
         let info = model.localInfo
-        ScrollView {
+        DashboardScroll {
             VStack(alignment: .leading, spacing: Metrics.gap) {
                 HeroCard { header(info) } strip: {
                     Group {
@@ -30,11 +30,7 @@ struct LocalDashboardView: View {
                 }
             }
             .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
-            .padding(EdgeInsets(top: 0, leading: 40, bottom: 20, trailing: 40))   // 위는 툴바가 이미 띄워 준다
-            .frame(maxWidth: 1200, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)   // 스크롤 영역은 창 폭 전체 — 툴바 밑 띠가 1200 에서 끊기지 않게
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await model.fetchLocalInfo() }   // 선택(didSet)이 이미 읽는 중이면 그 읽기를 기다린다
     }
 
@@ -122,21 +118,12 @@ struct LocalDashboardView: View {
                     Text(proxies.joined(separator: "\n")).textSelection(.enabled)
                 }
             }
-            GridRow(alignment: .top) {
-                Text("공인 IP").font(.fieldLabel).foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
-                        Text(model.publicIP[""] ?? (model.publicIPLoading.contains("") ? "확인 중…" : "–")).textSelection(.enabled)
-                        if model.publicIPLoading.contains("") { ProgressView().controlSize(.small) }
-                        Button { model.fetchPublicIP(force: true) } label: { Image(systemName: "arrow.clockwise") }
-                            .accessibilityLabel("공인 IP 다시 확인")
-                            .buttonStyle(.borderless).controlSize(.small).help("다시 확인").disabled(model.publicIPLoading.contains(""))
-                    }
-                    if let ip = model.publicIP[""], let location = model.publicIPLocation[ip], !location.text.isEmpty {
-                        Text(location.text).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
-                            .help("IP 로 추정한 위치 — 등록지로 나올 수 있습니다")
-                    }
-                }
+            // 기본 경로("")로 나가 본 값
+            let loading = model.publicIPLoading.contains("")
+            PublicIPGridRow(loading: loading, retryDisabled: loading,
+                            location: model.publicIP[""].flatMap { model.publicIPLocation[$0] }?.text,
+                            retry: { model.fetchPublicIP(force: true) }) {
+                Text(model.publicIP[""] ?? (loading ? "확인 중…" : "–")).textSelection(.enabled)
             }
         }
     }

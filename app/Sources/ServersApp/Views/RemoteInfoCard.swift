@@ -231,9 +231,7 @@ private struct PortsTableRow: View {
                 .opacity(hovering ? 1 : 0)   // 자리는 남겨 둬 행 높이·폭이 바뀌지 않게
                 .allowsHitTesting(hovering)
         }
-        .padding(.horizontal, 6).padding(.vertical, 3)
-        .background(hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))   // Services 표와 같은 행 강조
-        .contentShape(Rectangle())
+        .tableRowSurface(highlighted: hovering)   // Services 표와 같은 행 강조
         .onHover { hovering = $0 }
         .onTapGesture { model.copy(item.copyAddress) }
     }

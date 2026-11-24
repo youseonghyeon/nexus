@@ -50,3 +50,46 @@ struct TabBarPanels: View {
         model.closeNotes()
     }
 }
+
+// MARK: 두 패널(명령 모음 · 메모)이 같이 쓰는 부품
+
+extension View {
+    /// 패널의 한 줄 입력칸: 테두리 없는 칸 + 여백 8 · 5 + 입력칸 면
+    func panelField() -> some View {
+        textFieldStyle(.plain)
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .fieldSurface()
+    }
+
+    /// 패널 목록의 한 줄 면: 여백 8 · 6, 마우스를 올렸거나 ↑↓ 로 고른 줄은 옅은 면, 줄 전체가 마우스를 받는다
+    func panelRowSurface(highlighted: Bool) -> some View {
+        padding(.horizontal, 8).padding(.vertical, 6)
+            .background(highlighted ? Color.primary.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
+            .contentShape(Rectangle())
+    }
+}
+
+/// 편집 화면 아래 줄: 삭제(편집일 때만 — delete 가 nil 이면 없다) | 취소 · 저장(⌘Return)
+struct PanelEditorFooter: View {
+    let delete: (() -> Void)?
+    let cancel: () -> Void
+    let save: () -> Void
+    let saveDisabled: Bool
+
+    var body: some View {
+        HStack {
+            if let delete {
+                Button("삭제", action: delete)
+                    .buttonStyle(SecondaryButtonStyle())
+            }
+            Spacer()
+            Button("취소", action: cancel)
+                .buttonStyle(SecondaryButtonStyle())
+            Button("저장", action: save)
+                .buttonStyle(PrimaryButtonStyle())
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(saveDisabled)
+                .help("저장 (⌘Return)")
+        }
+    }
+}

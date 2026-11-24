@@ -1,7 +1,38 @@
-// 망 Dashboard 가 쓰는 부품: 켜기/끄기 버튼 · 이 망의 서버 목록 · 장치별 수치(받기/보내기 · 인터넷 응답 · 속도 · 공인 IP).
+// 망 Dashboard 가 쓰는 부품: 머리글(NetworkHeader) · 켜기/끄기 버튼 · 이 망의 서버 목록 · 장치별 수치(받기/보내기 · 인터넷 응답 · 속도 · 공인 IP).
 
 import ServersCore
 import SwiftUI
+
+/// 망 화면(Tailscale VPN · Intranet · Wi-Fi · Ethernet)의 머리글: 큰 제목 + 딱지 · 부제 | 결론 알약 · 확인 시각.
+/// LocalHeader 와는 제목–부제 간격(4)과 제목 옆 딱지 줄이 다르다
+struct NetworkHeader<Chips: View>: View {
+    let title: String
+    let subtitle: String
+    let tone: StatusTone
+    let conclusion: String
+    let checkedAt: Date?
+    /// 제목 옆 딱지 ("인터넷 경로" · Wi-Fi 규격)
+    @ViewBuilder let chips: Chips
+
+    var body: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(title).font(.screenTitle).tracking(-0.6)
+                    chips
+                }
+                Text(subtitle).font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 6) {
+                StatusPill(text: conclusion, tone: tone)
+                if let at = checkedAt {
+                    Text("\(at.formatted(date: .omitted, time: .shortened)) 확인").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
 
 /// 켜기/끄기: 사이드바 행과 같은 규칙 (Touch ID·비밀번호는 누른 뒤에 뜬다)
 struct NetworkToggleButton: View {
@@ -227,19 +258,38 @@ struct PublicIPRow: View {
     let device: String?
 
     var body: some View {
+        let ip = device.flatMap { model.publicIP[$0] }
+        PublicIPGridRow(loading: device.map { model.publicIPLoading.contains($0) } ?? false, retryDisabled: device == nil,
+                        location: ip.flatMap { model.publicIPLocation[$0] }?.text,
+                        retry: { if let device { model.fetchPublicIP(device: device, force: true) } }) {
+            Text(ip ?? "–").textSelection(.enabled)
+        }
+    }
+}
+
+/// 공인 IP 한 줄의 틀 (망 화면 · VPN 화면 · this Mac 화면): 라벨 | 값 · 묻는 중 표시 · ↻ , 그 아래 위치(도시 · AS — 공인 IP 와 함께 받는다).
+/// 값 칸의 모양(없을 때 문구 · 실패 문구)과 ↻ 를 끄는 조건은 화면마다 달라 부르는 쪽이 준다
+struct PublicIPGridRow<Value: View>: View {
+    let loading: Bool
+    let retryDisabled: Bool
+    /// 위치 문구 (없거나 비었으면 줄을 내지 않는다)
+    let location: String?
+    let retry: () -> Void
+    @ViewBuilder let value: Value
+
+    var body: some View {
         GridRow(alignment: .top) {
             Text("공인 IP").font(.fieldLabel).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
-                    Text(device.flatMap { model.publicIP[$0] } ?? "–").textSelection(.enabled)
-                    if let device, model.publicIPLoading.contains(device) { ProgressView().controlSize(.small) }
-                    Button { if let device { model.fetchPublicIP(device: device, force: true) } } label: { Image(systemName: "arrow.clockwise") }
+                    value
+                    if loading { ProgressView().controlSize(.small) }
+                    Button(action: retry) { Image(systemName: "arrow.clockwise") }
                         .accessibilityLabel("공인 IP 다시 확인")
-                        .buttonStyle(.borderless).controlSize(.small).help("다시 확인").disabled(device == nil)
+                        .buttonStyle(.borderless).controlSize(.small).help("다시 확인").disabled(retryDisabled)
                 }
-                // 위치(도시 · AS)는 공인 IP 와 함께 받는다 — VPN 화면과 같은 줄
-                if let ip = device.flatMap({ model.publicIP[$0] }), let location = model.publicIPLocation[ip], !location.text.isEmpty {
-                    Text(location.text).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                if let location, !location.isEmpty {
+                    Text(location).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
                         .help("IP 로 추정한 위치 — 등록지로 나올 수 있습니다")
                 }
             }

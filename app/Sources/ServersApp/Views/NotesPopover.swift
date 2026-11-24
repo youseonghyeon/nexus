@@ -83,9 +83,7 @@ struct NotesPopover: View {
                     .padding(.vertical, 8)
             } else {
                 TextField("검색 · ↑↓ 고르기 · Return", text: $query)
-                    .textFieldStyle(.plain)
-                    .padding(.horizontal, 8).padding(.vertical, 5)
-                    .fieldSurface()
+                    .panelField()
                     .focused($searchFocused)
                     .onSubmit { if shown.indices.contains(selected) { activate(shown[selected]) } }
                     .onKeyPress(.downArrow) { move(1); return .handled }
@@ -168,9 +166,7 @@ private struct NoteRow: View {
                 RowIconButton(systemName: "pencil", help: "편집", visible: hovering, action: edit)
             }
         }
-        .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(hovering || isSelected ? Color.primary.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
-        .contentShape(Rectangle())
+        .panelRowSurface(highlighted: hovering || isSelected)
         .onHover { hovering = $0 }
         .onTapGesture(perform: activate)
     }
@@ -256,20 +252,9 @@ private struct NoteEditor: View {
             case .login: login
             case .memo: memo
             }
-            HStack {
-                if !isNew {
-                    Button("삭제") { model.deleteNote(draft.id, for: serverKey); done() }
-                        .buttonStyle(SecondaryButtonStyle())
-                }
-                Spacer()
-                Button("취소", action: done)
-                    .buttonStyle(SecondaryButtonStyle())
-                Button("저장") { if model.saveNote(draft, for: serverKey) { done() } }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(model.notesError != nil || NoteVault.normalized(draft) == nil)
-                    .help("저장 (⌘Return)")
-            }
+            PanelEditorFooter(delete: isNew ? nil : { model.deleteNote(draft.id, for: serverKey); done() }, cancel: done,
+                              save: { if model.saveNote(draft, for: serverKey) { done() } },
+                              saveDisabled: model.notesError != nil || NoteVault.normalized(draft) == nil)
         }
         // 목록에서 바뀌어 들어오는 순간에 주면 무시된다 — 화면이 붙은 다음 차례에. 주소가 채워져 있으면(브라우저에서 연 새 로그인) ID 부터
         .onAppear { DispatchQueue.main.async { focused = draft.kind == .memo ? .title : (sites[0].isEmpty ? .site(0) : .username) } }

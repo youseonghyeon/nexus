@@ -113,9 +113,7 @@ struct SnippetsPopover: View {
                     .padding(.vertical, 8)
             } else {
                 TextField("검색 · ↑↓ 고르기 · Return", text: $query)
-                    .textFieldStyle(.plain)
-                    .padding(.horizontal, 8).padding(.vertical, 5)
-                    .fieldSurface()
+                    .panelField()
                     .focused($searchFocused)
                     .onSubmit {
                         guard shown.indices.contains(selected) else { return }
@@ -191,9 +189,7 @@ private struct SnippetRow: View {
                 RowIconButton(systemName: "pencil", help: "편집", visible: hovering, action: edit)
             }
         }
-        .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(hovering || isSelected ? Color.primary.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
-        .contentShape(Rectangle())
+        .panelRowSurface(highlighted: hovering || isSelected)
         .onHover { hovering = $0 }
         .onTapGesture(perform: canType ? type : copy)
         .contextMenu {
@@ -244,9 +240,7 @@ private struct SnippetConfirm: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("확인하려면 \(Text(word).bold()) 를 입력하세요").font(.callout)
             TextField(word, text: $typed)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 8).padding(.vertical, 5)
-                .fieldSurface()
+                .panelField()
                 .focused($focused)
                 .onSubmit { if ok { confirm() } }
             HStack {
@@ -287,9 +281,7 @@ private struct SnippetFill: View {
                 HStack(spacing: 8) {
                     Text(name).font(.callout).frame(minWidth: 60, alignment: .leading)
                     TextField(name, text: Binding(get: { values[name] ?? "" }, set: { values[name] = $0 }))
-                        .textFieldStyle(.plain)
-                        .padding(.horizontal, 8).padding(.vertical, 5)
-                        .fieldSurface()
+                        .panelField()
                         .focused($focused, equals: name)
                         .onSubmit { next(after: name) }
                 }
@@ -344,9 +336,7 @@ private struct SnippetEditor: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(isNew ? "명령 추가" : "명령 편집").font(.caption).fontWeight(.medium).foregroundStyle(.secondary)
             TextField("이름 (비우면 명령 첫 줄)", text: $draft.title)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 8).padding(.vertical, 5)
-                .fieldSurface()
+                .panelField()
                 .focused($titleFocused)
             TextEditor(text: $draft.command)
                 .font(.system(.callout, design: .monospaced))
@@ -371,20 +361,9 @@ private struct SnippetEditor: View {
                 Text("여러 줄 명령은 셸에 따라 체크를 꺼도 줄마다 실행될 수 있습니다.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            HStack {
-                if !isNew {
-                    Button("삭제") { model.deleteSnippet(draft.id); done() }
-                        .buttonStyle(SecondaryButtonStyle())
-                }
-                Spacer()
-                Button("취소", action: done)
-                    .buttonStyle(SecondaryButtonStyle())
-                Button("저장") { if model.saveSnippet(draft) { done() } }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(SnippetStore.normalized(draft) == nil)
-                    .help("저장 (⌘Return)")
-            }
+            PanelEditorFooter(delete: isNew ? nil : { model.deleteSnippet(draft.id); done() }, cancel: done,
+                              save: { if model.saveSnippet(draft) { done() } },
+                              saveDisabled: SnippetStore.normalized(draft) == nil)
         }
         .onAppear {
             titleFocused = true

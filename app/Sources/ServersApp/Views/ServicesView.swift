@@ -8,7 +8,7 @@ import SwiftUI
 
 /// 오른쪽 열 폭 (서비스·파드 공통)
 private enum Column {
-    static let uptime: CGFloat = 92
+    static let uptime = InfoColumn.uptime
     static let restarts: CGFloat = 72
     static let ready: CGFloat = 36
     static let status: CGFloat = 140
@@ -45,6 +45,7 @@ struct ServicesView: View {
                         }
                         if !report.basicRunning.isEmpty {
                             FoldButton(title: "기본 서비스 \(report.basicRunning.count)개", open: showBasic) { showBasic.toggle() }
+                                .padding(.vertical, 3)
                             if showBasic {
                                 ForEach(report.basicRunning) { unit in runningRow(unit) }
                             }
@@ -120,6 +121,7 @@ struct ServicesView: View {
             FoldButton(title: "\(foldTitle) \(finished.count)개", open: openFinished.contains(key)) {
                 if openFinished.contains(key) { openFinished.remove(key) } else { openFinished.insert(key) }
             }
+            .padding(.vertical, 3)
             if openFinished.contains(key) {
                 ForEach(finished) { item in containerRow(item) }
             }
@@ -211,22 +213,6 @@ private struct DockerPortsLegend: View {
     }
 }
 
-/// "› 기본 서비스 22개" 접기·펼치기
-private struct FoldButton: View {
-    let title: String
-    let open: Bool
-    let toggle: () -> Void
-
-    var body: some View {
-        Button(action: toggle) {
-            Label(title, systemImage: open ? "chevron.down" : "chevron.right")
-                .font(.caption).foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .padding(.leading, 6).padding(.vertical, 3)
-    }
-}
-
 /// 서비스 한 줄: 점 · 이름 · 설명(남는 폭) · 오른쪽 열들. 리눅스면 마우스를 올리면 옅은 면, 누르면 최근 로그.
 private struct ServiceRow<Trailing: View>: View {
     let unit: ServiceUnit
@@ -244,9 +230,7 @@ private struct ServiceRow<Trailing: View>: View {
             Spacer(minLength: 8)
             HStack(spacing: 0) { trailing }.foregroundStyle(.secondary).monospacedDigit()
         }
-        .padding(.horizontal, 6).padding(.vertical, 3)
-        .background(canOpenLog && hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
-        .contentShape(Rectangle())
+        .tableRowSurface(highlighted: canOpenLog && hovering)
         .onHover { hovering = $0 }
         .onTapGesture { if canOpenLog { openLog() } }
         .modifier(LogHelp(enabled: canOpenLog))
@@ -299,9 +283,7 @@ private struct ContainerRow: View {
             .lineLimit(1).truncationMode(.tail)
             .foregroundStyle(.secondary).monospacedDigit()
         }
-        .padding(.horizontal, 6).padding(.vertical, 3)
-        .background(hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
-        .contentShape(Rectangle())
+        .tableRowSurface(highlighted: hovering)
         .onHover { hovering = $0 }
         .onTapGesture(perform: tap)
         .contextMenu { if opensLog { Button("이름 복사", action: copy) } }

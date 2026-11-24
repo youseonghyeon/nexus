@@ -9,7 +9,7 @@ struct NetworkDashboardView: View {
     let kind: ServerNetwork
 
     var body: some View {
-        ScrollView {
+        DashboardScroll {
             VStack(alignment: .leading, spacing: Metrics.gap) {
                 HeroCard { header } strip: { metrics }
                 switch kind {
@@ -19,31 +19,14 @@ struct NetworkDashboardView: View {
                 }
                 InfoCard(title: "서버") { NetworkServersList(kind: kind) }
             }
-            .padding(EdgeInsets(top: 0, leading: 40, bottom: 20, trailing: 40))   // 위는 툴바가 이미 띄워 준다
-            .frame(maxWidth: 1200, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)   // 스크롤 영역은 창 폭 전체 — 툴바 밑 띠가 1200 에서 끊기지 않게
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     // MARK: 머리글
 
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(model.networkName(kind)).font(.screenTitle).tracking(-0.6)
-                    if isDefaultRoute { StatusChip(text: "인터넷 경로", tone: .good) }
-                }
-                Text(subtitle).font(.callout).foregroundStyle(.secondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
-                StatusPill(text: conclusion, tone: tone)
-                if let at = model.networkInfoAt {
-                    Text("\(at.formatted(date: .omitted, time: .shortened)) 확인").font(.caption).foregroundStyle(.secondary)
-                }
-            }
+        NetworkHeader(title: model.networkName(kind), subtitle: subtitle, tone: tone, conclusion: conclusion, checkedAt: model.networkInfoAt) {
+            if isDefaultRoute { StatusChip(text: "인터넷 경로", tone: .good) }
         }
     }
 
@@ -226,17 +209,7 @@ struct NetworkDashboardView: View {
             }
         }
         // 다른 망 화면처럼 상태·주소를 나란히 (좁으면 위아래로)
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: Metrics.gap) {
-                status.fillingHeight()
-                address.fillingHeight()
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            VStack(alignment: .leading, spacing: Metrics.gap) {
-                status
-                address
-            }
-        }
+        CardPair(left: status, right: address)
         DiagnosticCard(screen: AppModel.lanKey, wifi: model.wifi)
     }
 

@@ -1,5 +1,6 @@
 // 원격 정보 탭(OpenWrtViews · LinuxInfoViews · ServicesView)이 같이 쓰는 표 부품:
-// 원문 출력(RawLines) · 구역 제목(infoSection) · 한 줄(OpenWrtRow) · 받음/보냄 글자 · 경로 줄 · 상세 격자의 한 줄.
+// 원문 출력(RawLines) · 구역 제목(infoSection) · 한 줄(OpenWrtRow) · 행 면(tableRowSurface) · 접기 버튼(FoldButton) · 같이 쓰는 열 폭(InfoColumn) ·
+// 받음/보냄 글자 · 경로 줄 · 상세 격자의 한 줄.
 
 import ServersCore
 import SwiftUI
@@ -27,6 +28,43 @@ func transferText(_ rx: UInt64?, _ tx: UInt64?) -> String {
     return "↓ \(DiskFormat.bytes(rx))  ↑ \(DiskFormat.bytes(tx))"
 }
 
+/// 여러 표가 같은 자리에 맞추는 열 폭 (그 표만 쓰는 폭은 각 파일에)
+enum InfoColumn {
+    /// 가동 시간 — 서비스 · docker · 파드 · OpenWrt 가 모두 맨 오른쪽 같은 자리
+    static let uptime: CGFloat = 92
+    static let address: CGFloat = 150
+    static let bytes: CGFloat = 150
+    static let chevron: CGFloat = 18
+    /// 점 뒤 이름 줄에 맞춘 들여쓰기 (행 여백 6 + 점 8 + 간격 8)
+    static let indent: CGFloat = 22
+}
+
+extension View {
+    /// 표 한 줄의 면: 여백 6 · 3, 강조할 때(누를 수 있는 줄에 마우스가 올라감) 옅은 면, 줄 전체가 마우스를 받는다.
+    /// 마우스가 올라갔는지는 부르는 행이 따로 든다 — 표가 들면 마우스가 행을 넘을 때마다 모든 행을 다시 그렸다
+    func tableRowSurface(highlighted: Bool) -> some View {
+        padding(.horizontal, 6).padding(.vertical, 3)
+            .background(highlighted ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
+            .contentShape(Rectangle())
+    }
+}
+
+/// "› 기본 서비스 22개" 접기·펼치기. 위아래 여백은 부르는 쪽이 준다 (표마다 다르다)
+struct FoldButton: View {
+    let title: String
+    let open: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            Label(title, systemImage: open ? "chevron.down" : "chevron.right")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .padding(.leading, 6)
+    }
+}
+
 /// 한 줄: 점 · 내용 · 오른쪽 열. 누를 수 있으면 마우스를 올렸을 때 옅은 면
 struct OpenWrtRow<Leading: View, Trailing: View>: View {
     let dot: StatusTone
@@ -43,9 +81,7 @@ struct OpenWrtRow<Leading: View, Trailing: View>: View {
             Spacer(minLength: 8)
             HStack(spacing: 0) { trailing }.foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
         }
-        .padding(.horizontal, 6).padding(.vertical, 3)
-        .background(action != nil && hovering ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
-        .contentShape(Rectangle())
+        .tableRowSurface(highlighted: action != nil && hovering)
         .onHover { hovering = $0 }
         .onTapGesture { action?() }
         .help(help ?? "")

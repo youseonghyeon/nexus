@@ -101,6 +101,42 @@ extension InfoCard where Accessory == EmptyView {
     }
 }
 
+/// 상세 화면의 스크롤 뼈대 (망 · 이 Mac · 서버 정보 화면): 좌우 40 · 아래 여백, 내용 폭은 1200 까지. 내용은 카드를 쌓은 VStack 하나
+struct DashboardScroll<Content: View>: View {
+    var bottom: CGFloat = 20
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ScrollView {
+            content
+                .padding(EdgeInsets(top: 0, leading: 40, bottom: bottom, trailing: 40))   // 위는 툴바가 이미 띄워 준다
+                .frame(maxWidth: 1200, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .topLeading)   // 스크롤 영역은 창 폭 전체 — 툴바 밑 띠가 1200 에서 끊기지 않게
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+/// 나란한 카드 쌍: 들어가면 옆으로(두 카드 높이를 맞춘다), 안 들어가면 위아래로
+struct CardPair<LeftContent: View, LeftAccessory: View, RightContent: View, RightAccessory: View>: View {
+    let left: InfoCard<LeftContent, LeftAccessory>
+    let right: InfoCard<RightContent, RightAccessory>
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: Metrics.gap) {
+                left.fillingHeight()
+                right.fillingHeight()
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: Metrics.gap) {
+                left
+                right
+            }
+        }
+    }
+}
+
 /// 보조 버튼 (Browser·Tunnel… 등): 조작부 면 + 머리카락 선. 마우스를 올리면 한 단계 밝아진다.
 struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {

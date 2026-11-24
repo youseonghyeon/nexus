@@ -14,23 +14,12 @@ struct ServerInfoView: View {
     }
 
     var body: some View {
-        ScrollView {
+        DashboardScroll(bottom: 24) {
             VStack(alignment: .leading, spacing: Metrics.gap) {
                 ServerHero(server: server)
-                ViewThatFits(in: .horizontal) {
-                    // 두 카드 높이를 맞춘다 — 파일 카드의 드롭 영역이 남는 높이를 채운다
-                    HStack(alignment: .top, spacing: Metrics.gap) {
-                        InfoCard(title: "접속") { ConnectionCard(server: server) } accessory: { EditServerButton(server: server) }
-                            .fillingHeight()
-                        InfoCard(title: actionsTitle) { ActionButtons(server: server) }
-                            .fillingHeight()
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                    VStack(alignment: .leading, spacing: Metrics.gap) {
-                        InfoCard(title: "접속") { ConnectionCard(server: server) } accessory: { EditServerButton(server: server) }
-                        InfoCard(title: actionsTitle) { ActionButtons(server: server) }
-                    }
-                }
+                // 두 카드 높이를 맞춘다 — 파일 카드의 드롭 영역이 남는 높이를 채운다
+                CardPair(left: InfoCard(title: "접속") { ConnectionCard(server: server) } accessory: { EditServerButton(server: server) },
+                         right: InfoCard(title: actionsTitle) { ActionButtons(server: server) })
                 if RemoteCommands.query(.services, for: server.type) != nil {
                     RemoteInfoCard(server: server)
                     // 달라진 것이 있을 때만 — 빈 카드가 늘 떠 있으면 거슬렸다 (2026-11-18 사용자 지적)
@@ -40,11 +29,7 @@ struct ServerInfoView: View {
                     InfoCard(title: "터널") { TunnelsCard(server: server) }
                 }
             }
-            .padding(EdgeInsets(top: 0, leading: 40, bottom: 24, trailing: 40))   // 위는 툴바가 이미 띄워 준다
-            .frame(maxWidth: 1200, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)   // 스크롤 영역은 창 폭 전체 — 툴바 밑 띠가 1200 에서 끊기지 않게
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 

@@ -1,4 +1,5 @@
 // LOCAL 의 시스템·디스크·블루투스 화면이 같이 쓰는 부품: 보이는 동안만 도는 수집 루프 · 머리글 · 비율 막대.
+// 서버 Live 탭과 같이 쓰는 것: 코어 막대 한 줄(CoreBar) · 메모리 구성 행의 네모와 숫자 칸.
 
 import ServersCore
 import SwiftUI
@@ -99,5 +100,40 @@ struct Swatch: View {
     let opacity: Double
     var body: some View {
         RoundedRectangle(cornerRadius: 2).fill(Color.primary.opacity(opacity)).frame(width: 9, height: 9)
+    }
+
+    /// 메모리 구성 행의 네모 (System 화면 · 서버 Live 탭): 농도 0 은 빈 칸 테두리 (여유)
+    static func legend(_ shade: Double) -> some View {
+        Swatch(opacity: shade).overlay(shade == 0 ? RoundedRectangle(cornerRadius: 2).stroke(Color.secondary.opacity(0.5)) : nil)
+    }
+}
+
+/// 메모리 구성 행(GridRow)의 숫자 두 칸: 크기 · 전체에서의 몫 (System 화면 · 서버 Live 탭)
+@ViewBuilder
+func memoryShareCells(_ value: UInt64, of total: UInt64) -> some View {
+    Text(SystemFormat.bytes(value)).monospacedDigit().gridColumnAlignment(.trailing)
+    Text(total > 0 ? "\(Int((Double(value) / Double(total) * 100).rounded()))%" : "–").monospacedDigit().foregroundStyle(.secondary)
+        .gridColumnAlignment(.trailing)
+}
+
+/// 코어 하나의 막대 한 줄: 이름 · 막대 · 퍼센트 (System 화면 · 서버 Live 탭). 이름 · 숫자 칸 폭은 화면마다 다르다
+struct CoreBar: View {
+    let label: String
+    let labelWidth: CGFloat
+    let value: Double
+    let valueWidth: CGFloat
+    /// 설정의 코어 애니메이션
+    let animated: Bool
+
+    var body: some View {
+        let level = SystemHealth.level(value, .cpu)
+        HStack(spacing: 8) {
+            Text(label).font(.caption.monospaced()).foregroundStyle(.secondary).frame(width: labelWidth, alignment: .leading)
+            // 갱신 간격(기본 3초)마다 오는 값으로 짧게(0.4초) 이어 움직인다 — 한 번에 뛰면 딱딱해 보였고, 길게 하면 그리는 부담이 컸다
+            MeterBar(level: value / 100, tone: level.tone,
+                     animation: animated ? .easeInOut(duration: 0.4) : nil)
+            // 숫자는 바로 바꾼다 — 굴러가는 효과(numericText)는 프레임마다 글자를 CPU 로 다시 그려 화면 하나에 코어 10% 넘게 썼다
+            Text("\(Int(value.rounded()))%").font(.caption).monospacedDigit().frame(width: valueWidth, alignment: .trailing)
+        }
     }
 }

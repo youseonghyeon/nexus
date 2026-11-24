@@ -5,12 +5,11 @@ import ServersCore
 import SwiftUI
 
 private enum LinuxColumn {
-    static let address: CGFloat = 150
+    static let address = InfoColumn.address
     static let state: CGFloat = 50
-    static let bytes: CGFloat = 150
-    static let chevron: CGFloat = 18
-    /// 점 뒤 이름 줄에 맞춘 들여쓰기 (행 여백 6 + 점 8 + 간격 8)
-    static let indent: CGFloat = 22
+    static let bytes = InfoColumn.bytes
+    static let chevron = InfoColumn.chevron
+    static let indent = InfoColumn.indent
     static let when: CGFloat = 110
     static let schedule: CGFloat = 130
     static let user: CGFloat = 70
@@ -45,11 +44,8 @@ struct LinuxNetworkView: View {
                     if network.interfaces.isEmpty { Text("인터페이스가 없습니다").foregroundStyle(.secondary) }
                     let folded = network.layout.foldedItems
                     if !folded.isEmpty {
-                        Button { showFolded.toggle() } label: {
-                            Label("\(network.foldedTitle) \(folded.count)개", systemImage: showFolded ? "chevron.down" : "chevron.right")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain).padding(.leading, 6).padding(.top, 4)
+                        FoldButton(title: "\(network.foldedTitle) \(folded.count)개", open: showFolded) { showFolded.toggle() }
+                            .padding(.top, 4)
                         if showFolded { ForEach(folded) { item in interfaceItem(item, routing: network.routing) } }
                     }
                     if network.routing == nil {

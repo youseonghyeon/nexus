@@ -11,7 +11,7 @@ struct EthernetDashboardView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        ScrollView {
+        DashboardScroll {
             VStack(alignment: .leading, spacing: Metrics.gap) {
                 HeroCard { header } strip: { metrics }
                 if adapters.isEmpty {
@@ -20,48 +20,23 @@ struct EthernetDashboardView: View {
                     }
                 }
                 ForEach(adapters) { adapter in
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .top, spacing: Metrics.gap) {
-                            InfoCard(title: title("상태", adapter)) { statusRows(adapter) }.fillingHeight()
-                            InfoCard(title: title("주소", adapter)) { addressRows(adapter) }.fillingHeight()
-                        }
-                        .fixedSize(horizontal: false, vertical: true)   // 두 카드 높이를 맞춘다
-                        VStack(alignment: .leading, spacing: Metrics.gap) {
-                            InfoCard(title: title("상태", adapter)) { statusRows(adapter) }
-                            InfoCard(title: title("주소", adapter)) { addressRows(adapter) }
-                        }
-                    }
+                    CardPair(left: InfoCard(title: title("상태", adapter)) { statusRows(adapter) },
+                             right: InfoCard(title: title("주소", adapter)) { addressRows(adapter) })
                 }
                 InfoCard(title: "서비스") { serviceRows }
                 InfoCard(title: "인터넷") { internetRows }
                 // 진단도 대표 어댑터로만 (인터넷 카드와 같은 장치) — 어댑터가 여럿이면 제목에 서비스 이름
                 DiagnosticCard(screen: AppModel.ethernetKey, title: primary.map { title("진단", $0) } ?? "진단", wifi: model.wifi)
             }
-            .padding(EdgeInsets(top: 0, leading: 40, bottom: 20, trailing: 40))   // 위는 툴바가 이미 띄워 준다
-            .frame(maxWidth: 1200, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)   // 스크롤 영역은 창 폭 전체 — 툴바 밑 띠가 1200 에서 끊기지 않게
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     // MARK: 머리글
 
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(primary?.service ?? "Ethernet").font(.screenTitle).tracking(-0.6)
-                    if let primary, isDefaultRoute(primary) { StatusChip(text: "인터넷 경로", tone: .good) }
-                }
-                Text(subtitle).font(.callout).foregroundStyle(.secondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
-                StatusPill(text: conclusion(primary), tone: model.ethernetTone)
-                if let at = model.networkInfoAt {
-                    Text("\(at.formatted(date: .omitted, time: .shortened)) 확인").font(.caption).foregroundStyle(.secondary)
-                }
-            }
+        NetworkHeader(title: primary?.service ?? "Ethernet", subtitle: subtitle, tone: model.ethernetTone, conclusion: conclusion(primary),
+                      checkedAt: model.networkInfoAt) {
+            if let primary, isDefaultRoute(primary) { StatusChip(text: "인터넷 경로", tone: .good) }
         }
     }
 

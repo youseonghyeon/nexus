@@ -9,13 +9,7 @@ struct TunnelRow: View {
     @ObservedObject var tunnel: TunnelSession
 
     var body: some View {
-        HStack(spacing: 8) {
-            StatusIcon(symbol: TunnelIcon.symbol(for: tunnel.spec.kind), tone: tunnel.tone)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(tunnel.title).fontWeight(.medium)
-                Text(tunnel.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            Spacer()
+        LocalMonitorRow(name: tunnel.title, symbol: TunnelIcon.symbol(for: tunnel.spec.kind), detail: tunnel.detail, tone: tunnel.tone) {
             if !tunnel.isActive {
                 Button { model.reconnectTunnel(tunnel.id) } label: { Image(systemName: "arrow.clockwise.circle") }.accessibilityLabel("터널 다시 연결")
                     .buttonStyle(.borderless)
@@ -30,8 +24,6 @@ struct TunnelRow: View {
             .buttonStyle(.borderless)
             .help(tunnel.isActive ? "터널 끊기" : "목록에서 지우기")
         }
-        .padding(.vertical, 2)
-        .contentShape(Rectangle())
         .onTapGesture { model.showTunnelInfo(tunnel) }
         .selectionDisabled()
         .contextMenu {
@@ -55,13 +47,7 @@ struct NetworkRow: View {
     @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            StatusIcon(symbol: symbol, tone: tone)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(name).fontWeight(.medium)
-                Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            Spacer()
+        LocalMonitorRow(name: name, symbol: symbol, detail: detail, tone: tone) {
             if isBusy {
                 ProgressView().controlSize(.small)
             } else {
@@ -73,8 +59,6 @@ struct NetworkRow: View {
                     .opacity(hovering ? 1 : 0)
             }
         }
-        .padding(.vertical, 2)
-        .contentShape(Rectangle())
         .onHover { hovering = $0 }
     }
 
@@ -142,12 +126,15 @@ struct NetworkRow: View {
     }
 }
 
-/// LOCAL 의 이 Mac 모니터 행(시스템·디스크·블루투스): 아이콘+상태 점 · 이름 · 요약. NETWORK 행과 같은 모양이고 버튼은 없다.
-struct LocalMonitorRow: View {
+/// 사이드바 행의 틀: 아이콘+상태 점 · 이름 · 요약 | 오른쪽 조작부(trailing — 없으면 비운다).
+/// LOCAL 의 이 Mac 모니터 행(시스템·디스크·블루투스)과 Ethernet 행은 조작부 없이, 터널 · 망 · Wi-Fi 행은 버튼을 넣는다.
+/// 마우스가 올라갔는지(hover 때만 보이는 버튼)는 부르는 행이 든다
+struct LocalMonitorRow<Trailing: View>: View {
     let name: String
     let symbol: String
     let detail: String
     let tone: StatusTone
+    @ViewBuilder var trailing: Trailing
 
     var body: some View {
         HStack(spacing: 8) {
@@ -157,9 +144,16 @@ struct LocalMonitorRow: View {
                 Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
+            trailing
         }
         .padding(.vertical, 2)
         .contentShape(Rectangle())
+    }
+}
+
+extension LocalMonitorRow where Trailing == EmptyView {
+    init(name: String, symbol: String, detail: String, tone: StatusTone) {
+        self.init(name: name, symbol: symbol, detail: detail, tone: tone) { EmptyView() }
     }
 }
 
@@ -236,13 +230,7 @@ struct WiFiRow: View {
     @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            StatusIcon(symbol: "wifi", tone: tone)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Wi-Fi").fontWeight(.medium)
-                Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            Spacer()
+        LocalMonitorRow(name: "Wi-Fi", symbol: "wifi", detail: detail, tone: tone) {
             if let info = wifi.info {
                 // NetworkRow 와 같은 규칙: 마우스를 올렸을 때만 (자리는 유지)
                 Button(info.powerOn ? "끄기" : "켜기") { model.toggleWiFi() }
@@ -250,8 +238,6 @@ struct WiFiRow: View {
                     .opacity(hovering ? 1 : 0)
             }
         }
-        .padding(.vertical, 2)
-        .contentShape(Rectangle())
         .onHover { hovering = $0 }
     }
 
@@ -264,16 +250,7 @@ struct EthernetRow: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        HStack(spacing: 8) {
-            StatusIcon(symbol: "rectangle.connected.to.line.below", tone: model.ethernetTone)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Ethernet").fontWeight(.medium)
-                Text(model.ethernetDetail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            Spacer()
-        }
-        .padding(.vertical, 2)
-        .contentShape(Rectangle())
+        LocalMonitorRow(name: "Ethernet", symbol: "rectangle.connected.to.line.below", detail: model.ethernetDetail, tone: model.ethernetTone)
     }
 }
 

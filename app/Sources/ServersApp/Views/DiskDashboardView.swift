@@ -13,18 +13,14 @@ struct DiskDashboardView: View {
     @State private var showHidden = false
 
     var body: some View {
-        ScrollView {
+        DashboardScroll {
             VStack(alignment: .leading, spacing: Metrics.gap) {
                 HeroCard { header } strip: { metrics }
                 volumesCard
                 containersCard
                 disksCard
             }
-            .padding(EdgeInsets(top: 0, leading: 40, bottom: 20, trailing: 40))   // 위는 툴바가 이미 띄워 준다
-            .frame(maxWidth: 1200, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)   // 스크롤 영역은 창 폭 전체 — 툴바 밑 띠가 1200 에서 끊기지 않게
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .sampling(every: { AppSettings.interval(AppPreferences.diskInterval) }) { await monitor.sample(full: true, runner: model.runner) }
     }
 

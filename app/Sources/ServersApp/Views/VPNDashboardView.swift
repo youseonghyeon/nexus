@@ -19,7 +19,7 @@ struct VPNDashboardView: View {
     private var connected: [SystemVPN] { (model.vpns ?? []).filter { $0.state == .connected } }
 
     var body: some View {
-        ScrollView {
+        DashboardScroll {
             VStack(alignment: .leading, spacing: Metrics.gap) {
                 // 대표 카드: 띠에 목록 (켜기·끄기가 맨 위에)
                 HeroCard {
@@ -33,17 +33,8 @@ struct VPNDashboardView: View {
                     let detail = model.vpnDetails[vpn.id]
                     VStack(alignment: .leading, spacing: 12) {
                         HeroCard { connectionHeader(vpn, detail) } strip: { tiles(vpn, detail) }
-                        ViewThatFits(in: .horizontal) {
-                            HStack(alignment: .top, spacing: Metrics.gap) {
-                                InfoCard(title: title("상태", vpn)) { statusRows(vpn, detail) }.fillingHeight()
-                                InfoCard(title: title("주소", vpn)) { addressRows(vpn, detail) }.fillingHeight()
-                            }
-                            .fixedSize(horizontal: false, vertical: true)   // 두 카드 높이를 맞춘다
-                            VStack(alignment: .leading, spacing: 12) {
-                                InfoCard(title: title("상태", vpn)) { statusRows(vpn, detail) }
-                                InfoCard(title: title("주소", vpn)) { addressRows(vpn, detail) }
-                            }
-                        }
+                        CardPair(left: InfoCard(title: title("상태", vpn)) { statusRows(vpn, detail) },
+                                 right: InfoCard(title: title("주소", vpn)) { addressRows(vpn, detail) })
                     }
                 }
                 // network=vpn 서버 (Tailscale·Intranet 화면의 서버 카드와 같다)
@@ -52,11 +43,7 @@ struct VPNDashboardView: View {
                 }
                 DiagnosticCard(screen: AppModel.vpnKey, wifi: model.wifi)   // 첫 번째로 연결된 VPN 의 인터페이스로만
             }
-            .padding(EdgeInsets(top: 0, leading: 40, bottom: 20, trailing: 40))   // 위는 툴바가 이미 띄워 준다
-            .frame(maxWidth: 1200, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)   // 스크롤 영역은 창 폭 전체 — 툴바 밑 띠가 1200 에서 끊기지 않게
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .sampling(every: { 5 }) { await model.refreshVPNDetails() }
     }
 
@@ -178,27 +165,16 @@ private struct VPNPublicIPRow: View {
     var body: some View {
         let ip = device.flatMap { model.publicIP[$0] }
         let loading = device.map { model.publicIPLoading.contains($0) } ?? false
-        GridRow(alignment: .top) {
-            Text("공인 IP").font(.fieldLabel).foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 8) {
-                    if let ip {
-                        Text(ip).monospacedDigit().textSelection(.enabled)
-                    } else if let device, model.publicIPFailed.contains(device), !loading {
-                        Text("가져오지 못했습니다").foregroundStyle(.secondary)
-                            .help("이 VPN 으로는 인터넷에 나가지 못합니다 (지정한 경로만 가는 VPN 이거나 막힌 망)")
-                    } else {
-                        Text(loading ? "확인 중…" : "–").foregroundStyle(loading ? .secondary : .primary)
-                    }
-                    if loading { ProgressView().controlSize(.small) }
-                    Button { if let device { model.fetchVPNPublicIP(device: device, owner: vpn.id, force: true) } } label: { Image(systemName: "arrow.clockwise") }
-                        .accessibilityLabel("공인 IP 다시 확인")
-                        .buttonStyle(.borderless).controlSize(.small).help("다시 확인").disabled(device == nil || loading)
-                }
-                if let ip, let location = model.publicIPLocation[ip], !location.text.isEmpty {
-                    Text(location.text).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
-                        .help("IP 로 추정한 위치 — 등록지로 나올 수 있습니다")
-                }
+        PublicIPGridRow(loading: loading, retryDisabled: device == nil || loading,
+                        location: ip.flatMap { model.publicIPLocation[$0] }?.text,
+                        retry: { if let device { model.fetchVPNPublicIP(device: device, owner: vpn.id, force: true) } }) {
+            if let ip {
+                Text(ip).monospacedDigit().textSelection(.enabled)
+            } else if let device, model.publicIPFailed.contains(device), !loading {
+                Text("가져오지 못했습니다").foregroundStyle(.secondary)
+                    .help("이 VPN 으로는 인터넷에 나가지 못합니다 (지정한 경로만 가는 VPN 이거나 막힌 망)")
+            } else {
+                Text(loading ? "확인 중…" : "–").foregroundStyle(loading ? .secondary : .primary)
             }
         }
         .task(id: device) { if let device { model.fetchVPNPublicIP(device: device, owner: vpn.id) } }

@@ -318,21 +318,7 @@ extension AppModel {
     /// 공인 IP 조회 (+ 위치). device "" = 기본 경로, 그 밖은 그 장치로만 나가 본다. 자동 갱신은 5분에 한 번(실패해도 같은 간격),
     /// force 면 즉시 (버튼). 실패하면 이전 값을 유지한다.
     func fetchPublicIP(device: String = "", force: Bool = false) {
-        guard !publicIPLoading.contains(device) else { return }
-        if !force, let at = publicIPAt[device], Date().timeIntervalSince(at) < 300 { return }
-        publicIPLoading.insert(device)
-        let epoch = internetEpoch[device, default: 0]
-        Task {
-            let found = await lookupPublicIP(device: device)
-            publicIPLoading.remove(device)
-            guard internetEpoch[device, default: 0] == epoch else { return }   // 묻는 사이 끊겨 지워졌으면 버린다
-            publicIPAt[device] = Date()
-            if let found {
-                publicIP[device] = found.ip
-                if let location = found.location { publicIPLocation[found.ip] = location }
-            }
-            if found == nil, force { statusMessage = "공인 IP 를 가져오지 못했습니다." }
-        }
+        requestPublicIP(device: device, force: force, failure: .keepsValue)
     }
 
     /// VPN 화면의 공인 IP: 그 VPN 의 utun 으로만 나가 본 주소와 위치 (lookupPublicIP).
@@ -342,6 +328,19 @@ extension AppModel {
             clearVPNPublicIP(device: device)
             publicIPOwner[device] = owner
         }
+        requestPublicIP(device: device, force: force, failure: .clearsValue)
+    }
+
+    /// 조회가 실패했을 때 하는 일 — 두 조회(fetchPublicIP · fetchVPNPublicIP)가 갈리는 곳은 이것뿐이다
+    private enum PublicIPFailure {
+        /// 옛 값을 둔다. 버튼으로 물었을 때만 알림 (망 화면 · this Mac 화면)
+        case keepsValue
+        /// 옛 값을 지우고 실패 표시를 남긴다 — VPN 은 나가는 주소가 바뀌는 것이 곧 정보다. 성공하면 실패 표시를 지운다
+        case clearsValue
+    }
+
+    /// 두 조회의 공통 틀: 묻는 중이면 건너뜀 → 5분 안이면 건너뜀(force 제외) → 묻기 → 묻는 사이 끊겼거나 주인이 바뀌었으면(internetEpoch) 버린다
+    private func requestPublicIP(device: String, force: Bool, failure: PublicIPFailure) {
         guard !publicIPLoading.contains(device) else { return }
         if !force, let at = publicIPAt[device], Date().timeIntervalSince(at) < 300 { return }
         publicIPLoading.insert(device)
@@ -349,15 +348,20 @@ extension AppModel {
         Task {
             let found = await lookupPublicIP(device: device)
             publicIPLoading.remove(device)
-            guard internetEpoch[device, default: 0] == epoch else { return }   // 묻는 사이 끊겼거나 주인이 바뀌었으면 버린다
+            guard internetEpoch[device, default: 0] == epoch else { return }
             publicIPAt[device] = Date()
             if let found {
                 publicIP[device] = found.ip
-                publicIPFailed.remove(device)
+                if failure == .clearsValue { publicIPFailed.remove(device) }
                 if let location = found.location { publicIPLocation[found.ip] = location }
             } else {
-                publicIP[device] = nil   // 실패는 옛 값을 남기지 않는다 — VPN 은 나가는 주소가 바뀌는 것이 곧 정보다
-                publicIPFailed.insert(device)
+                switch failure {
+                case .keepsValue:
+                    if force { statusMessage = "공인 IP 를 가져오지 못했습니다." }
+                case .clearsValue:
+                    publicIP[device] = nil
+                    publicIPFailed.insert(device)
+                }
             }
         }
     }

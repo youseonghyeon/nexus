@@ -11,31 +11,17 @@ struct WiFiDashboardView: View {
     @ObservedObject var wifi: WiFiMonitor
 
     var body: some View {
-        ScrollView {
+        DashboardScroll {
             VStack(alignment: .leading, spacing: Metrics.gap) {
                 HeroCard { header } strip: { metrics }
                 if needsLocationNotice { locationNotice }
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: Metrics.gap) {
-                        InfoCard(title: "상태") { statusRows }.fillingHeight()
-                        InfoCard(title: "주소") { addressRows }.fillingHeight()
-                    }
-                    .fixedSize(horizontal: false, vertical: true)   // 두 카드 높이를 맞춘다
-                    VStack(alignment: .leading, spacing: Metrics.gap) {
-                        InfoCard(title: "상태") { statusRows }
-                        InfoCard(title: "주소") { addressRows }
-                    }
-                }
+                CardPair(left: InfoCard(title: "상태") { statusRows }, right: InfoCard(title: "주소") { addressRows })
                 InfoCard(title: "인터넷") { internetRows }
                 DiagnosticCard(screen: AppModel.wifiKey, wifi: wifi)
                 InfoCard(title: "접속 세부") { detailRows } accessory: { detailButton }
                 InfoCard(title: "주변 네트워크") { nearbyRows } accessory: { scanButton }
             }
-            .padding(EdgeInsets(top: 0, leading: 40, bottom: 20, trailing: 40))   // 위는 툴바가 이미 띄워 준다
-            .frame(maxWidth: 1200, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)   // 스크롤 영역은 창 폭 전체 — 툴바 밑 띠가 1200 에서 끊기지 않게
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // 화면을 열 때 한 번만 직접 검색 (계속 검색하면 연결 응답이 30초마다 튄다 — 그 뒤는 [다시 검색])
         .task { if AppModel.mainWindowVisible { wifi.scanNearby() } }
         // 창이 가려진 채 열려 검색을 건너뛰었으면 "검색 중…" 으로 남는다 — 창이 보이게 될 때 한 번 (AppModel.installVisibilityObserver 와 같은 알림)
@@ -93,22 +79,9 @@ struct WiFiDashboardView: View {
     // MARK: 머리글
 
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(ssidText).font(.screenTitle).tracking(-0.6)
-                    if let phy = wifi.info?.phyMode, associated { StatusChip(text: phy, tone: .muted) }
-                    if isDefaultRoute { StatusChip(text: "인터넷 경로", tone: .good) }
-                }
-                Text(subtitle).font(.callout).foregroundStyle(.secondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
-                StatusPill(text: conclusion, tone: tone)
-                if let at = model.networkInfoAt {
-                    Text("\(at.formatted(date: .omitted, time: .shortened)) 확인").font(.caption).foregroundStyle(.secondary)
-                }
-            }
+        NetworkHeader(title: ssidText, subtitle: subtitle, tone: tone, conclusion: conclusion, checkedAt: model.networkInfoAt) {
+            if let phy = wifi.info?.phyMode, associated { StatusChip(text: phy, tone: .muted) }
+            if isDefaultRoute { StatusChip(text: "인터넷 경로", tone: .good) }
         }
     }
 

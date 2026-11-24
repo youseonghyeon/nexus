@@ -137,13 +137,7 @@ struct ServerLiveView: View {
             if let values = s.cpu?.cores, !values.isEmpty {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 18, alignment: .leading)], alignment: .leading, spacing: 4) {
                     ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                        let level = SystemHealth.level(value, .cpu)
-                        HStack(spacing: 8) {
-                            Text("C\(index)").font(.caption.monospaced()).foregroundStyle(.secondary).frame(width: 30, alignment: .leading)
-                            MeterBar(level: value / 100, tone: level.tone,
-                                     animation: coreAnimation ? .easeInOut(duration: 0.4) : nil)
-                            Text("\(Int(value.rounded()))%").font(.caption).monospacedDigit().frame(width: 34, alignment: .trailing)
-                        }
+                        CoreBar(label: "C\(index)", labelWidth: 30, value: value, valueWidth: 34, animated: coreAnimation)
                     }
                 }
             } else {
@@ -209,15 +203,13 @@ struct ServerLiveView: View {
         GridRow {
             HStack(spacing: 6) {
                 if let shade {
-                    Swatch(opacity: shade).overlay(shade == 0 ? RoundedRectangle(cornerRadius: 2).stroke(Color.secondary.opacity(0.5)) : nil)
+                    Swatch.legend(shade)
                 } else {
                     Color.clear.frame(width: 9, height: 9)
                 }
                 Text(label).foregroundStyle(.secondary)
             }
-            Text(SystemFormat.bytes(value)).monospacedDigit().gridColumnAlignment(.trailing)
-            Text(total > 0 ? "\(Int((Double(value) / Double(total) * 100).rounded()))%" : "–").monospacedDigit().foregroundStyle(.secondary)
-                .gridColumnAlignment(.trailing)
+            memoryShareCells(value, of: total)
         }
     }
 

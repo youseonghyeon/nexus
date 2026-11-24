@@ -5,15 +5,14 @@ import ServersCore
 import SwiftUI
 
 private enum Column {
-    static let uptime: CGFloat = 92
-    static let bytes: CGFloat = 150
-    static let address: CGFloat = 150
+    static let uptime = InfoColumn.uptime
+    static let bytes = InfoColumn.bytes
+    static let address = InfoColumn.address
     static let lease: CGFloat = 92
     static let firewallMatch: CGFloat = 200
     static let firewallTarget: CGFloat = 70
-    static let chevron: CGFloat = 18
-    /// 점 뒤 이름 줄에 맞춘 들여쓰기 (행 여백 6 + 점 8 + 간격 8)
-    static let indent: CGFloat = 22
+    static let chevron = InfoColumn.chevron
+    static let indent = InfoColumn.indent
 }
 
 // MARK: Network
@@ -441,11 +440,7 @@ struct OpenWrtServicesView: View {
                     if report.running.isEmpty { Text("실행 중인 서비스가 없습니다").foregroundStyle(.secondary) }
                 }
                 if !report.other.isEmpty {
-                    Button { showOther.toggle() } label: {
-                        Label("그 밖 \(report.other.count)개 (한 번 도는 스크립트 · 꺼 둔 서비스)", systemImage: showOther ? "chevron.down" : "chevron.right")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain).padding(.leading, 6)
+                    FoldButton(title: "그 밖 \(report.other.count)개 (한 번 도는 스크립트 · 꺼 둔 서비스)", open: showOther) { showOther.toggle() }
                     if showOther {
                         VStack(alignment: .leading, spacing: 2) {
                             ForEach(report.other) { service in

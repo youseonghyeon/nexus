@@ -12,7 +12,7 @@ struct SystemDashboardView: View {
     @AppStorage(AppPreferences.coreAnimationKey) private var coreAnimation = true
 
     var body: some View {
-        ScrollView {
+        DashboardScroll {
             VStack(alignment: .leading, spacing: Metrics.gap) {
                 HeroCard { header } strip: { metrics }
                 // 카드의 이상 폭을 고정해 둔다 — 안 그러면 매 표본 길이가 바뀌는 문구(페이징) 폭으로 두 열·한 열이 번갈아 바뀐다
@@ -30,11 +30,7 @@ struct SystemDashboardView: View {
                 processCard
                 powerCard
             }
-            .padding(EdgeInsets(top: 0, leading: 40, bottom: 20, trailing: 40))   // 위는 툴바가 이미 띄워 준다
-            .frame(maxWidth: 1200, alignment: .topLeading)
-            .frame(maxWidth: .infinity, alignment: .topLeading)   // 스크롤 영역은 창 폭 전체 — 툴바 밑 띠가 1200 에서 끊기지 않게
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .sampling(every: { AppSettings.interval(AppPreferences.systemInterval) }) { await monitor.sample(full: true, runner: model.runner) }
     }
 
@@ -158,16 +154,7 @@ struct SystemDashboardView: View {
         VStack(alignment: .leading, spacing: 5) {
             if let title { Text(title).font(.caption).foregroundStyle(.secondary) }
             ForEach(indices, id: \.self) { index in
-                let value = cores[index]
-                let level = SystemHealth.level(value, .cpu)
-                HStack(spacing: 8) {
-                    Text(info.coreName(index)).font(.caption.monospaced()).foregroundStyle(.secondary).frame(width: 24, alignment: .leading)
-                    // 갱신 간격(기본 3초)마다 오는 값으로 짧게(0.4초) 이어 움직인다 — 한 번에 뛰면 딱딱해 보였고, 길게 하면 그리는 부담이 컸다
-                    MeterBar(level: value / 100, tone: level.tone,
-                             animation: coreAnimation ? .easeInOut(duration: 0.4) : nil)
-                    // 숫자는 바로 바꾼다 — 굴러가는 효과(numericText)는 프레임마다 글자를 CPU 로 다시 그려 화면 하나에 코어 10% 넘게 썼다
-                    Text("\(Int(value.rounded()))%").font(.caption).monospacedDigit().frame(width: 36, alignment: .trailing)
-                }
+                CoreBar(label: info.coreName(index), labelWidth: 24, value: cores[index], valueWidth: 36, animated: coreAnimation)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -211,12 +198,10 @@ struct SystemDashboardView: View {
     private func memoryRow(_ label: String, _ value: UInt64, of total: UInt64, shade: Double, note: String? = nil) -> some View {
         GridRow {
             HStack(spacing: 6) {
-                Swatch(opacity: shade).overlay(shade == 0 ? RoundedRectangle(cornerRadius: 2).stroke(Color.secondary.opacity(0.5)) : nil)
+                Swatch.legend(shade)
                 Text(label)
             }
-            Text(SystemFormat.bytes(value)).monospacedDigit().gridColumnAlignment(.trailing)
-            Text(total > 0 ? "\(Int((Double(value) / Double(total) * 100).rounded()))%" : "–").monospacedDigit().foregroundStyle(.secondary)
-                .gridColumnAlignment(.trailing)
+            memoryShareCells(value, of: total)
             Text(note ?? "").font(.caption).foregroundStyle(.tertiary)
         }
     }
