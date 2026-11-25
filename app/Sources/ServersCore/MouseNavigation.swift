@@ -1,6 +1,8 @@
-// 브라우저 탭의 뒤로 · 앞으로를 마우스 옆 버튼과 ⌘[ · ⌘] 로: 브라우저 탭이 보일 때 본창에서 누르면 그 탭의 뒤로 · 앞으로 (툴바의 ‹ › 와 같은 동작).
+// 브라우저 탭의 뒤로 · 앞으로를 마우스 옆 버튼 · 쓸어 넘기기 · ⌘[ · ⌘] 로: 브라우저 탭이 보일 때 본창에서 누르면 그 탭의 뒤로 · 앞으로 (툴바의 ‹ › 와 같은 동작).
 // 웹 뷰(WKWebView)는 옆 버튼도 ⌘[ · ⌘] 도 스스로 처리하지 않는다 — 감시(MouseShortcuts)가 창에 가기 전에 받아 이 판정대로 한다.
-// macOS 의 버튼 번호: 0 왼쪽 · 1 오른쪽 · 2 가운데 · 3 뒤로 · 4 앞으로. 마우스 드라이버(Logitech 등)는 옆 버튼을 ⌘[ · ⌘] 키로 바꿔 보내기도 한다.
+// macOS 의 버튼 번호: 0 왼쪽 · 1 오른쪽 · 2 가운데 · 3 뒤로 · 4 앞으로.
+// 마우스 드라이버는 옆 버튼을 다른 신호로 바꿔 보낸다 — Logi Options+ 는 쓸어 넘기기(swipe, deltaX +1 뒤로 · −1 앞으로. 누를 때마다 deltaX 0 인 것이 하나 먼저 온다)로
+// 보내는 것을 입력 감시로 찍어 확인했다 (2026-11-25). ⌘[ · ⌘] 로 보내는 드라이버 · 설정도 있다. 트랙패드의 세 손가락 쓸어 넘기기도 같은 신호다.
 
 public enum MouseNavigation {
     public static let backButton = 3
@@ -24,6 +26,11 @@ public enum MouseNavigation {
         case forwardButton: return .forward
         default: return nil
         }
+    }
+
+    /// 쓸어 넘기기: 왼쪽으로(deltaX > 0) 뒤로 · 오른쪽으로(deltaX < 0) 앞으로. 0 은 시작 · 끝을 알리는 것이라 아무것도 아니다
+    public static func direction(swipeDeltaX: Double) -> Direction? {
+        swipeDeltaX > 0 ? .back : swipeDeltaX < 0 ? .forward : nil
     }
 
     /// ⌘[ · ⌘] — ⌘ 만 누른 것 (⌘⇧[ · ⌘⇧] 는 탭 이동). 키는 자리로 본다 (입력기 · 배열과 무관)

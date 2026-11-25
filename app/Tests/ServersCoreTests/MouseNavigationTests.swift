@@ -54,4 +54,14 @@ final class MouseNavigationTests: XCTestCase {
         XCTAssertEqual(MouseNavigation.action(back, mainWindow: true, sheetOpen: false, browserVisible: true, canGoBack: false, canGoForward: true), .swallow)
         XCTAssertNil(MouseNavigation.action(back, mainWindow: true, sheetOpen: false, browserVisible: false, canGoBack: true, canGoForward: true))
     }
+
+    /// 쓸어 넘기기(Logi Options+ 의 옆 버튼 · 트랙패드): +1 뒤로 · −1 앞으로, 누를 때마다 먼저 오는 0 은 아무것도 아니다 — 한 번 누름에 한 번만 움직인다
+    func testSwipe() {
+        XCTAssertEqual(MouseNavigation.direction(swipeDeltaX: 1), .back)
+        XCTAssertEqual(MouseNavigation.direction(swipeDeltaX: -1), .forward)
+        XCTAssertNil(MouseNavigation.direction(swipeDeltaX: 0))
+        // 찍힌 순서 그대로: 0, +1, 0, −1 → 뒤로 한 번 · 앞으로 한 번
+        let actions = [0.0, 1, 0, -1].compactMap { MouseNavigation.action(MouseNavigation.direction(swipeDeltaX: $0), mainWindow: true, sheetOpen: false, browserVisible: true, canGoBack: true, canGoForward: true) }
+        XCTAssertEqual(actions, [.back, .forward])
+    }
 }
