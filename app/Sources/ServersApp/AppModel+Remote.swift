@@ -128,7 +128,7 @@ extension AppModel {
         }
     }
 
-    /// Services 탭에서 서비스 줄을 누르면: 최근 로그 50줄을 결과 시트로 (리눅스 journalctl, ServiceLog · OpenWrt logread)
+    /// Services 탭에서 서비스 줄을 누르면: 최근 로그 50줄을 결과 창으로 (리눅스 journalctl, ServiceLog · OpenWrt logread)
     func showServiceLog(_ server: Server, unit: String) {
         let key = "\(server.key)|\(unit)"
         let command: String?
@@ -141,7 +141,7 @@ extension AppModel {
         showRecentLog(server, key: key, name: unit, command: command, stripANSI: false)
     }
 
-    /// Services 탭에서 docker 컨테이너 줄을 누르면: 최근 로그 50줄을 결과 시트로 (리눅스만 — ServiceLog.dockerCommand)
+    /// Services 탭에서 docker 컨테이너 줄을 누르면: 최근 로그 50줄을 결과 창으로 (리눅스만 — ServiceLog.dockerCommand)
     func showContainerLog(_ server: Server, container: String) {
         let key = "\(server.key)|docker|\(container)"
         guard server.type == .linux, let command = ServiceLog.dockerCommand(container: container) else { return }
@@ -149,7 +149,7 @@ extension AppModel {
         showRecentLog(server, key: key, name: container, command: command, stripANSI: true)
     }
 
-    /// 서비스 · 컨테이너의 최근 로그를 결과 시트로 (두 곳 공통 틀): 같은 것을 가져오는 중이면 건너뛰고, 안내 → 실행 → 안내 지우기 → 시트.
+    /// 서비스 · 컨테이너의 최근 로그를 결과 창으로 (두 곳 공통 틀): 같은 것을 가져오는 중이면 건너뛰고, 안내 → 실행 → 안내 지우기 → 창.
     /// 줄 · 빈 결과 문구는 ServiceLog.displayLines
     private func showRecentLog(_ server: Server, key: String, name: String, command: String, stripANSI: Bool) {
         guard !serviceLogLoading.contains(key) else { return }

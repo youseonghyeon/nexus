@@ -11,31 +11,31 @@ struct QueryResultView: View {
 
     var body: some View {
         Group {
-        if let result = model.queryResult {
-            VStack(spacing: 0) {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(result.lines.enumerated()), id: \.offset) { _, line in
-                            QueryResultLine(line: line) { model.copy(line) }
+            if let result = model.queryResult {
+                VStack(spacing: 0) {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(result.lines.enumerated()), id: \.offset) { _, line in
+                                QueryResultLine(line: line) { model.copy(line) }
+                            }
                         }
+                        .padding(.vertical, 6)
                     }
-                    .padding(.vertical, 6)
+                    .defaultScrollAnchor(result.startsAtEnd ? .bottom : .top)
+                    .id(result.id)   // 새 결과면 스크롤을 처음 자리로
+                    Rectangle().fill(Palette.hairline).frame(height: 1)
+                    HStack(spacing: 8) {
+                        if result.failed { Text("실패").foregroundStyle(StatusTone.bad.color) }
+                        Text("\(result.lines.count)줄").foregroundStyle(.secondary)
+                        Spacer()
+                        Button("모두 복사") { model.copy(result.lines.joined(separator: "\n")) }.buttonStyle(CompactButtonStyle())
+                    }
+                    .font(.caption)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
                 }
-                .defaultScrollAnchor(result.startsAtEnd ? .bottom : .top)
-                .id(result.id)   // 새 결과면 스크롤을 처음 자리로
-                Rectangle().fill(Palette.hairline).frame(height: 1)
-                HStack(spacing: 8) {
-                    if result.failed { Text("실패").foregroundStyle(StatusTone.bad.color) }
-                    Text("\(result.lines.count)줄").foregroundStyle(.secondary)
-                    Spacer()
-                    Button("모두 복사") { model.copy(result.lines.joined(separator: "\n")) }.buttonStyle(CompactButtonStyle())
-                }
-                .font(.caption)
-                .padding(.horizontal, 12).padding(.vertical, 6)
+                // esc 로 닫기 (보이는 닫기 버튼은 없다)
+                .background(Button("") { model.closeQueryResult() }.keyboardShortcut(.cancelAction).opacity(0))
             }
-            // esc 로 닫기 (보이는 닫기 버튼은 없다)
-            .background(Button("") { model.closeQueryResult() }.keyboardShortcut(.cancelAction).opacity(0))
-        }
         }
         // 틀은 조건 밖 — 결과가 비어 있을 때(닫는 순간)도 최소 크기가 남는다
         .frame(minWidth: 560, maxWidth: .infinity, minHeight: 320, maxHeight: .infinity)
@@ -87,9 +87,9 @@ final class QueryResultWindow: NSObject, NSWindowDelegate {
         let window = NSWindow(contentViewController: hosting)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.isReleasedWhenClosed = false
-        window.setContentSize(Self.openSize)
+        window.setContentSize(Self.openSize)   // 가운데 놓기 전에 — 저장된 위치가 없는 첫 실행의 자리
         window.center()
-        window.setFrameAutosaveName("QueryResultPosition")   // 저장된 위치가 있으면 그것으로 (크기는 sync 가 열 때마다 다시 잡는다)
+        window.setFrameAutosaveName("QueryResultPosition")   // 저장된 위치가 있으면 그것으로 (크기는 sync 가 열 때마다 잡는다)
         window.delegate = self
         self.window = window
         return window
