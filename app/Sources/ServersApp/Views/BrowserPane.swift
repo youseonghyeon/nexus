@@ -18,7 +18,7 @@ struct BrowserPane: View {
                 Button { browser.goForward() } label: { Image(systemName: "chevron.right") }.accessibilityLabel("앞으로").disabled(!browser.canGoForward)
                 Button { browser.isLoading ? browser.stopLoading() : browser.reload() } label: { Image(systemName: browser.isLoading ? "xmark" : "arrow.clockwise") }.accessibilityLabel(browser.isLoading ? "중지" : "새로 고침")
                     .disabled(browser.notice != nil)
-                Button { browser.showStart() } label: { Image(systemName: "house") }.accessibilityLabel("시작 페이지").help("시작 페이지 — 이 서버의 열린 포트")
+                Button { browser.openStart() } label: { Image(systemName: "house") }.accessibilityLabel("시작 페이지").help("시작 페이지 — 이 서버의 열린 포트")
                     .disabled(browser.notice != nil)
                 TextField("검색어 또는 주소", text: $address)
                     .textFieldStyle(.plain)

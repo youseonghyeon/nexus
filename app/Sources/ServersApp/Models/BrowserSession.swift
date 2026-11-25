@@ -63,13 +63,14 @@ final class BrowserSession: NSObject, ObservableObject {
     private var declinedLogins: Set<String> = []
     private let loginWorld = WKContentWorld.world(name: LoginForms.world)
     /// 지금 시작 페이지를 보고 있는가 (포트 목록이 오면 다시 그린다 · 주소창은 비운다)
-    private(set) var showingStart = false { didSet { updateCanGoBack() } }
+    private(set) var showingStart = false { didSet { if !showingStart { startPending = false }; updateCanGoBack() } }
+    /// 시작 페이지 자리(빈 문서)로 가는 중 — 다 뜨면 그 위에 시작 페이지를 그린다 (openStart · 뒤로/앞으로 돌아온 빈 문서)
+    private var startPending = false
     /// 시작 페이지를 한 번이라도 띄웠는가 (프록시 연결 중에는 뒤로 갈 곳이 없다)
     private var started = false
 
-    /// 뒤로: 시작 페이지가 아니면 늘 갈 수 있다 — 기록의 앞 항목이 없거나 빈 문서(시작 페이지 자리)면 시작 페이지로 간다 (goBack).
-    /// WebKit 의 canGoBack 만 보면 시작 페이지에서 처음 연 페이지에서 뒤로가 꺼졌다 (2026-11-17 사용자 확인).
-    private func updateCanGoBack() { canGoBack = started && !showingStart }
+    /// 뒤로: 기록에 앞 항목이 있으면 간다 (시작 페이지도 기록의 한 항목 — openStart). 앞 항목이 없어도 시작 페이지가 아니면 시작 페이지로 (BrowserHistory).
+    private func updateCanGoBack() { canGoBack = BrowserHistory.canGoBack(started: started, showingStart: showingStart, historyHasBack: webView.canGoBack) }
     private let relay: SocksRelay
     /// 앱 안 중계의 포트 (준비되면 값이 있다) — 웹 확인(WebProbe)도 이 중계로 보낸다
     private(set) var relayPort: Int?
@@ -169,7 +170,7 @@ final class BrowserSession: NSObject, ObservableObject {
             guard relayPort != nil else { notice = notice ?? "브라우저 중계가 준비되지 않았습니다"; return }
             notice = nil
             started = true
-            showStart()
+            openStart()
         }
     }
 
@@ -196,14 +197,28 @@ final class BrowserSession: NSObject, ObservableObject {
         webView.load(request)
     }
 
-    /// 시작 페이지(서버·열린 포트)를 지금 값으로 그린다
+    /// 시작 페이지로 간다 (첫 표시 · 집 버튼 · 앞 항목 없는 뒤로): 빈 문서로 이동해 기록에 한 항목을 만들고, 다 뜨면 그 위에 그린다 (didFinish).
+    /// 그리기(loadHTMLString)만으로는 기록에 항목이 생기지 않는다 — 시작 페이지에서 연 페이지의 뒤로가 시작 페이지를 건너뛰어 그 앞 페이지로 갔고,
+    /// 집 버튼으로 온 시작 페이지에서는 뒤로가 꺼져 있었다 (2026-11-25 사용자 지적, 화면 밖 웹 뷰로 기록을 찍어 확인). 이미 시작 페이지면 다시 그리기만.
+    func openStart() {
+        if showingStart, !startPending, webView.url?.absoluteString == "about:blank" { return showStart() }
+        markStart()
+        startPending = true
+        webView.load(URLRequest(url: URL(string: "about:blank")!))
+    }
+
+    /// 시작 페이지(서버·열린 포트)를 지금 자리에 지금 값으로 그린다 — 기록은 건드리지 않는다
     func showStart() {
+        markStart()
+        webView.loadHTMLString(startPage(), baseURL: nil)
+        onStartShown()
+    }
+
+    private func markStart() {
         showingStart = true
         url = nil
         fillPrompt = nil
         icon = nil; iconSite = nil
-        webView.loadHTMLString(startPage(), baseURL: nil)
-        onStartShown()
     }
 
     /// 포트 목록·웹 확인 결과가 새로 왔을 때 모델이 부른다 — 시작 페이지를 보고 있을 때만, 포트 부분만 갈아 끼운다 (주소칸에 치던 글자는 그대로)
@@ -375,7 +390,7 @@ final class BrowserSession: NSObject, ObservableObject {
     }
 
     func goBack() {
-        if let back = webView.backForwardList.backItem, back.url.absoluteString != "about:blank" { webView.goBack() } else { showStart() }
+        if webView.canGoBack { webView.goBack() } else { openStart() }
     }
     func goForward() { webView.goForward() }
     func reload() {
@@ -412,11 +427,16 @@ extension BrowserSession: WKNavigationDelegate {
             return (.cancel, preferences)
         }
         if navigationAction.shouldPerformDownload { return (.download, preferences) }
-        // 웹 주소로 떠나면 시작 페이지가 아니다. 뒤로 가기로 돌아온 시작 페이지(about:blank)는 다시 그린다 — 기록에 남은 것은 빈 문서뿐이다
+        // 웹 주소로 떠나면 시작 페이지가 아니다. 뒤로 · 앞으로 돌아온 시작 페이지(about:blank)는 다 뜬 뒤 다시 그린다 — 기록에 남은 것은 빈 문서뿐이다
+        // (이동이 끝나기 전에 그리면 그 이동이 취소돼 기록의 자리가 안 옮겨진다 — didFinish 에서)
         if navigationAction.targetFrame?.isMainFrame ?? true {
             if BrowserPolicy.isWeb(url) { showingStart = false }
             else if url.absoluteString == "about:blank", navigationAction.navigationType == .backForward {
-                Task { @MainActor in self.showStart() }
+                Task { @MainActor in
+                    self.markStart()
+                    // 이미 다 떴으면(didFinish 가 먼저 왔다) 바로 그린다
+                    if !webView.isLoading, webView.url?.absoluteString == "about:blank" { self.showStart() } else { self.startPending = true }
+                }
             }
         }
         return (.allow, preferences)
@@ -440,6 +460,10 @@ extension BrowserSession: WKNavigationDelegate {
 
     /// 시작 페이지가 다 그려진 뒤 포트 부분을 한 번 더 맞춘다 — 그리는 사이에 온 포트 목록·웹 확인 결과를 놓치지 않게
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if startPending, webView.url?.absoluteString == "about:blank" {   // 시작 페이지 자리에 닿았다 — 이제 그린다
+            startPending = false
+            return showStart()
+        }
         refreshStartPorts()
         settleLoginAfterNavigation()
         refreshIcon()
