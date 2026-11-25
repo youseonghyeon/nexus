@@ -13,37 +13,43 @@ struct BrowserPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Button { browser.goBack() } label: { Image(systemName: "chevron.left") }.accessibilityLabel("뒤로").disabled(!browser.canGoBack)
-                Button { browser.goForward() } label: { Image(systemName: "chevron.right") }.accessibilityLabel("앞으로").disabled(!browser.canGoForward)
-                Button { browser.isLoading ? browser.stopLoading() : browser.reload() } label: { Image(systemName: browser.isLoading ? "xmark" : "arrow.clockwise") }.accessibilityLabel(browser.isLoading ? "중지" : "새로 고침")
-                    .disabled(browser.notice != nil)
-                Button { browser.openStart() } label: { Image(systemName: "house") }.accessibilityLabel("시작 페이지").help("시작 페이지 — 이 서버의 열린 포트")
-                    .disabled(browser.notice != nil)
-                TextField("검색어 또는 주소", text: $address)
-                    .textFieldStyle(.plain)
-                    .font(.callout.monospaced())
-                    .padding(.horizontal, 8)
-                    .frame(height: 26)
-                    .background(Palette.card, in: RoundedRectangle(cornerRadius: Metrics.controlRadius))   // 테두리 대신 옅은 면 (사이드바 검색칸과 같게)
-                    .focused($addressFocused)
-                    .onSubmit { browser.load(address); addressFocused = false }
-                    .onChange(of: browser.url) { _, url in if !addressFocused { address = url?.absoluteString ?? "" } }
-                    .onAppear { address = browser.url?.absoluteString ?? "" }
-                // 즐겨찾기 별: 이 서버의 즐겨찾기에 넣고 뺀다 (시작 페이지 맨 위에 보인다)
-                Button { browser.toggleBookmark() } label: { Image(systemName: browser.bookmarked ? "star.fill" : "star") }
-                    .accessibilityLabel(browser.bookmarked ? "즐겨찾기에서 빼기" : "즐겨찾기에 넣기")
-                    .help(browser.bookmarked ? "즐겨찾기에서 빼기" : "즐겨찾기에 넣기 — \(browser.server.key) 의 시작 페이지에 보입니다")
-                    .disabled(!browser.canBookmark)
-                Text("프록시: \(browser.server.key)")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .help("이 탭은 \(browser.server.key) 서버(\(browser.server.ip))에서 브라우저를 켠 것처럼 동작합니다. 127.0.0.1 은 그 서버 자신입니다")
+            VStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    Button { browser.goBack() } label: { Image(systemName: "chevron.left") }.accessibilityLabel("뒤로").disabled(!browser.canGoBack)
+                    Button { browser.goForward() } label: { Image(systemName: "chevron.right") }.accessibilityLabel("앞으로").disabled(!browser.canGoForward)
+                    Button { browser.isLoading ? browser.stopLoading() : browser.reload() } label: { Image(systemName: browser.isLoading ? "xmark" : "arrow.clockwise") }.accessibilityLabel(browser.isLoading ? "중지" : "새로 고침")
+                        .disabled(browser.notice != nil)
+                    Button { browser.openStart() } label: { Image(systemName: "house") }.accessibilityLabel("시작 페이지").help("시작 페이지 — 이 서버의 열린 포트")
+                        .disabled(browser.notice != nil)
+                    TextField("검색어 또는 주소", text: $address)
+                        .textFieldStyle(.plain)
+                        .font(.callout.monospaced())
+                        .padding(.horizontal, 8)
+                        .frame(height: 26)
+                        .background(Palette.card, in: RoundedRectangle(cornerRadius: Metrics.controlRadius))   // 테두리 대신 옅은 면 (사이드바 검색칸과 같게)
+                        .focused($addressFocused)
+                        .onSubmit { browser.load(address); addressFocused = false }
+                        .onChange(of: browser.url) { _, url in if !addressFocused { address = url?.absoluteString ?? "" } }
+                        .onAppear { address = browser.url?.absoluteString ?? "" }
+                    // 즐겨찾기 별: 이 서버의 즐겨찾기에 넣고 뺀다 (시작 페이지 맨 위에 보인다)
+                    Button { browser.toggleBookmark() } label: { Image(systemName: browser.bookmarked ? "star.fill" : "star") }
+                        .accessibilityLabel(browser.bookmarked ? "즐겨찾기 삭제" : "즐겨찾기 추가")
+                        .help(browser.bookmarked ? "즐겨찾기 삭제" : "즐겨찾기 추가 — \(browser.server.key) 의 시작 페이지에 보입니다")
+                        .disabled(!browser.canBookmark)
+                    Text("프록시: \(browser.server.key)")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .help("이 탭은 \(browser.server.key) 서버(\(browser.server.ip))에서 브라우저를 켠 것처럼 동작합니다. 127.0.0.1 은 그 서버 자신입니다")
+                }
+                .buttonStyle(.borderless)
+                .padding(.horizontal, 8).padding(.vertical, 6)
+                // 즐겨찾기 막대: 이 서버의 즐겨찾기를 주소창 아래 한 줄로 — 하나도 없으면 줄이 없다 (2026-11-25 사용자)
+                if !browser.bookmarkBar.isEmpty {
+                    BookmarkBar(items: browser.bookmarkBar, open: { browser.load($0) }, remove: { browser.removeBookmark($0) })
+                }
             }
-            .buttonStyle(.borderless)
-            .padding(.horizontal, 8).padding(.vertical, 6)
             .background(Palette.content)   // 위 탭줄과 한 면으로 이어진다
             // 진행 줄: 페이지를 받는 동안 주소창 아래에 받은 만큼 찬다 (X 버튼만으로는 가는 중인지 알기 어려웠다 — 2026-11-17).
-            // 값이 바뀔 때만 움직인다 (계속 도는 스피너는 쓰지 않는다). 주소창 면 안쪽에 그린다 — 아래 WKWebView 위로 넘기면 가려진다.
+            // 값이 바뀔 때만 움직인다 (계속 도는 스피너는 쓰지 않는다). 주소창 면(즐겨찾기 막대가 있으면 그 아래) 안쪽에 그린다 — 아래 WKWebView 위로 넘기면 가려진다.
             .overlay(alignment: .bottomLeading) {
                 GeometryReader { geometry in
                     Rectangle().fill(Palette.neutralTint)
@@ -94,4 +100,52 @@ struct WebViewRepresentable: NSViewRepresentable {
     let webView: WKWebView
     func makeNSView(context: Context) -> WKWebView { webView }
     func updateNSView(_ nsView: WKWebView, context: Context) {}
+}
+
+/// 주소창 아래 즐겨찾기 막대: 아이콘 + 이름 칩을 한 줄로. 누르면 그 주소로, 우클릭으로 뺀다. 넘치면 가로로 민다 (창이 좁아도 줄이 늘지 않는다).
+private struct BookmarkBar: View {
+    let items: [BrowserSession.BarItem]
+    let open: (String) -> Void
+    let remove: (String) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 2) {
+                ForEach(items) { item in
+                    BookmarkChip(item: item) { open(item.bookmark.url) }
+                        .contextMenu { Button("삭제") { remove(item.bookmark.url) } }
+                }
+            }
+            .padding(.horizontal, 8)
+        }
+        .padding(.bottom, 5)
+    }
+}
+
+private struct BookmarkChip: View {
+    let item: BrowserSession.BarItem
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Group {
+                    if let icon = item.icon {
+                        Image(nsImage: icon).resizable().interpolation(.high)
+                    } else {
+                        Image(systemName: "globe").resizable().foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 14, height: 14)
+                Text(item.bookmark.title).font(.caption).lineLimit(1).truncationMode(.tail).frame(maxWidth: 150)
+            }
+            .padding(.horizontal, 7).padding(.vertical, 4)
+            .background(hovering ? Color.primary.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(BookmarkStore.shortAddress(item.bookmark.url))
+    }
 }

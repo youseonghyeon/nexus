@@ -27,6 +27,7 @@ final class BrowserSession: NSObject, ObservableObject {
     /// 즐겨찾기(서버별 — 모델이 들고 있다)로 가는 길: 시작 페이지의 즐겨찾기 부분 · 이 주소가 들어 있는가 · 넣기/빼기(주소·제목·아이콘) · 빼기(주소)
     struct BookmarkHooks {
         let startHTML: @MainActor () -> String
+        let list: @MainActor () -> [BrowserBookmark]
         let contains: @MainActor (URL) -> Bool
         let toggle: @MainActor (URL, String, String?) -> Void
         let remove: @MainActor (String) -> Void
@@ -87,6 +88,13 @@ final class BrowserSession: NSObject, ObservableObject {
     @Published private(set) var progress = 0.0
     /// 보고 있는 주소가 이 서버의 즐겨찾기에 있는가 (주소창의 별)
     @Published private(set) var bookmarked = false
+    /// 주소창 아래 즐겨찾기 막대의 칩 (이 서버의 즐겨찾기 — 아이콘은 바뀔 때 한 번만 푼다). 비어 있으면 막대가 없다
+    struct BarItem: Identifiable {
+        let bookmark: BrowserBookmark
+        let icon: NSImage?
+        var id: String { bookmark.url }
+    }
+    @Published private(set) var bookmarkBar: [BarItem] = []
     /// 보고 있는 페이지의 아이콘 (탭 머리 — 없으면 지구본). 주소(호스트·포트)가 바뀔 때만 다시 받는다
     @Published private(set) var icon: NSImage?
     /// 아이콘을 받아 본 주소 (못 받았어도 — 같은 곳에서 페이지마다 다시 묻지 않게)
@@ -164,6 +172,7 @@ final class BrowserSession: NSObject, ObservableObject {
 
     /// SOCKS 터널이 열린 뒤 모델이 부른다. 중계가 준비되면 시작 페이지를 보인다.
     func start() {
+        updateBookmarkBar()
         Task {
             let deadline = Date().addingTimeInterval(5)
             while relayPort == nil, Date() < deadline { try? await Task.sleep(for: .milliseconds(50)) }
@@ -235,9 +244,17 @@ final class BrowserSession: NSObject, ObservableObject {
 
     private func updateBookmarked() { bookmarked = url.map(bookmarks.contains) ?? false }
 
-    /// 모델이 부른다 — 이 서버의 즐겨찾기가 바뀌었다 (이 탭·같은 서버의 다른 탭에서): 별과 시작 페이지의 즐겨찾기 줄을 다시 맞춘다
+    private func updateBookmarkBar() {
+        bookmarkBar = bookmarks.list().map { BarItem(bookmark: $0, icon: BookmarkStore.iconData($0.icon).flatMap(NSImage.init(data:))) }
+    }
+
+    /// 즐겨찾기 막대의 칩을 우클릭 → 빼기
+    func removeBookmark(_ address: String) { bookmarks.remove(address) }
+
+    /// 모델이 부른다 — 이 서버의 즐겨찾기가 바뀌었다 (이 탭·같은 서버의 다른 탭에서): 별 · 주소창 아래 막대 · 시작 페이지의 즐겨찾기 줄을 다시 맞춘다
     func bookmarksChanged() {
         updateBookmarked()
+        updateBookmarkBar()
         guard showingStart, notice == nil else { return }
         guard let json = try? JSONEncoder().encode(bookmarks.startHTML()), let literal = String(data: json, encoding: .utf8) else { return }
         webView.evaluateJavaScript("var m=document.getElementById('marks');if(m){m.innerHTML=\(literal)}", completionHandler: nil)

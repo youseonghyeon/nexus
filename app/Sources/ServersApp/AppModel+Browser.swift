@@ -114,6 +114,7 @@ extension AppModel {
                                      onStartReload: { [weak self] in self?.reloadBrowserStart(server) },
                                      bookmarks: BrowserSession.BookmarkHooks(
                                         startHTML: { [weak self] in self?.browserStartMarks(for: server) ?? "" },
+                                        list: { [weak self] in self?.browserBookmarks.servers[server.key] ?? [] },
                                         contains: { [weak self] in self?.isBookmarked($0, on: server) ?? false },
                                         toggle: { [weak self] url, title, icon in self?.toggleBookmark(url, title: title, icon: icon, on: server) },
                                         remove: { [weak self] in self?.removeBookmark($0, on: server) }),

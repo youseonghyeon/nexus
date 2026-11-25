@@ -182,7 +182,7 @@ public enum BrowserStartPage {
             let icon = mark.icon.map { "<img class=\"i\" src=\"\(escape($0))\" alt=\"\">" } ?? placeholderIcon
             return "<a class=\"tile\" href=\"\(escape(mark.url))\">\(icon)<div class=\"x\"><div class=\"t\">\(escape(mark.title))</div>"
                 + "<div class=\"b\"><span class=\"u\">\(escape(BookmarkStore.shortAddress(mark.url)))</span></div></div>"
-                + "<button class=\"rm\" data-u=\"\(escape(mark.url))\" title=\"즐겨찾기에서 빼기\">✕</button></a>"
+                + "<button class=\"rm\" data-u=\"\(escape(mark.url))\" title=\"즐겨찾기 삭제\">✕</button></a>"
         }.joined() + "</div>"
     }
 
