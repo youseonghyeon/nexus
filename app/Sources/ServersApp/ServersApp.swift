@@ -39,6 +39,7 @@ struct ServersApp: App {
                                                   return true
                                               },
                                               find: { model.handleFindKey($0) })
+                    MouseShortcuts.install(browser: { model.visibleBrowser })
                     // 메뉴바: 창을 닫아 둔 채로 망·서버·터널 상태를 보고 망 스위치·터널을 조작한다 (MenuBarController — 아이콘 아래 패널)
                     appDelegate.installMenuBar(model: model)
                     appDelegate.installNotificationHandler(model: model)

@@ -51,6 +51,9 @@ int main(int argc, char** argv) {
     {"cmd+V", "붙여 넣기", 9, C, "v", 'v', HANDLED},
     {"cmd+shift+[", "이전 탭", 33, C | S, "{", '[', HANDLED},
     {"cmd+shift+]", "다음 탭", 30, C | S, "}", ']', HANDLED},
+    // 브라우저 탭에서만 앱이 받는다 (MouseShortcuts) — 터미널 탭에서는 흘려서 터미널이 그대로 쓴다
+    {"cmd+[", "브라우저 뒤로", 33, C, "[", '[', HANDLED},
+    {"cmd+]", "브라우저 앞으로", 30, C, "]", ']', HANDLED},
     {"cmd+shift+Return", "전체 화면", 36, C | S, "\r", '\r', HANDLED},
     {"cmd+1", "1번 서버", 18, C, "1", '1', HANDLED}, {"cmd+2", "2번 서버", 19, C, "2", '2', HANDLED}, {"cmd+3", "3번 서버", 20, C, "3", '3', HANDLED},
     {"cmd+4", "4번 서버", 21, C, "4", '4', HANDLED}, {"cmd+5", "5번 서버", 23, C, "5", '5', HANDLED}, {"cmd+6", "6번 서버", 22, C, "6", '6', HANDLED},
