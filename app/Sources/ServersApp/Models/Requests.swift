@@ -35,7 +35,19 @@ struct QueryResult: Identifiable {
     let lines: [String]
     let failed: Bool
     /// 로그처럼 최신이 맨 아래인 결과는 맨 아래부터 보인다 (파드 상태 · 명령 오류는 위부터)
-    var startsAtEnd = false
+    let startsAtEnd: Bool
+    /// 줄마다의 로그 레벨 — 받을 때 한 번 판정한다 (화면이 그리기마다 하지 않게). 못 읽은 줄은 nil
+    let levels: [LogLevel?]
+
+    init(title: String, lines: [String], failed: Bool, startsAtEnd: Bool = false) {
+        self.title = title
+        self.lines = lines
+        self.failed = failed
+        self.startsAtEnd = startsAtEnd
+        levels = LogLevel.resolve(lines)
+    }
+
+    func count(_ level: LogLevel) -> Int { levels.count { $0 == level } }
 }
 
 /// 터널 입력창 요청 (미리 채울 값)

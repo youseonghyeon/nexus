@@ -5,36 +5,18 @@ import ServersCore
 import SwiftUI
 
 /// 조회 결과: 줄을 클릭하면 복사된다. 제목은 창 제목 줄에 (QueryResultWindow).
-/// 줄들이 창을 좌우 끝까지 채우고(터미널처럼 — 바깥 여백 · 구분선 없음), 아래 얇은 띠에 줄 수와 모두 복사. 닫기는 창의 신호등 · esc.
+/// 줄들이 창을 좌우 끝까지 채우고(터미널처럼 — 바깥 여백 · 구분선 없음), 아래 얇은 띠에 줄 수 · 오류/경고 개수 · 모두 복사. 닫기는 창의 신호등 · esc.
+/// 오류 · 경고 줄은 상태 색(왼쪽 띠 + 글자), debug 는 흐리게, info 와 레벨을 못 읽은 줄은 그대로 (판정은 ServersCore LogLevel).
 struct QueryResultView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Group {
             if let result = model.queryResult {
-                VStack(spacing: 0) {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 0) {
-                            ForEach(Array(result.lines.enumerated()), id: \.offset) { _, line in
-                                QueryResultLine(line: line) { model.copy(line) }
-                            }
-                        }
-                        .padding(.vertical, 6)
-                    }
-                    .defaultScrollAnchor(result.startsAtEnd ? .bottom : .top)
-                    .id(result.id)   // 새 결과면 스크롤을 처음 자리로
-                    Rectangle().fill(Palette.hairline).frame(height: 1)
-                    HStack(spacing: 8) {
-                        if result.failed { Text("실패").foregroundStyle(StatusTone.bad.color) }
-                        Text("\(result.lines.count)줄").foregroundStyle(.secondary)
-                        Spacer()
-                        Button("모두 복사") { model.copy(result.lines.joined(separator: "\n")) }.buttonStyle(CompactButtonStyle())
-                    }
-                    .font(.caption)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-                }
-                // esc 로 닫기 (보이는 닫기 버튼은 없다)
-                .background(Button("") { model.closeQueryResult() }.keyboardShortcut(.cancelAction).opacity(0))
+                QueryResultBody(result: result)
+                    .id(result.id)   // 새 결과면 스크롤 · 걸러 보기를 처음으로
+                    // esc 로 닫기 (보이는 닫기 버튼은 없다)
+                    .background(Button("") { model.closeQueryResult() }.keyboardShortcut(.cancelAction).opacity(0))
             }
         }
         // 틀은 조건 밖 — 결과가 비어 있을 때(닫는 순간)도 최소 크기가 남는다
@@ -43,18 +25,90 @@ struct QueryResultView: View {
     }
 }
 
+private struct QueryResultBody: View {
+    @Environment(AppModel.self) private var model
+    let result: QueryResult
+    /// 걸러 보기: 아래 띠의 오류 · 경고 개수를 누르면 그 레벨의 줄만 (다시 누르면 전부)
+    @State private var filter: LogLevel?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(result.lines.enumerated()), id: \.offset) { index, line in
+                        if filter == nil || result.levels[index] == filter {
+                            QueryResultLine(line: line, level: result.levels[index]) { model.copy(line) }
+                        }
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+            .defaultScrollAnchor(result.startsAtEnd ? .bottom : .top)
+            Rectangle().fill(Palette.hairline).frame(height: 1)
+            HStack(spacing: 8) {
+                if result.failed { Text("실패").foregroundStyle(StatusTone.bad.color) }
+                Text("\(result.lines.count)줄").foregroundStyle(.secondary)
+                LogLevelFilterButton(title: "Error", count: result.count(.error), tone: .bad, level: .error, filter: $filter)
+                LogLevelFilterButton(title: "Warning", count: result.count(.warning), tone: .warn, level: .warning, filter: $filter)
+                Spacer()
+                Button("모두 복사") { model.copy(result.lines.joined(separator: "\n")) }.buttonStyle(CompactButtonStyle())
+            }
+            .font(.caption)
+            .padding(.horizontal, 12).padding(.vertical, 6)
+        }
+    }
+}
+
+/// 아래 띠의 "● Error 3": 누르면 그 레벨의 줄만, 다시 누르면 전부. 고른 것은 올라온 면. 0개면 자리 없음
+private struct LogLevelFilterButton: View {
+    let title: String
+    let count: Int
+    let tone: StatusTone
+    let level: LogLevel
+    @Binding var filter: LogLevel?
+
+    var body: some View {
+        if count > 0 {
+            Button { filter = filter == level ? nil : level } label: {
+                HStack(spacing: 4) {
+                    Circle().fill(tone.color).frame(width: 6, height: 6)
+                    Text("\(title) \(count)").foregroundStyle(filter == level ? .primary : .secondary)
+                }
+                .padding(.horizontal, 6).padding(.vertical, 2)
+                .background(filter == level ? Palette.control : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
 /// 조회 결과의 한 줄: 긴 줄은 접혀 내려가고, 올리면 옅은 면(누르면 복사된다는 표시), 줄 사이는 조금 띄워 접힌 줄과 새 줄을 가른다.
+/// 오류 · 경고는 왼쪽 가는 띠와 글자를 상태 색으로 — 이어진 줄(스택 트레이스)의 띠는 한 줄로 붙는다.
 private struct QueryResultLine: View {
     let line: String
+    let level: LogLevel?
     let copy: () -> Void
     @State private var hovering = false
+
+    private var tone: StatusTone? {
+        switch level {
+        case .error: .bad
+        case .warning: .warn
+        default: nil
+        }
+    }
 
     var body: some View {
         Text(line.isEmpty ? " " : line)
             .font(.system(size: 12, design: .monospaced))
+            .foregroundStyle(tone?.color ?? (level == .debug ? Color.secondary : Color.primary))
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12).padding(.vertical, 3)
             .background(hovering ? Color.primary.opacity(0.06) : Color.clear)
+            .overlay(alignment: .leading) {
+                if let tone { Rectangle().fill(tone.color).frame(width: 2) }
+            }
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .onTapGesture(perform: copy)
