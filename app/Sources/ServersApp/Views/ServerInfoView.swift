@@ -143,6 +143,7 @@ struct ConnectionCard: View {
                 // 저장된 비밀번호(암호화 파일). 있으면 ssh·spec·터널·전송이 창 없이 대입한다.
                 HStack(spacing: 6) {
                     if model.hasPassword(server) {
+                        EncryptedMark()
                         Text("●●●●●●●●").foregroundStyle(.secondary)
                         Text("저장됨").font(.caption).foregroundStyle(.tertiary)
                         Button("지우기") { model.clearPassword(for: server) }.buttonStyle(.borderless)

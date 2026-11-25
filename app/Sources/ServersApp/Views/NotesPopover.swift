@@ -67,6 +67,7 @@ struct NotesPopover: View {
     private var list: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
+                EncryptedMark()
                 Text("\(serverKey) 메모 · 로그인")
                     .font(.caption).fontWeight(.medium).foregroundStyle(.secondary)
                 Spacer()

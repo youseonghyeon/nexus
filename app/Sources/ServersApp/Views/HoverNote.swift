@@ -7,14 +7,15 @@ import AppKit
 import ServersCore
 import SwiftUI
 
-/// 작은 ⓘ 기호. 올리면 content 가 팝업으로 뜬다. label 은 손쉬운 사용에 읽힐 한 줄.
+/// 작은 ⓘ 기호(systemName 으로 다른 기호도 — 암호화 표시의 방패). 올리면 content 가 팝업으로 뜬다. label 은 손쉬운 사용에 읽힐 한 줄.
 struct HoverNote<Content: View>: View {
     let label: String
+    var systemName = "info.circle"
     @ViewBuilder var content: Content
     @State private var hovering = false
 
     var body: some View {
-        Image(systemName: "info.circle")
+        Image(systemName: systemName)
             .padding(3).contentShape(Rectangle()).padding(-3)   // 작은 기호라 닿는 자리를 조금 넓힌다 (배치는 그대로)
             .onHover { hovering = $0 }
             .background(HoverPanelAnchor(shown: hovering) { HoverNoteSurface { content } })
@@ -95,5 +96,16 @@ private struct HoverPanelAnchor<Content: View>: NSViewRepresentable {
             panel.isReleasedWhenClosed = false
             return panel
         }
+    }
+}
+
+/// 암호화해 저장한 것의 표시: 작은 회색 방패(자물쇠). 올리면 바로 뜻이 뜬다 — 서버 화면의 비밀번호 줄 · 메모 · 로그인 패널의 제목 옆 (2026-11-25 사용자)
+struct EncryptedMark: View {
+    var body: some View {
+        HoverNote(label: "암호화해 저장", systemName: "lock.shield.fill") {
+            Text("이 Mac 의 키체인 키로 암호화해 저장합니다")
+        }
+        .font(.body)   // 줄 글자 크기 — caption 은 작아 방패로 안 보였다 (줄 높이는 그대로)
+        .foregroundStyle(.secondary)
     }
 }
