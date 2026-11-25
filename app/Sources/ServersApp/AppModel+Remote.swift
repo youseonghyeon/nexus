@@ -159,7 +159,7 @@ extension AppModel {
             let result = await runRemote(server, command: command, allowPrompt: true)
             serviceLogLoading.remove(key)
             if statusMessage?.hasSuffix("로그를 가져옵니다…") == true { statusMessage = nil }
-            queryResult = QueryResult(title: "\(server.key) · \(name) 최근 로그", lines: ServiceLog.displayLines(result, stripANSI: stripANSI), failed: !result.ok)
+            queryResult = QueryResult(title: "\(server.key) · \(name) 최근 로그", lines: ServiceLog.displayLines(result, stripANSI: stripANSI), failed: !result.ok, startsAtEnd: result.ok)
         }
     }
 

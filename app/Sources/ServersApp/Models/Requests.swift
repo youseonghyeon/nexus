@@ -34,6 +34,8 @@ struct QueryResult: Identifiable {
     let title: String
     let lines: [String]
     let failed: Bool
+    /// 로그처럼 최신이 맨 아래인 결과는 맨 아래부터 보인다 (파드 상태 · 명령 오류는 위부터)
+    var startsAtEnd = false
 }
 
 /// 터널 입력창 요청 (미리 채울 값)
