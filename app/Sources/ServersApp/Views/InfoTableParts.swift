@@ -46,6 +46,7 @@ extension View {
         padding(.horizontal, 6).padding(.vertical, 3)
             .background(highlighted ? Color.primary.opacity(0.06) : Color.clear, in: RoundedRectangle(cornerRadius: Metrics.smallRadius))
             .contentShape(Rectangle())
+            .hoverEase(highlighted)
     }
 }
 

@@ -144,6 +144,11 @@ extension View {
         scaleEffect(pressed ? 0.97 : 1).animation(.easeOut(duration: 0.12), value: pressed)
     }
 
+    /// 마우스가 올라올 때 면이 0.1초에 걸쳐 들어온다. 나갈 때는 바로 끈다 — 표를 빠르게 훑을 때 지나온 줄에 잔상이 남지 않게
+    func hoverEase(_ on: Bool) -> some View {
+        animation(on ? .easeOut(duration: 0.1) : nil, value: on)
+    }
+
     /// 누르면 복사되는 줄 · 값: 누른 순간 면이 한 번 밝아졌다 꺼진다 (무엇이 복사됐는지). active 가 아니면(누름이 다른 일을 할 때) 조용히.
     /// outset 은 여백 없는 글자에서 면을 글자 밖으로 조금 내는 폭.
     func copyFlash(active: Bool = true, outset: CGFloat = 0) -> some View {
@@ -218,6 +223,7 @@ struct SecondaryButtonStyle: ButtonStyle {
                 .opacity(configuration.isPressed ? 0.7 : 1)
                 .opacity(isEnabled ? 1 : 0.4)
                 .pressDip(configuration.isPressed)
+                .hoverEase(hovering)
                 .onHover { hovering = $0 }
         }
     }
@@ -244,6 +250,7 @@ struct CompactButtonStyle: ButtonStyle {
                 .opacity(configuration.isPressed ? 0.7 : 1)
                 .opacity(isEnabled ? 1 : 0.4)
                 .pressDip(configuration.isPressed)
+                .hoverEase(hovering)
                 .onHover { hovering = $0 }
         }
     }
@@ -271,6 +278,7 @@ struct TabBarIconButtonStyle: ButtonStyle {
                 .background(hovering || active ? Color.primary.opacity(configuration.isPressed ? 0.14 : 0.08) : Color.clear,
                             in: RoundedRectangle(cornerRadius: Metrics.smallRadius, style: .continuous))
                 .contentShape(Rectangle())
+                .hoverEase(hovering)
                 .onHover { hovering = $0 }
         }
     }

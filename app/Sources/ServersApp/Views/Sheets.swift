@@ -168,6 +168,7 @@ private struct QueryResultLine: View {
                 if let tone { Rectangle().fill(tone.color).frame(width: 2) }
             }
             .contentShape(Rectangle())
+            .hoverEase(hovering)
             .onHover { hovering = $0 }
     }
 }

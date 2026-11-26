@@ -74,7 +74,16 @@ private struct HoverPanelAnchor<Content: View>: NSViewRepresentable {
                 panel.parent?.removeChildWindow(panel)
                 window.addChildWindow(panel, ordered: .above)   // 본창과 함께 움직이고 본창 위에
             }
+            // 처음 뜰 때만 0.12초에 걸쳐 나타난다 (사라질 때는 바로). 떠 있는 동안의 갱신은 그대로
+            let fresh = !panel.isVisible
+            if fresh { panel.alphaValue = 0 }
             panel.orderFront(nil)
+            if fresh {
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.12
+                    panel.animator().alphaValue = 1
+                }
+            }
             self.panel = panel
         }
 

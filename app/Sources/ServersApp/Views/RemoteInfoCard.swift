@@ -16,6 +16,9 @@ struct RemoteInfoCard: View {
         return available.first ?? .spec
     }
 
+    /// 확인 시각 자리의 폭을 재는 데 쓰는 가장 긴 시각 (두 자리 시 · 분)
+    private static let widestTime = Calendar.current.date(bySettingHour: 22, minute: 58, second: 0, of: Date(timeIntervalSinceReferenceDate: 0)) ?? Date(timeIntervalSinceReferenceDate: 0)
+
     var body: some View {
         let entry = model.info(server, tab)
         let reachable = model.isReachable(server)
@@ -26,19 +29,25 @@ struct RemoteInfoCard: View {
                                       selection: Binding(get: { tab }, set: { model.selectInfoTab($0, for: server) }),
                                       title: \.title)
                 .disabled(!RemoteInfoTabs.canSwitch(reachable: reachable, current: tab, currentFetchedAt: entry.fetchedAt))   // 실시간 탭엔 fetchedAt 이 없다 — 꺼져도 다른 탭으로 옮길 수 있게
+            // 오른쪽 끝(확인 시각 · ↻)은 늘 같은 폭을 잡는다 — 가져오는 중(도는 표시)은 좁고 끝나면 시각이 들어와 넓어져,
+            // 한 줄에 겨우 들어가던 탭이 가져오기가 끝나는 순간 아랫줄로 내려갔다 (2026-11-26 사용자). 가져오지 않는 탭(Live · Diagnose)도 자리는 그대로.
             let trailing = HStack(spacing: 8) {
-                // 실시간 탭은 저절로 갱신된다 — 확인 시각·간격은 탭 안 요약 줄에. Diagnose 는 가져오는 것이 없다
-                if tab.fetches {
-                    if entry.loading {
-                        ProgressView().controlSize(.small)
-                    } else if let at = entry.fetchedAt {
-                        Text("\(at.formatted(date: .omitted, time: .shortened)) 확인").font(.caption).foregroundStyle(.secondary)
+                Text("\(Self.widestTime.formatted(date: .omitted, time: .shortened)) 확인").font(.caption).hidden()
+                    .overlay(alignment: .trailing) {
+                        // 실시간 탭은 저절로 갱신된다 — 확인 시각·간격은 탭 안 요약 줄에. Diagnose 는 가져오는 것이 없다
+                        if tab.fetches {
+                            if entry.loading {
+                                ProgressView().controlSize(.small)
+                            } else if let at = entry.fetchedAt {
+                                Text("\(at.formatted(date: .omitted, time: .shortened)) 확인").font(.caption).foregroundStyle(.secondary).fixedSize()
+                            }
+                        }
                     }
-                    Button { model.fetchInfo(server, tab, allowPrompt: true) } label: { Image(systemName: "arrow.clockwise") }.accessibilityLabel("다시 가져오기")
-                        .buttonStyle(.borderless)
-                        .disabled(!reachable || entry.loading)
-                        .help("다시 가져오기")
-                }
+                Button { model.fetchInfo(server, tab, allowPrompt: true) } label: { Image(systemName: "arrow.clockwise") }.accessibilityLabel("다시 가져오기")
+                    .buttonStyle(.borderless)
+                    .disabled(!reachable || entry.loading)
+                    .help("다시 가져오기")
+                    .hidden(!tab.fetches)
             }
             // 탭이 한 줄에 다 들어가면 제목 옆에, 좁으면(창 최소 폭 · 탭이 많은 OpenWrt) 아랫줄로 내려 가로로 민다
             ViewThatFits(in: .horizontal) {
