@@ -603,15 +603,14 @@ final class AppModel {
     // MARK: 클립보드
 
     func copy(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        copyQuietly(text)
         statusMessage = "복사됨: \(text.prefix(60))"
     }
 
-    /// 조회 결과 창에서 고른 줄들 (한 줄이면 전처럼 그 글, 여러 줄이면 줄 수)
-    func copyLines(_ text: String, count: Int) {
-        copy(text)
-        if count > 1 { statusMessage = "\(count)줄 복사됨" }
+    /// 알림 없이 복사만 — 알림을 제 창에 띄우는 곳이 쓴다 (조회 결과 창: 본창의 토스트는 그 창에서 안 보인다)
+    func copyQuietly(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     // MARK: 명령 모음

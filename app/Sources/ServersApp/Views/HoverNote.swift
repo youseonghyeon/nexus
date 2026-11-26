@@ -112,7 +112,7 @@ private struct HoverPanelAnchor<Content: View>: NSViewRepresentable {
 struct EncryptedMark: View {
     var body: some View {
         HoverNote(label: "암호화해 저장", systemName: "lock.shield.fill") {
-            Text("이 Mac 의 키체인 키로 암호화해 저장합니다")
+            Text("키체인으로 암호화됨")
         }
         .font(.body)   // 줄 글자 크기 — caption 은 작아 방패로 안 보였다 (줄 높이는 그대로)
         .foregroundStyle(.secondary)

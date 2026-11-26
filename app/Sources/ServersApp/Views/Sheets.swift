@@ -37,9 +37,18 @@ private struct QueryResultBody: View {
     @State private var rows = RowFrames()
     /// 복사할 때마다 올린다 — 고른 줄들이 한 번 반짝인다
     @State private var copiedTick = 0
+    /// 복사 알림 — 이 창의 오른쪽 아래에 잠깐 (본창의 토스트는 이 창을 보는 동안 눈에 안 들어왔다, 2026-11-26 사용자)
+    @State private var notice: String?
     private static let space = "query-lines"
 
     private func shown(_ index: Int) -> Bool { filter == nil || result.levels[index] == filter }
+
+    /// 복사하고 이 창에 알린다: 한 줄이면 그 글, 여러 줄이면 줄 수
+    private func copy(_ text: String, count: Int) {
+        model.copyQuietly(text)
+        notice = count > 1 ? "\(count)줄 복사됨" : "복사됨: \(text.prefix(60))"
+        copiedTick += 1
+    }
 
     /// 누름 · 끌기 · 놓음을 한 제스처로 (거리 0 — 끌지 않은 누름도 여기로 온다). macOS 의 스크롤은 휠이라 겹치지 않는다
     private var selecting: some Gesture {
@@ -53,8 +62,7 @@ private struct QueryResultBody: View {
             }
             .onEnded { _ in
                 guard let range = selection.release() else { return }
-                copiedTick += 1
-                model.copyLines(LineSelection.text(lines: result.lines, range: range, shown: shown), count: result.lines.indices.filter { range.contains($0) && shown($0) }.count)
+                copy(LineSelection.text(lines: result.lines, range: range, shown: shown), count: result.lines.indices.filter { range.contains($0) && shown($0) }.count)
             }
     }
 
@@ -77,6 +85,17 @@ private struct QueryResultBody: View {
             // 걸러 보기를 바꾸면 숨은 줄에 표시가 남는다 — 처음부터 (줄 자리는 줄마다 스스로 다시 알린다)
             .onChange(of: filter) { selection.clear() }
             .defaultScrollAnchor(result.startsAtEnd ? .bottom : .top)
+            .overlay(alignment: .bottomTrailing) {
+                if let notice {
+                    StatusToast(message: notice, count: 1) { self.notice = nil }
+                        .padding(12)
+                        // 줄을 덮으니 본창(5초)보다 짧게. 또 복사하면 다시 센다
+                        .task(id: copiedTick) {
+                            do { try await Task.sleep(for: .seconds(2)) } catch { return }
+                            self.notice = nil
+                        }
+                }
+            }
             Rectangle().fill(Palette.hairline).frame(height: 1)
             HStack(spacing: 8) {
                 if result.failed { Text("실패").foregroundStyle(StatusTone.bad.color) }
@@ -84,7 +103,7 @@ private struct QueryResultBody: View {
                 LogLevelFilterButton(title: "Error", count: result.count(.error), tone: .bad, level: .error, filter: $filter)
                 LogLevelFilterButton(title: "Warning", count: result.count(.warning), tone: .warn, level: .warning, filter: $filter)
                 Spacer()
-                Button("모두 복사") { model.copy(result.lines.joined(separator: "\n")) }.buttonStyle(CompactButtonStyle())
+                Button("모두 복사") { copy(result.lines.joined(separator: "\n"), count: result.lines.count) }.buttonStyle(CompactButtonStyle())
             }
             .font(.caption)
             .padding(.horizontal, 12).padding(.vertical, 6)
