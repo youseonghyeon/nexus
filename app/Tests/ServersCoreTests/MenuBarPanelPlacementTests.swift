@@ -58,4 +58,13 @@ final class MenuBarPanelPlacementTests: XCTestCase {
         XCTAssertEqual(frame.height, 0)
         XCTAssertEqual(frame.width, 184)
     }
+
+    /// 아이콘 위를 누른 것은 밖을 누른 것으로 치지 않는다 (옆 아이콘 · 패널 아래는 밖)
+    func testClickOnIconIsNotOutside() {
+        let anchor = CGRect(x: 900, y: 948, width: 30, height: 34)
+        XCTAssertTrue(MenuBarPanelPlacement.isOnIcon(CGPoint(x: 915, y: 965), anchor: anchor))
+        XCTAssertTrue(MenuBarPanelPlacement.isOnIcon(CGPoint(x: 900, y: 948), anchor: anchor))
+        XCTAssertFalse(MenuBarPanelPlacement.isOnIcon(CGPoint(x: 940, y: 965), anchor: anchor))
+        XCTAssertFalse(MenuBarPanelPlacement.isOnIcon(CGPoint(x: 915, y: 600), anchor: anchor))
+    }
 }

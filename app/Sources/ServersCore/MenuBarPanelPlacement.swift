@@ -21,4 +21,10 @@ public enum MenuBarPanelPlacement {
         let x = max(visible.minX + margin, min(anchor.minX, visible.maxX - margin - width))
         return CGRect(x: x, y: top - height, width: width, height: height)
     }
+
+    /// 누른 자리가 아이콘 위인가 — 아이콘을 다시 누른 것은 "밖을 눌러 닫기"가 아니라 여닫기(togglePanel)가 맡는다.
+    /// 둘 다 닫으려 들면 닫힌 직후 다시 열려, 아이콘으로는 패널이 닫히지 않는다.
+    public static func isOnIcon(_ point: CGPoint, anchor: CGRect) -> Bool {
+        anchor.contains(point)
+    }
 }

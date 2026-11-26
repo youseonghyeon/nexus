@@ -106,7 +106,11 @@ final class MenuBarController: NSObject {
         let downs: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
         monitors = [
             NSEvent.addGlobalMonitorForEvents(matching: downs) { [weak self] _ in
-                MainActor.assumeIsolated { self?.close() }
+                MainActor.assumeIsolated {
+                    // 아이콘을 누른 것이 이쪽(다른 프로세스로 간 누름)으로도 온다 — 여기서 닫으면 togglePanel 이 닫힌 걸 보고 다시 연다
+                    guard let self, !self.isOnIcon(NSEvent.mouseLocation) else { return }
+                    self.close()
+                }
             },
             NSEvent.addLocalMonitorForEvents(matching: downs) { [weak self] event in
                 MainActor.assumeIsolated {
@@ -141,6 +145,12 @@ final class MenuBarController: NSObject {
             guard let self else { return }
             run(self)
         }
+    }
+
+    /// 화면 좌표의 점이 메뉴바 아이콘 위인가
+    private func isOnIcon(_ point: CGPoint) -> Bool {
+        guard let button = statusItem.button, let window = button.window else { return false }
+        return MenuBarPanelPlacement.isOnIcon(point, anchor: window.convertToScreen(button.convert(button.bounds, to: nil)))
     }
 
     private func place() {
