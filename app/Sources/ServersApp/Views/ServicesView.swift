@@ -286,6 +286,7 @@ private struct ContainerRow: View {
         .tableRowSurface(highlighted: hovering)
         .onHover { hovering = $0 }
         .onTapGesture(perform: tap)
+        .copyFlash(active: !opensLog)
         .contextMenu { if opensLog { Button("이름 복사", action: copy) } }
         .help(opensLog ? (item.kind == .pod ? "누르면 상태 · 최근 로그" : "누르면 최근 로그") : "누르면 이름 복사")
     }

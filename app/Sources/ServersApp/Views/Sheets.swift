@@ -35,6 +35,8 @@ private struct QueryResultBody: View {
     @State private var selection = LineSelection()
     /// 그려진 줄들의 자리 (목록 안 좌표) — 마우스 자리를 줄로 바꾸는 데만 쓴다. 바뀌어도 다시 그릴 일이 없어 관찰하지 않는 상자에
     @State private var rows = RowFrames()
+    /// 복사할 때마다 올린다 — 고른 줄들이 한 번 반짝인다
+    @State private var copiedTick = 0
     private static let space = "query-lines"
 
     private func shown(_ index: Int) -> Bool { filter == nil || result.levels[index] == filter }
@@ -51,6 +53,7 @@ private struct QueryResultBody: View {
             }
             .onEnded { _ in
                 guard let range = selection.release() else { return }
+                copiedTick += 1
                 model.copyLines(LineSelection.text(lines: result.lines, range: range, shown: shown), count: result.lines.indices.filter { range.contains($0) && shown($0) }.count)
             }
     }
@@ -62,6 +65,7 @@ private struct QueryResultBody: View {
                     ForEach(Array(result.lines.enumerated()), id: \.offset) { index, line in
                         if shown(index) {
                             QueryResultLine(line: line, level: result.levels[index], selected: selection.contains(index))
+                                .copyFlash(tick: copiedTick, active: selection.contains(index))
                                 .modifier(RowFrameReport(line: index, rows: rows, space: Self.space))
                         }
                     }

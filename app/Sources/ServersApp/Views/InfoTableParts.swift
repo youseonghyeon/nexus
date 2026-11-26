@@ -84,6 +84,7 @@ struct OpenWrtRow<Leading: View, Trailing: View>: View {
         .tableRowSurface(highlighted: action != nil && hovering)
         .onHover { hovering = $0 }
         .onTapGesture { action?() }
+        .copyFlash(active: action != nil)   // 이 줄의 누름은 늘 복사다 (주소 · 공개키)
         .help(help ?? "")
     }
 }

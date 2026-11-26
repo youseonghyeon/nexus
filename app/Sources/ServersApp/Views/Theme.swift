@@ -176,12 +176,26 @@ struct StatusDot: View {
     var body: some View {
         Circle().fill(tone == .muted ? Color.secondary.opacity(mutedOpacity) : tone.color)
             .frame(width: size, height: size)
+            .toneChange(tone)
             .frame(width: size + margin * 2, height: size + margin * 2)
     }
 
     /// 원격 정보 표 행의 점: 둘레 자리 없이 8, 꺼짐은 회색 그대로 — 손으로 그리던 점과 같은 크기 · 자리 (열 들여쓰기가 여기에 맞춰져 있다)
     static func tableRow(_ tone: StatusTone) -> StatusDot {
         StatusDot(tone: tone, margin: 0, mutedOpacity: 1)
+    }
+}
+
+extension View {
+    /// 상태가 바뀌는 순간에만: 색이 0.25초에 걸쳐 넘어가고 점이 한 번 커졌다 돌아온다. 그대로인 동안은 아무것도 돌지 않는다 (2026-11-26 사용자)
+    func toneChange(_ tone: StatusTone) -> some View {
+        animation(.easeInOut(duration: 0.25), value: tone)
+            .keyframeAnimator(initialValue: 1.0, trigger: tone) { view, scale in view.scaleEffect(scale) } keyframes: { _ in
+                KeyframeTrack {
+                    CubicKeyframe(1.4, duration: 0.12)
+                    CubicKeyframe(1.0, duration: 0.28)
+                }
+            }
     }
 }
 
@@ -222,6 +236,7 @@ struct StatusIcon: View {
                 if let tone {
                     Circle().fill(tone == .muted ? Color.secondary.opacity(0.45) : tone.color)
                         .frame(width: Self.dot, height: Self.dot)
+                        .toneChange(tone)
                         .padding(1.5)
                         .background(selected ? Palette.raisedSidebar : Palette.sidebar, in: Circle())
                         .offset(x: 2, y: 2)

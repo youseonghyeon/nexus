@@ -110,6 +110,7 @@ struct SpecGrid: View {
                     }
                     .contentShape(Rectangle())
                     .onTapGesture { if expandable { showUpdates.toggle() } else { model.copy(item.value) } }
+                    .copyFlash(active: !expandable, outset: 4)
                     .help(expandable ? "누르면 패키지 목록" : "클릭하면 복사")
                 }
             }
@@ -129,6 +130,7 @@ struct SpecGrid: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { model.copy(item.value) }
+                .copyFlash(outset: 4)
             }
             if items.isEmpty { Text("(출력 없음)").foregroundStyle(.secondary) }
         }
@@ -238,6 +240,7 @@ private struct PortsTableRow: View {
         .tableRowSurface(highlighted: hovering)   // Services 표와 같은 행 강조
         .onHover { hovering = $0 }
         .onTapGesture { model.copy(item.copyAddress) }
+        .copyFlash()
     }
 }
 

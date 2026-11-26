@@ -69,7 +69,7 @@ struct LinuxNetworkView: View {
                             } else {
                                 HStack(spacing: 10) {
                                     ForEach(network.dns, id: \.self) { server in
-                                        Button(server) { model.copy(server) }.buttonStyle(.plain).help("누르면 주소 복사")
+                                        Button(server) { model.copy(server) }.buttonStyle(.plain).copyFlash(outset: 3).help("누르면 주소 복사")
                                     }
                                 }
                             }
@@ -124,7 +124,7 @@ struct LinuxNetworkView: View {
                 infoDetailRow("Address") {
                     ForEach(iface.addresses, id: \.self) { address in
                         Button(address) { model.copy(String(address.split(separator: "/").first ?? Substring(address))) }
-                            .buttonStyle(.plain).help("누르면 주소 복사")
+                            .buttonStyle(.plain).copyFlash(outset: 3).help("누르면 주소 복사")
                     }
                 }
             }

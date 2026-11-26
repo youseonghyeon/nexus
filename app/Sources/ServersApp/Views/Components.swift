@@ -137,6 +137,66 @@ struct CardPair<LeftContent: View, LeftAccessory: View, RightContent: View, Righ
     }
 }
 
+// 움직임은 사용자가 방금 한 일에 한 번만 — 짧게(0.4초 안) · 작게 · 튕김 없이. 계속 도는 것은 넣지 않는다 (2026-11-26 사용자 — 눌림 · 복사 반짝 · 상태 점).
+extension View {
+    /// 버튼 눌림: 누르는 동안 조금 줄었다 돌아온다 (세 버튼 스타일 공통)
+    func pressDip(_ pressed: Bool) -> some View {
+        scaleEffect(pressed ? 0.97 : 1).animation(.easeOut(duration: 0.12), value: pressed)
+    }
+
+    /// 누르면 복사되는 줄 · 값: 누른 순간 면이 한 번 밝아졌다 꺼진다 (무엇이 복사됐는지). active 가 아니면(누름이 다른 일을 할 때) 조용히.
+    /// outset 은 여백 없는 글자에서 면을 글자 밖으로 조금 내는 폭.
+    func copyFlash(active: Bool = true, outset: CGFloat = 0) -> some View {
+        modifier(CopyFlashOnTap(active: active, outset: outset))
+    }
+
+    /// 누름을 밖에서 받는 줄(조회 결과 창 — 끌기 제스처가 목록에 있다): tick 이 바뀔 때 active 인 줄만 반짝인다
+    func copyFlash(tick: Int, active: Bool) -> some View {
+        modifier(CopyFlashOnTick(tick: tick, active: active))
+    }
+}
+
+/// 반짝이는 면: 바로 켜고 0.4초에 걸쳐 끈다
+private struct CopyFlashSurface: View {
+    let lit: Bool
+    var radius: CGFloat = Metrics.smallRadius
+    var body: some View {
+        RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Color.primary.opacity(lit ? 0.16 : 0)).allowsHitTesting(false)
+    }
+
+    static func flash(_ lit: Binding<Bool>) {
+        var now = Transaction()
+        now.disablesAnimations = true
+        withTransaction(now) { lit.wrappedValue = true }
+        DispatchQueue.main.async { withAnimation(.easeOut(duration: 0.4)) { lit.wrappedValue = false } }
+    }
+}
+
+private struct CopyFlashOnTap: ViewModifier {
+    let active: Bool
+    let outset: CGFloat
+    @State private var lit = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(CopyFlashSurface(lit: lit).padding(-outset))
+            // 줄의 누름 동작은 그대로 두고 곁에서 듣기만 한다
+            .simultaneousGesture(TapGesture().onEnded { if active { CopyFlashSurface.flash($lit) } })
+    }
+}
+
+private struct CopyFlashOnTick: ViewModifier {
+    let tick: Int
+    let active: Bool
+    @State private var lit = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(CopyFlashSurface(lit: lit, radius: 0))
+            .onChange(of: tick) { if active { CopyFlashSurface.flash($lit) } }
+    }
+}
+
 /// 보조 버튼 (Browser·Tunnel… 등): 조작부 면 + 머리카락 선. 마우스를 올리면 한 단계 밝아진다.
 struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -157,6 +217,7 @@ struct SecondaryButtonStyle: ButtonStyle {
                 .overlay(RoundedRectangle(cornerRadius: Metrics.controlRadius, style: .continuous).strokeBorder(Palette.hairline))
                 .opacity(configuration.isPressed ? 0.7 : 1)
                 .opacity(isEnabled ? 1 : 0.4)
+                .pressDip(configuration.isPressed)
                 .onHover { hovering = $0 }
         }
     }
@@ -182,6 +243,7 @@ struct CompactButtonStyle: ButtonStyle {
                 .overlay(RoundedRectangle(cornerRadius: Metrics.smallRadius, style: .continuous).strokeBorder(Palette.hairline))
                 .opacity(configuration.isPressed ? 0.7 : 1)
                 .opacity(isEnabled ? 1 : 0.4)
+                .pressDip(configuration.isPressed)
                 .onHover { hovering = $0 }
         }
     }
@@ -236,6 +298,7 @@ struct PrimaryButtonStyle: ButtonStyle {
                 .padding(.horizontal, 12).padding(.vertical, 5)
                 .background(Color.primary.opacity(configuration.isPressed ? 0.7 : 0.92), in: shape)
                 .foregroundStyle(colorScheme == .dark ? Color.black.opacity(0.88) : Color.white)
+                .pressDip(configuration.isPressed)
         }
     }
 }

@@ -102,7 +102,7 @@ struct OpenWrtNetworkView: View {
                 infoDetailRow("Address") {
                     ForEach(iface.addresses, id: \.self) { address in
                         Button(address) { model.copy(String(address.split(separator: "/").first ?? Substring(address))) }
-                            .buttonStyle(.plain).help("누르면 주소 복사")
+                            .buttonStyle(.plain).copyFlash(outset: 3).help("누르면 주소 복사")
                     }
                 }
             }

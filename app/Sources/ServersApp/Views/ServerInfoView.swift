@@ -143,8 +143,11 @@ struct ConnectionCard: View {
                 // 저장된 비밀번호(암호화 파일). 있으면 ssh·spec·터널·전송이 창 없이 대입한다.
                 HStack(spacing: 6) {
                     if model.hasPassword(server) {
-                        EncryptedMark()
-                        Text("●●●●●●●●").foregroundStyle(.secondary)
+                        // 방패는 가린 글자에 붙인다 (표 머리의 ⓘ 처럼 — 떨어져 있으면 따로 노는 것처럼 보였다)
+                        HStack(spacing: 2) {
+                            EncryptedMark()
+                            Text("●●●●●●●●").foregroundStyle(.secondary)
+                        }
                         Text("저장됨").font(.caption).foregroundStyle(.tertiary)
                         Button("지우기") { model.clearPassword(for: server) }.buttonStyle(.borderless)
                     } else {
@@ -154,6 +157,7 @@ struct ConnectionCard: View {
                             .fieldSurface()
                             .id(server.accountID)
                         Button("저장", action: savePassword).buttonStyle(.borderless).disabled(passwordDraft.isEmpty)
+                            .fixedSize()   // 칸이 좁게 잡혀도 글자가 세로로 접히지 않게 (2026-11-26 — 자리가 있는데도 "저/장" 으로 접혔다)
                     }
                 }
             }
