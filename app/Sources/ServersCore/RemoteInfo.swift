@@ -214,17 +214,35 @@ public enum RemoteInfo {
 
     // MARK: Ports
 
+    /// 번호로 짐작하는 이름표 — 실제로 그 서비스가 듣는지는 보지 않는다.
+    /// 이름에 http 가 없는 번호는 시작 페이지가 HTTP 로 묻지 않는다(WebProbe.nonWebPorts) — 웹 화면을 주는 포트(kibana 5601 · rabbitmq 관리 15672 · proxmox 8006 …)는 여기 넣지 않는다.
     public static let knownPorts: [Int: String] = [
         22: "ssh", 53: "dns", 80: "http", 443: "https", 135: "rpc", 139: "netbios", 445: "smb", 631: "cups",
         2379: "etcd", 2380: "etcd peer", 3000: "http-alt", 3306: "mysql", 3389: "rdp", 5432: "postgres", 5900: "vnc",
         5985: "winrm", 5986: "winrm tls", 6379: "redis", 6443: "k3s api", 8080: "http-alt", 8443: "https-alt",
         9090: "http-alt", 9100: "node-exporter", 10250: "kubelet", 27017: "mongodb", 41641: "tailscale",
+        // 메일 · 파일
+        21: "ftp", 23: "telnet", 25: "smtp", 110: "pop3", 111: "rpcbind", 143: "imap", 465: "smtps", 587: "submission",
+        873: "rsync", 993: "imaps", 995: "pop3s", 2049: "nfs", 3260: "iscsi",
+        // 디렉터리 · 인증 · 망
+        88: "kerberos", 179: "bgp", 389: "ldap", 636: "ldaps", 853: "dns tls", 1080: "socks", 1194: "openvpn", 3128: "squid", 5201: "iperf3",
+        // DB · 캐시
+        1433: "mssql", 1521: "oracle", 5433: "postgres", 9042: "cassandra", 11211: "memcached", 26379: "redis sentinel", 33060: "mysql x",
+        // 메시지 큐
+        1883: "mqtt", 2181: "zookeeper", 4222: "nats", 5671: "amqp tls", 5672: "amqp", 8883: "mqtt tls", 9092: "kafka",
+        // 컨테이너 · k8s · 관측
+        2375: "docker", 2376: "docker tls", 4317: "otlp grpc", 10248: "kubelet healthz", 10249: "kube-proxy", 10256: "kube-proxy",
+        10257: "kube-controller", 10259: "kube-scheduler",
     ]
 
     /// UDP 로 알려진 번호 (TCP 이름표와 따로 — 53 은 둘 다 dns 지만 123·51820 은 UDP 뿐)
     public static let knownUDPPorts: [Int: String] = [
         53: "dns", 67: "dhcp", 68: "dhcp", 123: "ntp", 137: "netbios", 138: "netbios", 161: "snmp", 323: "chrony", 500: "ipsec",
         514: "syslog", 1900: "ssdp", 3478: "stun", 4500: "ipsec nat-t", 5353: "mdns", 8472: "vxlan", 41641: "tailscale", 51820: "wireguard",
+        69: "tftp", 88: "kerberos", 111: "rpcbind", 162: "snmp trap", 443: "quic", 520: "rip", 546: "dhcpv6", 547: "dhcpv6", 1194: "openvpn",
+        1812: "radius", 1813: "radius acct", 2049: "nfs", 4789: "vxlan", 5355: "llmnr", 6081: "geneve", 8125: "statsd",
+        1701: "l2tp", 2055: "netflow", 3702: "ws-discovery", 3784: "bfd", 4739: "ipfix", 5060: "sip", 5349: "turn tls", 5683: "coap",
+        6343: "sflow", 7946: "serf",
     ]
 
     /// "0.0.0.0:22", "*:6443", "[::]:22", ":::135", "100.101.0.1%tailscale0:10004", "[::1]%lo:10004", Windows "0.0.0.0:22|6788|sshd" → 포트별 한 줄. 포트 순으로 정렬.

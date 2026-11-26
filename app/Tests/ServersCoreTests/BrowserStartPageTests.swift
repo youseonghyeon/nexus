@@ -143,7 +143,7 @@ final class BrowserStartPageTests: XCTestCase {
     /// 가르는 것은 제목이 아니라 화면(HTML)인가 — 제목은 이름일 뿐. 다른 곳으로 보내는 답(3xx)은 타일, 목록의 다른 포트로 넘기기만 하면 칩
     func testClassifiesByHTMLNotTitle() {
         let list = [item(80), item(443), item(7000), item(7001, ["10.0.0.5"], tunnel: "10.0.0.5"), item(7002), item(7003), item(8080, process: "uhttpd"),
-                    item(8081), item(9090), item(9091), item(9092)]
+                    item(8081), item(9090), item(9091), item(9093)]
         let probes = [
             80: WebProbeResult(scheme: "http", title: "Admin Panel", status: 301, redirect: ":443/", redirectPort: 443, html: true),   // 443 의 제목을 빌려 왔지만 넘기기만 하는 포트
             443: WebProbeResult(scheme: "https", title: "Admin Panel", status: 200, html: true),
@@ -155,9 +155,9 @@ final class BrowserStartPageTests: XCTestCase {
             8081: WebProbeResult(scheme: "http", title: nil, status: 200, html: true),                                  // 같은데 프로세스 이름도 모름
             9090: WebProbeResult(scheme: "http", title: nil, status: 200),                                              // JSON · 글
             9091: WebProbeResult(scheme: "http", title: nil, status: 404, html: true),                                  // HTML 오류 페이지
-            9092: WebProbeResult(scheme: "http", title: "OpenWrt - LuCI", status: 403, html: true)]                     // 403 으로 오는 로그인 화면 (쓸 제목이 있다)
+            9093: WebProbeResult(scheme: "http", title: "OpenWrt - LuCI", status: 403, html: true)]                     // 403 으로 오는 로그인 화면 (쓸 제목이 있다)
         let (web, bare, other) = BrowserStartPage.sections(ports: list, probes: probes, probed: true)
-        XCTAssertEqual(web.map(\.port), [443, 7000, 7001, 7002, 7003, 8080, 8081, 9092])
+        XCTAssertEqual(web.map(\.port), [443, 7000, 7001, 7002, 7003, 8080, 8081, 9093])
         XCTAssertEqual(web.map(\.title), ["Admin Panel", ":7000", ":7001", "Sign in", ":7003", "uhttpd", ":8081", "OpenWrt - LuCI"],
                        "이름: 제목 → 프로세스 이름 → :포트")
         XCTAssertEqual(web[1], .init(port: 7000, title: ":7000", url: "http://localhost:7000/", status: 302, redirect: "sso.example.com/login"))

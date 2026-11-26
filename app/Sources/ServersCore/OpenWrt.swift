@@ -93,8 +93,9 @@ public enum OpenWrt {
     echo @END
     """#
 
-    /// busybox netstat — 4번째 칸이 "0.0.0.0:22" · ":::22" (RemoteInfo.parsePorts 가 ss 와 같이 읽는다)
-    public static let portsCommand = "netstat -lnt 2>/dev/null | awk 'NR > 2 {print $4}'"
+    /// busybox netstat — 4번째 칸이 "0.0.0.0:22" · ":::22" (RemoteInfo.parsePorts 가 ss 와 같이 읽는다).
+    /// 이어서 UDP ("주소:포트/udp" — 리눅스의 linuxPorts 와 같은 꼴). 실제 출력: Tests/…/Fixtures/openwrt-ports-udp.txt (GL-MT5000, 2026-11-26 — 주소는 문서용으로 바꿈)
+    public static let portsCommand = "netstat -lnt 2>/dev/null | awk 'NR > 2 {print $4}'; netstat -lnu 2>/dev/null | awk 'NR > 2 {print $4 \"/udp\"}' | sort -u"
 
     /// 서비스 이름 (init.d 파일 이름). 원격 명령에 그대로 들어가므로 이 글자만.
     static let serviceNamePattern = #"^[A-Za-z0-9._-]{1,64}$"#

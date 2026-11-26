@@ -168,11 +168,15 @@ struct PortsTable: View {
             if !items.isEmpty {
                 HStack(spacing: 10) {
                     Text("Port").frame(width: 56, alignment: .trailing)
-                    Text("Service").frame(width: 110, alignment: .leading)
+                    // 이름이 어디서 오는지 (번호로 짐작한 것 — 올리면 바로 뜬다)
+                    HStack(spacing: 4) { Text("Service"); HoverNote(label: "서비스 이름 설명") { ServiceLegend() } }
+                        .frame(width: 110, alignment: .leading)
                     if showsProcess { Text("Process").frame(width: PortsTableRow.processWidth, alignment: .leading) }
-                    Text("Address")
-                    // 번호의 딱지가 무엇인지 (열린 포트가 있을 때만)
-                    if items.contains(where: \.open) { HoverNote(label: "포트 표시 설명") { PortsLegend() } }
+                    // 번호의 딱지가 무엇인지 (열린 포트가 있을 때만) — ⓘ 는 글자에 붙인다
+                    HStack(spacing: 4) {
+                        Text("Address")
+                        if items.contains(where: \.open) { HoverNote(label: "포트 표시 설명") { PortsLegend() } }
+                    }
                     Spacer()
                 }
                 .font(.caption).foregroundStyle(.secondary)
@@ -246,6 +250,18 @@ private struct PortsLegend: View {
                 GridRow { PortBadge(text: "443"); Text("외부 공개 (모든 주소)") }
                 GridRow { Text(verbatim: "5432").monospacedDigit().foregroundStyle(.secondary); Text("해당 주소 전용") }
             }
+        }
+        .fixedSize()
+    }
+}
+
+/// Service 칸 제목 옆 ⓘ 의 설명: 이름은 번호로 짐작한 것 (올리면 바로 뜬다 — HoverNote)
+private struct ServiceLegend: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Service").font(.cardTitle).foregroundStyle(.secondary)
+            Text("잘 알려진 포트 번호로 짐작한 이름입니다.")
+            Text("실제로 듣고 있는 프로그램은 다를 수 있습니다.").foregroundStyle(.secondary)
         }
         .fixedSize()
     }

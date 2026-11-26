@@ -875,6 +875,25 @@ final class OpenWrtTests: XCTestCase {
         XCTAssertEqual(ports.last?.addresses, ["127.0.0.11"])
     }
 
+    /// UDP 도 읽는다 — 실제 출력: Fixtures/openwrt-ports-udp.txt (GL-MT5000 의 busybox netstat -lnu, 2026-11-26. 주소는 문서용으로 바꿈)
+    func testPortsWithUDP() throws {
+        XCTAssertTrue(OpenWrt.portsCommand.contains("netstat -lnu"))
+        let ports = RemoteInfo.parsePorts(try fixture("ports-udp"))
+        XCTAssertEqual(ports.map(\.id), ["22", "80", "443", "53/udp", "67/udp", "123/udp", "137/udp", "138/udp", "323/udp", "3053/udp", "5353/udp", "51820/udp"],
+                       "TCP 를 다 적은 뒤 UDP 를 번호순으로 — 같은 번호의 여러 주소는 한 줄")
+        let udp = Dictionary(uniqueKeysWithValues: ports.filter(\.udp).map { ($0.port, $0) })
+        XCTAssertEqual(ports.filter(\.udp).map(\.label), ["dns", "dhcp", "ntp", "netbios", "netbios", "chrony", nil, "mdns", "wireguard"])
+        XCTAssertEqual(udp[53]?.open, false, "특정 주소들에만 묶인 것은 딱지가 아니다 (::1:53 은 루프백)")
+        XCTAssertEqual(udp[53]?.addresses.contains("::1"), true, "대괄호 없는 IPv6 루프백 \"::1:53\" 도 주소 · 포트로 갈린다")
+        XCTAssertEqual(udp[53]?.addresses.count, 5)
+        XCTAssertEqual(udp[137]?.open, true, "0.0.0.0 과 특정 주소가 함께면 모든 주소로 듣는 것")
+        XCTAssertEqual(udp[3053]?.addresses, ["*"], "\":::3053\" 은 모든 주소")
+        XCTAssertEqual(udp[323]?.open, false)
+        XCTAssertTrue(ports.filter(\.udp).allSatisfy { $0.tunnelAddress == nil }, "UDP 는 ssh 터널로 닿지 못한다")
+        // UDP 를 쓰는 곳: 변경 이력은 TCP 만 견준다
+        XCTAssertEqual(ServerHistory.observe(.ports(ports), type: .openwrt)?.ports.map { Set($0.keys) }, ["22", "80", "443"])
+    }
+
     /// eMMC 부트·보안 영역은 장치 목록·속도에서 뺀다 (옛 스크립트가 보낸 줄이 와도 파서가 거른다)
     func testEMMCBootAreasAreNotDisks() throws {
         let blk = "mmcblk0 0 0 15269888 \nmmcblk0boot0 0 0 8192 \nmmcblk0boot1 0 0 8192 \nmmcblk0rpmb 0 0 8192 \nsda 0 0 976773168 PSSD T7 Touch"
