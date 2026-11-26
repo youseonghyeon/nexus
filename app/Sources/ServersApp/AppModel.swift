@@ -608,6 +608,12 @@ final class AppModel {
         statusMessage = "복사됨: \(text.prefix(60))"
     }
 
+    /// 조회 결과 창에서 고른 줄들 (한 줄이면 전처럼 그 글, 여러 줄이면 줄 수)
+    func copyLines(_ text: String, count: Int) {
+        copy(text)
+        if count > 1 { statusMessage = "\(count)줄 복사됨" }
+    }
+
     // MARK: 명령 모음
 
     /// 명령 모음이 입력할 터미널: 선택한 서버(또는 이 Mac)의 보이는 탭이 살아 있는 터미널일 때만 (Dashboard·브라우저 탭이면 nil)

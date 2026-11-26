@@ -4,7 +4,8 @@ import AppKit
 import ServersCore
 import SwiftUI
 
-/// 조회 결과: 줄을 클릭하면 복사된다. 제목은 창 제목 줄에 (QueryResultWindow).
+/// 조회 결과: 줄을 클릭하면 복사된다. 누르고 끌면 그 사이 줄들이 골라지고 놓으면 복사, Shift 누름은 앞서 누른 줄부터 (판정은 ServersCore LineSelection · LineHit).
+/// 제목은 창 제목 줄에 (QueryResultWindow).
 /// 줄들이 창을 좌우 끝까지 채우고(터미널처럼 — 바깥 여백 · 구분선 없음), 아래 얇은 띠에 줄 수 · 오류/경고 개수 · 모두 복사. 닫기는 창의 신호등 · esc.
 /// 오류 · 경고 줄은 상태 색(왼쪽 띠 + 글자), debug 는 흐리게, info 와 레벨을 못 읽은 줄은 그대로 (판정은 ServersCore LogLevel).
 struct QueryResultView: View {
@@ -30,19 +31,47 @@ private struct QueryResultBody: View {
     let result: QueryResult
     /// 걸러 보기: 아래 띠의 오류 · 경고 개수를 누르면 그 레벨의 줄만 (다시 누르면 전부)
     @State private var filter: LogLevel?
+    /// 고른 줄들 (누르고 끌기 · Shift 누름)
+    @State private var selection = LineSelection()
+    /// 그려진 줄들의 자리 (목록 안 좌표) — 마우스 자리를 줄로 바꾸는 데만 쓴다. 바뀌어도 다시 그릴 일이 없어 관찰하지 않는 상자에
+    @State private var rows = RowFrames()
+    private static let space = "query-lines"
+
+    private func shown(_ index: Int) -> Bool { filter == nil || result.levels[index] == filter }
+
+    /// 누름 · 끌기 · 놓음을 한 제스처로 (거리 0 — 끌지 않은 누름도 여기로 온다). macOS 의 스크롤은 휠이라 겹치지 않는다
+    private var selecting: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.space))
+            .onChanged { value in
+                if !selection.pressing {
+                    guard let line = LineHit.line(atY: value.startLocation.y, rows: rows.list) else { return }
+                    selection.press(line, extend: NSEvent.modifierFlags.contains(.shift))
+                }
+                if let line = LineHit.line(atY: value.location.y, rows: rows.list) { selection.drag(to: line) }
+            }
+            .onEnded { _ in
+                guard let range = selection.release() else { return }
+                model.copyLines(LineSelection.text(lines: result.lines, range: range, shown: shown), count: result.lines.indices.filter { range.contains($0) && shown($0) }.count)
+            }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(result.lines.enumerated()), id: \.offset) { index, line in
-                        if filter == nil || result.levels[index] == filter {
-                            QueryResultLine(line: line, level: result.levels[index]) { model.copy(line) }
+                        if shown(index) {
+                            QueryResultLine(line: line, level: result.levels[index], selected: selection.contains(index))
+                                .modifier(RowFrameReport(line: index, rows: rows, space: Self.space))
                         }
                     }
                 }
                 .padding(.vertical, 6)
+                .coordinateSpace(.named(Self.space))
+                .gesture(selecting)
             }
+            // 걸러 보기를 바꾸면 숨은 줄에 표시가 남는다 — 처음부터 (줄 자리는 줄마다 스스로 다시 알린다)
+            .onChange(of: filter) { selection.clear() }
             .defaultScrollAnchor(result.startsAtEnd ? .bottom : .top)
             Rectangle().fill(Palette.hairline).frame(height: 1)
             HStack(spacing: 8) {
@@ -83,12 +112,37 @@ private struct LogLevelFilterButton: View {
     }
 }
 
-/// 조회 결과의 한 줄: 긴 줄은 접혀 내려가고, 올리면 옅은 면(누르면 복사된다는 표시), 줄 사이는 조금 띄워 접힌 줄과 새 줄을 가른다.
+/// 그려진 줄들의 자리 (줄 번호 → 목록 안 틀). 화면 밖으로 나간 줄은 뺀다
+@MainActor
+private final class RowFrames {
+    var frames: [Int: CGRect] = [:]
+    var list: [LineHit.Row] { frames.map { LineHit.Row(line: $0.key, minY: $0.value.minY, maxY: $0.value.maxY) } }
+}
+
+/// 줄이 제 자리를 알린다: 자리가 바뀔 때마다, 그리고 화면에 다시 들어올 때마다 (밖으로 나가면 뺀다).
+/// LazyVStack 은 나간 줄을 버리기도 그대로 두기도 한다 — 그대로 둔 줄은 같은 자리로 돌아오면 자리 변화가 없어 다시 알리지 않으므로,
+/// 들어올 때마다 바뀌는 번호(seen)를 값에 넣어 알리게 한다.
+private struct RowFrameReport: ViewModifier {
+    private struct Report: Equatable { let frame: CGRect; let seen: Int }
+    let line: Int
+    let rows: RowFrames
+    let space: String
+    @State private var seen = 0
+
+    func body(content: Content) -> some View {
+        content
+            .onGeometryChange(for: Report.self) { Report(frame: $0.frame(in: .named(space)), seen: seen) } action: { rows.frames[line] = $0.frame }
+            .onAppear { seen += 1 }
+            .onDisappear { rows.frames[line] = nil }
+    }
+}
+
+/// 조회 결과의 한 줄: 긴 줄은 접혀 내려가고, 올리면 옅은 면(누르면 복사된다는 표시), 고른 줄은 조금 더 진한 면, 줄 사이는 조금 띄워 접힌 줄과 새 줄을 가른다.
 /// 오류 · 경고는 왼쪽 가는 띠와 글자를 상태 색으로 — 이어진 줄(스택 트레이스)의 띠는 한 줄로 붙는다.
 private struct QueryResultLine: View {
     let line: String
     let level: LogLevel?
-    let copy: () -> Void
+    let selected: Bool
     @State private var hovering = false
 
     private var tone: StatusTone? {
@@ -105,13 +159,12 @@ private struct QueryResultLine: View {
             .foregroundStyle(tone?.color ?? (level == .debug ? Color.secondary : Color.primary))
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12).padding(.vertical, 3)
-            .background(hovering ? Color.primary.opacity(0.06) : Color.clear)
+            .background(Color.primary.opacity(selected ? 0.12 : (hovering ? 0.06 : 0)))
             .overlay(alignment: .leading) {
                 if let tone { Rectangle().fill(tone.color).frame(width: 2) }
             }
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
-            .onTapGesture(perform: copy)
     }
 }
 
