@@ -40,13 +40,16 @@ public struct ContainerItem: Sendable, Equatable, Identifiable {
     /// 파드: 준비 "1/1" · 재시작 횟수
     public let ready: String?
     public let restarts: Int?
+    /// 파드: 마지막 재시작이 얼마 전인지 (kubectl 의 RESTARTS 칸 "3 (5d10h ago)" 의 "5d10h" — 직전 컨테이너가 끝난 때). 재시작이 없거나 옛 kubectl 이면 nil
+    public let restartedAgo: String?
     /// docker: 호스트로 내놓은 포트 (docker ps 의 Ports 원문 — 화면 꼴은 ServicesFormat.dockerPortList · dockerPortsShown) · compose 프로젝트 (없으면 nil)
     public let ports: String
     public let project: String?
 
     public init(kind: Kind, name: String, status: String, detail: String = "", age: String? = nil, ready: String? = nil, restarts: Int? = nil,
-                ports: String = "", project: String? = nil) {
+                restartedAgo: String? = nil, ports: String = "", project: String? = nil) {
         self.kind = kind; self.name = name; self.status = status; self.detail = detail; self.age = age; self.ready = ready; self.restarts = restarts
+        self.restartedAgo = restartedAgo
         self.ports = ports; self.project = project
     }
 
@@ -55,6 +58,10 @@ public struct ContainerItem: Sendable, Equatable, Identifiable {
         guard kind == .pod, let slash = name.firstIndex(of: "/") else { return nil }
         return String(name[..<slash])
     }
+
+    /// 파드 줄 오른쪽 끝의 시간: 마지막으로 뜬 뒤 지난 시간 — 재시작했으면 마지막 재시작부터, 아니면 만든 뒤부터 (서비스 줄의 가동 시간과 같은 뜻).
+    /// 만든 뒤 지난 시간(age)은 파드를 눌렀을 때의 상태에 적는다 (PodInspect "만든 지").
+    public var upFor: String? { (restarts ?? 0) > 0 ? restartedAgo ?? age : age }
 
     /// 화면용 이름: 네임스페이스를 떼고, 쿠버네티스가 붙인 꼬리(해시)를 따로 — ("calapp-server", "-f6cdff6d5-mt2v2")
     public var displayName: (base: String, hash: String) {
@@ -110,16 +117,24 @@ public struct ContainerItem: Sendable, Equatable, Identifiable {
 
 /// 쿠버네티스 파드 이름의 자동 꼬리. 디플로이먼트 "이름-<RS 해시>-<5글자>", 데몬셋 "이름-<5글자>", 크론잡 "이름-<시각 숫자>-<5글자>".
 /// 꼬리 글자는 모음 없는 영숫자(k8s SafeEncodeString)라 "nginx-proxy" 같은 사람이 지은 낱말은 떼지 않는다. 스테이트풀셋 "-0" 은 그대로.
+/// k3s 서비스 로드밸런서는 "svclb-<서비스>-<서비스 UID 앞 8자리>-<5글자>" — UID 는 16진이라 꼬리 글자에 없는 0·1·3·a·e 가 섞인다.
+/// 숫자가 든 16진 8자리도 꼬리로 본다 (숫자 없는 "deadbeef" 같은 낱말은 이름).
 public enum PodName {
     static let safe = Set("bcdfghjklmnpqrstvwxz2456789")
+
+    /// 가운데 꼬리인가: RS 해시(꼬리 글자 6~10자) · 크론잡 시각(숫자 6자 이상) · UID 조각(숫자가 든 16진 8자리)
+    static func isMiddleTail(_ segment: String) -> Bool {
+        if (6...10).contains(segment.count), segment.allSatisfy(safe.contains) { return true }
+        if segment.count >= 6, segment.allSatisfy(\.isNumber) { return true }
+        return segment.count == 8 && segment.allSatisfy { $0.isHexDigit && !$0.isUppercase } && segment.contains(where: \.isNumber)
+    }
 
     public static func split(_ name: String) -> (base: String, hash: String) {
         var segments = name.split(separator: "-", omittingEmptySubsequences: false).map(String.init)
         var tail: [String] = []
         if segments.count > 1, let last = segments.last, last.count == 5, last.allSatisfy(safe.contains) {
             tail.insert(segments.removeLast(), at: 0)
-            if segments.count > 1, let prev = segments.last,
-               (6...10).contains(prev.count) && prev.allSatisfy(safe.contains) || (prev.count >= 6 && prev.allSatisfy(\.isNumber)) {
+            if segments.count > 1, let prev = segments.last, isMiddleTail(prev) {
                 tail.insert(segments.removeLast(), at: 0)
             }
         }
@@ -212,7 +227,7 @@ public enum ServicesScript {
       echo "SOURCE|k3s|$state"
       if [ "$state" = ok ] && [ -n "$out" ]; then
         n=$(printf '%s\n' "$out" | wc -l); [ "$n" -gt 200 ] && echo "MORE|k3s|$n"
-        printf '%s\n' "$out" | head -n 200 | awk '{print "P|" $1 "/" $2 "|" $4 "|" $3 "|" $5 "|" $NF}'
+        printf '%s\n' "$out" | head -n 200 | awk '{r = ""; if (NF >= 8) { r = $6; sub(/^\(/, "", r) } print "P|" $1 "/" $2 "|" $4 "|" $3 "|" $5 "|" $NF "|" r}'
       fi
     fi
     [ -n "$E" ] && rm -f "$E"
@@ -311,9 +326,10 @@ public enum ServicesParser {
                                                            detail: parts.count > 3 ? parts[3] : "", age: nil,
                                                            ports: parts.count > 4 ? parts[4] : "",
                                                            project: parts.count > 5 && !parts[5].isEmpty ? parts[5] : nil))
-                case "P" where parts.count >= 6:   // P|ns/이름|상태|준비|재시작|나이
+                case "P" where parts.count >= 6:   // P|ns/이름|상태|준비|재시작|나이[|마지막 재시작] — 끝 칸은 재시작한 파드만 ("5d10h")
                     report.containers.append(ContainerItem(kind: .pod, name: parts[1], status: parts[2], age: parts[5],
-                                                           ready: parts[3], restarts: Int(parts[4])))
+                                                           ready: parts[3], restarts: Int(parts[4]),
+                                                           restartedAgo: parts.count > 6 && !parts[6].isEmpty ? parts[6] : nil))
                 default: break
                 }
                 continue

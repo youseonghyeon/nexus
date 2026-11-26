@@ -41,6 +41,23 @@ final class PodInspectTests: XCTestCase {
         XCTAssertTrue(lines.contains { $0.contains("Warning  BackOff ×") }, "\(lines)")
     }
 
+    /// 목록의 시간이 마지막 재시작부터라, 재시작한 파드는 만든 때를 상태에 적는다 (실제 k3s v1.34.1 의 P 줄 꼴, 2026-11-26)
+    func testCreatedAgoIsShownForRestartedPods() {
+        let restarted = PodInspect.parse(["NOW|2026-11-26T01:59:26Z", "## STATUS", "P|Running||2026-11-24T00:59:26Z", "PM|",
+                                          "C|flap|1||Error|1|2026-11-26T01:59:15Z||", "## END"])
+        XCTAssertEqual(restarted?.createdAgo, 2 * 86400 + 3600)
+        XCTAssertEqual(restarted.map(PodInspect.displayLines)?.prefix(3), ["── 상태 ──", "만든 지 2일 1시간", "flap: 재시작 1"])
+        // 재시작이 없는 파드는 목록의 시간이 곧 만든 뒤라 적지 않는다 (문제가 있어 상태가 보여도)
+        let pending = PodInspect.parse(["NOW|2026-11-26T01:59:26Z", "## STATUS", "P|Pending|Evicted|2026-11-24T00:59:26Z", "PM|", "## END"])
+        XCTAssertEqual(pending?.reason, "Evicted", "이유 칸에 만든 시각이 붙지 않는다")
+        XCTAssertFalse(pending.map(PodInspect.displayLines)?.contains { $0.hasPrefix("만든 지") } ?? true)
+        // 옛 꼴(만든 시각 없음)은 그대로
+        let old = PodInspect.parse(["NOW|2026-11-26T01:59:26Z", "## STATUS", "P|Running|", "PM|", "C|web|2||Error|1|||", "## END"])
+        XCTAssertNil(old?.createdAgo)
+        XCTAssertEqual(old.map(PodInspect.displayLines)?.prefix(2), ["── 상태 ──", "web: 재시작 2"])
+        XCTAssertTrue(PodInspect.script(namespace: "a", pod: "b")?.contains(#"{.status.reason}{"|"}{.metadata.creationTimestamp}"#) == true)
+    }
+
     func testOOMKilledIsNamed() throws {
         let r = try report("oom")
         XCTAssertEqual(r.containers.first?.lastReason, "OOMKilled")

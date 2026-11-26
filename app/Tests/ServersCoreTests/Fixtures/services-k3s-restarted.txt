@@ -1,0 +1,9 @@
+## FAILED
+## RUNNING
+## CONTAINERS
+SOURCE|k3s|ok
+P|default/flap|Error|0/1|1|28s|11s
+P|default/steady|Running|1/1|0|40s|
+P|kube-system/coredns-7896679cc-27pm7|Running|1/1|0|40s|
+P|kube-system/local-path-provisioner-578895bd58-cbn6l|Running|1/1|0|40s|
+## END

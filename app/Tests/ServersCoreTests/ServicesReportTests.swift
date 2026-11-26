@@ -174,6 +174,27 @@ final class ServicesReportTests: XCTestCase {
         XCTAssertEqual(both(""), [nil, ""])
     }
 
+    /// 파드 줄의 시간은 마지막으로 뜬 뒤부터 — 재시작했으면 kubectl 의 "1 (11s ago)" 에서, 아니면 만든 뒤부터 (서비스 줄의 가동 시간과 같은 뜻).
+    /// 실제 출력: Fixtures/services-k3s-restarted.txt (이 Mac 의 docker 안 rancher/k3s v1.34.1 — 8초마다 죽는 flap 과 멀쩡한 파드들을 스크립트의 awk 로 거른 것, 2026-11-26)
+    func testPodTimeIsSinceLastStart() throws {
+        let report = try XCTUnwrap(ServicesParser.parse(RemoteCommands.cleanOutput(try fixtureText("services-k3s-restarted"), type: .linux), type: .linux))
+        let pods = Dictionary(uniqueKeysWithValues: report.containers.map { ($0.copyName, $0) })
+        XCTAssertEqual(pods["flap"]?.restarts, 1)
+        XCTAssertEqual(pods["flap"]?.age, "28s", "만든 뒤 지난 시간은 그대로 든다")
+        XCTAssertEqual(pods["flap"]?.restartedAgo, "11s")
+        XCTAssertEqual(pods["flap"]?.upFor, "11s", "재시작했으면 마지막 재시작부터")
+        XCTAssertNil(pods["steady"]?.restartedAgo)
+        XCTAssertEqual(pods["steady"]?.upFor, "40s", "재시작이 없으면 만든 뒤부터")
+        XCTAssertTrue(ServicesScript.linux.contains(#"if (NF >= 8) { r = $6; sub(/^\(/, "", r) }"#), "RESTARTS 칸의 \"(11s\" 를 읽는다")
+        // 옛 kubectl (\"ago\" 를 안 준다 — 여섯 칸) · 옛 꼴의 줄: 만든 뒤 지난 시간으로
+        let old = ContainerItem(kind: .pod, name: "a/b", status: "Running", age: "40d", ready: "1/1", restarts: 3)
+        XCTAssertEqual(old.upFor, "40d")
+        let legacy = ServicesParser.parse(["## CONTAINERS", "SOURCE|k3s|ok", "P|a/b|Running|1/1|3|40d", "P|a/c|Running|1/1|3|40d|5d10h", "## END"], type: .linux)
+        XCTAssertEqual(legacy?.containers.map(\.upFor), ["40d", "5d10h"])
+        XCTAssertEqual(ServicesFormat.podAge(legacy?.containers.last?.upFor), "5일 10시간")
+        XCTAssertEqual(ContainerItem(kind: .pod, name: "a/b", status: "Running", restarts: 0, restartedAgo: "5d").upFor, nil, "재시작 0 이면 재시작 시각을 쓰지 않는다")
+    }
+
     /// 2026-10-05 nexus k3s 화면에 나온 파드 이름들 (사용자 스크린샷)
     func testPodNameSplitAndAges() {
         func split(_ n: String) -> [String] { let p = PodName.split(n); return [p.base, p.hash] }
@@ -183,6 +204,13 @@ final class ServicesReportTests: XCTestCase {
         XCTAssertEqual(split("argocd-application-controller-0"), ["argocd-application-controller-0", ""], "스테이트풀셋 번호는 그대로")
         XCTAssertEqual(split("svclb-traefik-x7k2q"), ["svclb-traefik", "-x7k2q"], "데몬셋")
         XCTAssertEqual(split("nginx-proxy"), ["nginx-proxy", ""], "모음이 든 낱말은 꼬리가 아니다")
+        // k3s 서비스 로드밸런서 "svclb-<서비스>-<서비스 UID 앞 8자리(16진)>-<5글자>" — 16진 글자(0·1·3·a·e)는 꼬리 글자에 없어 UID 가 이름에 남기도 꼬리로 가기도 했다 (2026-11-26 사용자 화면)
+        XCTAssertEqual(split("svclb-web-lb-03a913b0-zhkbz"), ["svclb-web-lb", "-03a913b0-zhkbz"], "16진 UID 도 꼬리")
+        XCTAssertEqual(split("svclb-web-lb-4b5fb499-wl4xf"), ["svclb-web-lb", "-4b5fb499-wl4xf"], "꼬리 글자만으로 된 UID 도 같게")
+        XCTAssertEqual(split("svclb-db-lb-e131881e-q2mlx"), ["svclb-db-lb", "-e131881e-q2mlx"])
+        XCTAssertEqual(split("web-facade-x7k2q"), ["web-facade", "-x7k2q"], "숫자 없는 16진 낱말(facade · deadbeef)은 이름")
+        XCTAssertEqual(split("web-deadbeef-x7k2q"), ["web-deadbeef", "-x7k2q"])
+        XCTAssertEqual(split("api-v2-x7k2q"), ["api-v2", "-x7k2q"], "8자리가 아니면 이름")
         let pod = ContainerItem(kind: .pod, name: "database/mysql-backup-29852280-l8p2h", status: "Completed", ready: "0/1", restarts: 0)
         XCTAssertEqual(pod.displayName.base, "mysql-backup")
         XCTAssertTrue(pod.finished)

@@ -270,7 +270,7 @@ private struct ContainerRow: View {
                     Text(item.statusWorthShowing ? item.status : "").frame(width: Column.status, alignment: .trailing)
                     Text(item.ready ?? "").frame(width: Column.ready, alignment: .trailing)
                     Text((item.restarts ?? 0) > 0 ? "재시작 \(item.restarts!)" : "").frame(width: Column.restarts, alignment: .trailing)
-                    Text(ServicesFormat.podAge(item.age)).frame(width: Column.uptime, alignment: .trailing)
+                    Text(ServicesFormat.podAge(item.upFor)).frame(width: Column.uptime, alignment: .trailing)
                 } else {
                     let status = ServicesFormat.dockerStatus(item.status)
                     if !item.ports.isEmpty {

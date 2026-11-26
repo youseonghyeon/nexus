@@ -6,7 +6,7 @@
 // 출력은 "## 구역" 머리 + 줄 (탭은 cleanOutput 이 공백으로 바꾸므로 "|" 로 가른다 — 글(메시지)은 늘 맨 뒤 칸이라 "|" 가 들어 있어도 된다):
 //   NOW|<서버 시각 UTC>                         경과("3분 전")는 서버 시각으로 잰다 (이 Mac 과 시계가 달라도)
 //   ## STATUS   KUBECTL=failed + ERR|kubectl 이 낸 오류 줄 (못 읽었을 때 — 파드가 없어졌거나 권한이 없거나)
-//               P|단계|이유            PM|메시지
+//               P|단계|이유|만든 시각   PM|메시지
 //               C|컨테이너|재시작|대기 이유|직전 종료 이유|직전 종료 코드|직전 종료 시각|종료 이유|종료 코드       CM|컨테이너|대기 메시지
 //               N|조건|이유            NM|조건|메시지          (False 인 조건만 — PodScheduled 실패 등)
 //   ## EVENTS   E|마지막 시각|처음 시각|종류|이유|횟수|메시지      (kubectl 은 처음 생긴 순서로 준다 — 마지막으로 일어난 순서로 다시 세우고 최근 8개만: parse)
@@ -45,6 +45,8 @@ public struct PodReport: Sendable, Equatable {
         public let message: String
     }
     public var phase = ""
+    /// 파드를 만든 지 (초). 시각을 못 읽었으면 nil
+    public var createdAgo: TimeInterval?
     public var reason = ""
     public var message = ""
     public var containers: [Container] = []
@@ -76,7 +78,7 @@ public enum PodInspect {
     public static func script(namespace: String, pod: String) -> String? {
         guard isValidName(namespace), isValidName(pod) else { return nil }
         let target = "-n '\(namespace)' '\(pod)'"
-        let status = #"{.status.phase}{"|"}{.status.reason}{"\n"}PM|{.status.message}{"\n"}"#
+        let status = #"{.status.phase}{"|"}{.status.reason}{"|"}{.metadata.creationTimestamp}{"\n"}PM|{.status.message}{"\n"}"#
             + #"{range .status.initContainerStatuses[*]}C|{.name}|{.restartCount}|{.state.waiting.reason}|{.lastState.terminated.reason}|{.lastState.terminated.exitCode}|{.lastState.terminated.finishedAt}|{.state.terminated.reason}|{.state.terminated.exitCode}{"\n"}CM|{.name}|{.state.waiting.message}{"\n"}{end}"#
             + #"{range .status.containerStatuses[*]}C|{.name}|{.restartCount}|{.state.waiting.reason}|{.lastState.terminated.reason}|{.lastState.terminated.exitCode}|{.lastState.terminated.finishedAt}|{.state.terminated.reason}|{.state.terminated.exitCode}{"\n"}CM|{.name}|{.state.waiting.message}{"\n"}{end}"#
             + #"{range .status.conditions[?(@.status=="False")]}N|{.type}|{.reason}{"\n"}NM|{.type}|{.message}{"\n"}{end}"#
@@ -135,7 +137,8 @@ public enum PodInspect {
             }
             switch (section, line.split(separator: "|", maxSplits: 1).first.map(String.init) ?? "") {
             case ("STATUS", "P"):
-                let p = columns(3); report.phase = p[1]; report.reason = p[2]
+                let p = columns(4); report.phase = p[1]; report.reason = p[2]
+                report.createdAgo = timestamp(p[3]).flatMap { created in now.map { max(0, $0.timeIntervalSince(created)) } }
             case ("STATUS", "PM"):
                 report.message = columns(2)[1]
             case ("STATUS", "C"):
@@ -202,6 +205,8 @@ public enum PodInspect {
         func when(_ seconds: TimeInterval?) -> String { seconds.map { " · " + ServicesFormat.ago($0) } ?? "" }
         if hasTrouble(report) {
             header("상태")
+            // 목록의 시간은 마지막으로 뜬 뒤부터라, 재시작한 파드는 만든 때를 여기 적는다
+            if let created = report.createdAgo, report.containers.contains(where: { $0.restarts > 0 }) { out.append("만든 지 \(ServicesFormat.duration(created))") }
             if !report.reason.isEmpty { out.append("파드: \(report.reason)" + (report.message.isEmpty ? "" : " — \(report.message)")) }
             for c in report.containers {
                 if let reason = c.waitingReason {
